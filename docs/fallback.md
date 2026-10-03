@@ -1,4 +1,4 @@
-# Fallback policy (unreleased 0.4 development)
+# Fallback policy
 
 `ambiguity_policy="fallback"` / `AmbiguityPolicy::Fallback` opts into
 source-faithful rendering. Existing valid readings and hints retain precedence.
@@ -70,15 +70,5 @@ capacity during traversal. Gap supplementation owns only unclaimed graphemes.
 Pipeline composition owns source coordinates, diagnostics and allocation
 accounting. Python performs no linguistic normalization.
 
-## Contribution reuse
-
-Compatible literal-part and shaped-source ideas, common-name data and selected
-coverage cases are adapted from [Canberk's PR #1](https://github.com/erdemtuna/normalizer-tr/pull/1),
-head `0a5de68286cacc4f95c754f519899d15fc2c5e73`.
-The large abbreviation expansion, whole-call spoken style, silent marks,
-Bidi stripping and context-guessing policy are deliberately not adopted.
-Existing exact numeric, spoken-tail, morphology and source-range primitives
-remain authoritative.
-
-The source is a development change only. Published 0.3.0 does not support this
-new policy; no registry publication is authorized by this change.
+Available since 0.4.0. Fallback support incorporates parts of
+[Canberk's contribution](https://github.com/erdemtuna/normalizer-tr/pull/1).

@@ -60,6 +60,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           architecture: ${{ matrix.architecture }}
+      - name: Isolate the release toolchain from the runner image
+        run: echo "RUSTUP_HOME=$RUNNER_TEMP/normalizer-rustup" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
         with:
           toolchain: "1.99.0"

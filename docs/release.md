@@ -1,35 +1,53 @@
-# Release 0.3.0
+# Release notes
 
-First registry distribution of the single built-in Turkish normalizer.
-The Rust crate and Python distribution are both named `normalizer-tr`;
-the import is `normalizer_tr`.
+## 0.4.0
 
-The release uses Rust 1.99.0, with a separately tested minimum Rust 1.94.
-Python artifacts target ordinary CPython 3.11–3.14: Windows/Linux x64 and
-macOS x64/arm64. Linux's baseline is glibc 2.28; macOS's is 12.0.
-Other interpreters, free-threaded builds and architectures are not promised.
+Opt into source faithful fallback with Python's `ambiguity_policy="fallback"`
+or Rust's `AmbiguityPolicy::Fallback`. Existing valid readings and hints keep
+precedence. Preserve remains the default, and Preserve/Reject behavior is unchanged.
 
-Normalization readings, source offsets, partial/strict behavior and resource
-limits are unchanged. This is a pre-1.0, bounded-coverage library—not a claim
-of universal Turkish pronunciation or end-to-end speech quality.
+Fallback handles ambiguous formats, identifiers and otherwise unhandled symbols.
+It returns `complete=true` with separate `fallbacks` diagnostics and a derived
+`fallback_used` getter/property. Invalid dates or accounts are read as written,
+not repaired or certified. Input/hint errors, cancellation and resource limits
+remain real errors.
 
-## Releasing
+Rust adds fallback enum variants and diagnostic types. Optional Serde results
+now include `fallbacks` and `fallback_used`. Python exposes frozen diagnostic
+records; its `fallback_used` property is not a stored dataclass field.
+Update exhaustive Rust matches and strict serialized schemas as needed.
+See the [fallback contract](fallback.md).
 
-`release.yml` is manually dispatched. Its default is **build/test only**:
-16 interpreter/platform wheels, one tested self-contained source distribution,
-core archive/dry-run checks and an exact-checksum release manifest.
-No PR or ordinary push publishes packages.
+The README is shorter, with API details in dedicated guides.
 
-PyPI publication requires the matching `v0.3.0` tag, `publish=true`, the `pypi`
-environment and its configured Trusted Publisher. Only that publish job has
-OIDC permission. No long-lived PyPI token is stored.
+## 0.3.0
 
-The initial crates.io upload requires owner-configured Cargo authentication;
-the internal Rust/Python companion remains `publish = false`. Publish only
-the reviewed core from the same clean revision, then verify fresh registry
-consumers. Do not paste credentials into chat, command arguments or source.
+First registry release of the shared Rust engine and typed Python binding.
+Both distributions are named `normalizer-tr`, imported as `normalizer_tr`.
 
-If an upload returns an uncertain result, inspect the registry before retrying.
-Do not reuse a version for different artifacts or claim success for a blocked
-registry. All speech integrations/private history/models/audio remain outside
-the public source and artifacts.
+## Compatibility
+
+Rust 1.94 or newer; release builds use 1.99.0. Ordinary CPython 3.11 to 3.14
+wheels target Windows/Linux x64 and macOS x64/arm64. Linux requires glibc 2.28
+or newer; macOS requires 12.0 or newer. Other interpreters and architectures
+are not promised.
+
+## Maintainer release process
+
+`release.yml` is manually dispatched. Its default is build/test only:
+16 wheels, a tested source distribution, the core archive and an exact checksum
+manifest. No PR or ordinary push publishes packages.
+
+PyPI publication requires a matching `v<version>` tag, `publish=true`, the `pypi`
+environment and its configured Trusted Publisher. Only the publish job has
+OIDC permission. No persistent PyPI token is stored.
+
+Publish the core to crates.io using owner configured Cargo authentication,
+from the same clean revision and byte identical reviewed archive. The internal
+Rust/Python companion keeps `publish = false`. Verify fresh registry consumers
+and live checksums afterward.
+
+Never paste credentials into chat, command arguments or source. If an upload
+has an uncertain result, inspect the registry before retrying. Do not reuse a
+version for different artifacts. Models, integrations, private history and audio
+remain outside the public source and packages.

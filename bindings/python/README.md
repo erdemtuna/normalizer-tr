@@ -1,7 +1,6 @@
 # Python binding
 
-Distribution `normalizer-tr`: unreleased development 0.4.0, published 0.3.0;
-import `normalizer_tr`, native submodule
+Distribution `normalizer-tr` 0.4.0; import `normalizer_tr`, native submodule
 `normalizer_tr._native`. This is the Python bridge to the same Rust engine, not a
 second implementation. Release target: ordinary CPython 3.11–3.14 on
 Windows/Linux x64 and macOS x64/arm64. Linux requires glibc 2.28+ and macOS
@@ -58,7 +57,7 @@ start_byte/end_byte/kind/text/rule_id. Issue fields:
 start_byte/end_byte/category/explanation. All offsets are half-open
 **original UTF-8 bytes**, not Python character indices.
 
-The unreleased source accepts `ambiguity_policy="fallback"` as well as
+Version 0.4 accepts `ambiguity_policy="fallback"` as well as
 `"preserve"` (default) and `"reject"`. It keeps resolved readings unchanged,
 renders otherwise unresolved notation and symbols, and returns `complete=True`
 with separate handled-source diagnostics rather than unresolved issues:
@@ -71,8 +70,7 @@ assert r.complete and r.fallback_used and not r.issues
 
 `FallbackDiagnostic` is frozen and has start_byte/end_byte/attempted_class/
 reason/original_category/strategy. Completion is not logical-value validation,
-redaction or a voice-quality promise. The published 0.3.0 does not support
-fallback. See the [full contract](../../docs/fallback.md), including Rust Serde
+redaction or a voice-quality promise. See the [full contract](../../docs/fallback.md), including Rust Serde
 versus Python record naming.
 
 `normalize(text, *, ambiguity_policy="preserve", hints=(), cancellation=None,

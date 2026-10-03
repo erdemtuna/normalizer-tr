@@ -9,12 +9,10 @@ or remote model assets are included.
 
 ## Runtime and optional dependencies
 
-Fallback common-name/letter data and the ordered literal-part/source-surface
-approach selectively adapt Canberk Aslan's contribution in PR #1, head
+Fallback data and source rendering incorporate parts of Canberk Aslan's
+Apache-2.0 contribution in PR #1, head
 `0a5de68286cacc4f95c754f519899d15fc2c5e73`, under this repository's Apache-2.0
 license. Source: https://github.com/erdemtuna/normalizer-tr/pull/1.
-The broad abbreviation dictionary, silent-mark rules and whole-call style are
-not included. The contribution is credited in README and docs/fallback.md.
 
 The separate local Python companion adds PyO3 0.29.3 (MIT OR Apache-2.0), its
 same-version build/FFI/macro packages, heck 0.5.0 (MIT OR Apache-2.0),

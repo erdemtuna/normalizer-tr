@@ -46,7 +46,7 @@ cargo bench --locked --features serde --bench latency -- --output <new-absolute-
 - Three repetitions are retained by the full verifier; results are not replaced
   by a batched average or confidence interval.
 
-Unreleased 0.4 adds a separate `fallback_measurement` using the same frozen
+Version 0.4 adds a separate `fallback_measurement` using the same frozen
 cohorts, 2,000 warmups and 10,000 individually timed calls per cohort.
 The original Preserve/Reject aggregate/order/corpus are unchanged. Fallback
 results are not semantically equivalent to preservation/rejection, so do not

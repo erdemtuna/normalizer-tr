@@ -5,14 +5,10 @@ phonological inventory is in domain/lexicon.rs; patterns are validated/cached
 once in resources.rs. There is no selectable profile, older table or
 older-version mode. Preserve/Reject/Fallback are per-call resolution policies.
 
-The fallback name inventory, ordered literal-part representation and
-source-surface date/time approach selectively adapt Canberk Aslan's Apache-2.0
-contribution in https://github.com/erdemtuna/normalizer-tr/pull/1,
+Fallback data and source rendering incorporate parts of Canberk Aslan's
+Apache-2.0 contribution: https://github.com/erdemtuna/normalizer-tr/pull/1,
 head `0a5de68286cacc4f95c754f519899d15fc2c5e73`.
-The explicit small inventory is in fallback/spelling.rs. No bulk dictionary,
-silent-mark list, whole-call style or contributor engine is imported wholesale.
-Owned adaptations and new bounded emission/code-point behavior share this
-repository's license; THIRD_PARTY_NOTICES.md preserves the attribution.
+The inventory is in fallback/spelling.rs; THIRD_PARTY_NOTICES.md retains attribution.
 
 Owned Rust code, unit/currency/abbreviation/character readings and finite
 source/target/derived-tail metadata are Apache-2.0. No bulk dictionary or
