@@ -2,6 +2,7 @@
 //!
 //! The default preserves unresolved spans and reports them. Use
 //! [`AmbiguityPolicy::Reject`] when partial speech is not acceptable.
+//! [`AmbiguityPolicy::Fallback`] renders unresolved source with separate diagnostics.
 //! Original source ranges are UTF-8 byte coordinates, not character indices.
 //!
 //! ```
@@ -18,6 +19,7 @@
 mod api;
 mod classify;
 mod domain;
+mod fallback;
 mod model;
 mod morphology;
 mod normalizer;
@@ -28,8 +30,9 @@ mod source_map;
 mod verbalize;
 
 pub use api::{
-    AmbiguityPolicy, Hint, HintKind, Issue, IssueCategory, LimitKind, NormalizeError,
-    NormalizeOptions, NormalizeResult, Segment, SegmentKind, SourceRange, WorkControl,
+    AmbiguityPolicy, FallbackClass, FallbackDiagnostic, FallbackReason, FallbackStrategy, Hint,
+    HintKind, Issue, IssueCategory, LimitKind, NormalizeError, NormalizeOptions, NormalizeResult,
+    Segment, SegmentKind, SourceRange, WorkControl,
 };
 pub use normalizer::Normalizer;
 pub use resources::NORMALIZER_ID;

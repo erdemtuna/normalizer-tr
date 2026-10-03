@@ -123,6 +123,25 @@ pub(crate) enum Value {
     Symbol(String),
 }
 
+pub(crate) enum TemporalPreference {
+    Date(Date, bool),
+    Time(Clock, bool),
+}
+
+pub(crate) struct TemporalFailure {
+    pub(crate) category: crate::IssueCategory,
+    pub(crate) preference: Option<TemporalPreference>,
+}
+
+impl From<crate::IssueCategory> for TemporalFailure {
+    fn from(category: crate::IssueCategory) -> Self {
+        Self {
+            category,
+            preference: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

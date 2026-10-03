@@ -18,6 +18,7 @@ __all__ = [
     "Issue",
     "Segment",
     "NormalizeResult",
+    "FallbackDiagnostic",
     "CancellationToken",
     "NORMALIZER_ID",
     "BUILD_VERSION",
@@ -84,6 +85,18 @@ class Segment:
 
 
 @dataclass(frozen=True, slots=True)
+class FallbackDiagnostic:
+    """Handled assumption at original UTF-8 byte coordinates, not a validation."""
+
+    start_byte: int
+    end_byte: int
+    attempted_class: str
+    reason: str
+    original_category: str | None
+    strategy: str
+
+
+@dataclass(frozen=True, slots=True)
 class NormalizeResult:
     normalized_text: str
     locale: str
@@ -91,6 +104,11 @@ class NormalizeResult:
     complete: bool
     segments: tuple[Segment, ...]
     issues: tuple[Issue, ...]
+    fallbacks: tuple[FallbackDiagnostic, ...] = ()
+
+    @property
+    def fallback_used(self) -> bool:
+        return bool(self.fallbacks)
 
 
 class NormalizationError(Exception):
@@ -156,8 +174,8 @@ class Normalizer:
             raise NormalizationError(
                 "invalid_input", "input contains invalid Unicode"
             ) from None
-        if ambiguity_policy not in ("preserve", "reject"):
-            raise ValueError("ambiguity_policy must be preserve or reject")
+        if ambiguity_policy not in ("preserve", "reject", "fallback"):
+            raise ValueError("ambiguity_policy must be preserve, reject or fallback")
         if not isinstance(hints, Sequence):
             raise TypeError("hints must be a sequence of Hint")
         if any(not isinstance(hint, Hint) for hint in hints):
@@ -169,12 +187,14 @@ class Normalizer:
             if deadline_ms == 0:
                 raise ValueError("deadline_ms must be between 1 and 60000")
         try:
-            text, locale, identity, complete, segments, issues = self._inner.normalize(
-                text,
-                ambiguity_policy,
-                [(h.start_byte, h.end_byte, h.kind) for h in hints],
-                cancellation,
-                deadline_ms,
+            text, locale, identity, complete, segments, issues, fallbacks = (
+                self._inner.normalize(
+                    text,
+                    ambiguity_policy,
+                    [(h.start_byte, h.end_byte, h.kind) for h in hints],
+                    cancellation,
+                    deadline_ms,
+                )
             )
         except NativeNormalizationError as exc:
             raise _error(exc) from None
@@ -185,4 +205,5 @@ class Normalizer:
             complete,
             tuple(Segment(*s) for s in segments),
             tuple(Issue(*i) for i in issues),
+            tuple(FallbackDiagnostic(*record) for record in fallbacks),
         )

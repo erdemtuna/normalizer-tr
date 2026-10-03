@@ -5,8 +5,9 @@ use std::{
 };
 
 use normalizer_tr::{
-    AmbiguityPolicy, Hint, HintKind, Issue, IssueCategory, LimitKind, NormalizeError,
-    NormalizeOptions, Normalizer, SegmentKind, SourceRange, WorkControl,
+    AmbiguityPolicy, FallbackClass, FallbackDiagnostic, FallbackReason, FallbackStrategy, Hint,
+    HintKind, Issue, IssueCategory, LimitKind, NormalizeError, NormalizeOptions, Normalizer,
+    SegmentKind, SourceRange, WorkControl,
 };
 use pyo3::{create_exception, exceptions::PyException, prelude::*};
 
@@ -14,6 +15,14 @@ create_exception!(_native, NativeNormalizationError, PyException);
 
 type IssueRecord = (usize, usize, &'static str, &'static str);
 type SegmentRecord = (usize, usize, &'static str, String, &'static str);
+type FallbackRecord = (
+    usize,
+    usize,
+    &'static str,
+    &'static str,
+    Option<&'static str>,
+    &'static str,
+);
 type ResultRecord = (
     String,
     &'static str,
@@ -21,27 +30,73 @@ type ResultRecord = (
     bool,
     Vec<SegmentRecord>,
     Vec<IssueRecord>,
+    Vec<FallbackRecord>,
 );
+
+fn issue_category(category: IssueCategory) -> &'static str {
+    match category {
+        IssueCategory::Ambiguous => "ambiguous",
+        IssueCategory::InvalidExpression => "invalid_expression",
+        IssueCategory::ProtectedIdentifier => "protected_identifier",
+        IssueCategory::Unsupported => "unsupported",
+        IssueCategory::UnknownAbbreviation => "unknown_abbreviation",
+    }
+}
 
 fn issues(records: &[Issue]) -> Vec<IssueRecord> {
     records
         .iter()
         .map(|issue| {
-            let category = match issue.category() {
-                IssueCategory::Ambiguous => "ambiguous",
-                IssueCategory::InvalidExpression => "invalid_expression",
-                IssueCategory::ProtectedIdentifier => "protected_identifier",
-                IssueCategory::Unsupported => "unsupported",
-                IssueCategory::UnknownAbbreviation => "unknown_abbreviation",
-            };
             (
                 issue.range().start(),
                 issue.range().end(),
-                category,
+                issue_category(issue.category()),
                 issue.explanation(),
             )
         })
         .collect()
+}
+
+fn fallback_record(record: &FallbackDiagnostic) -> FallbackRecord {
+    let class = match record.attempted_class() {
+        FallbackClass::Number => "number",
+        FallbackClass::Date => "date",
+        FallbackClass::Time => "time",
+        FallbackClass::Percent => "percent",
+        FallbackClass::Quantity => "quantity",
+        FallbackClass::Abbreviation => "abbreviation",
+        FallbackClass::Identifier => "identifier",
+        FallbackClass::Roman => "roman",
+        FallbackClass::Electronic => "electronic",
+        FallbackClass::Expression => "expression",
+        FallbackClass::Symbol => "symbol",
+    };
+    let reason = match record.reason() {
+        FallbackReason::MissingIntent => "missing_intent",
+        FallbackReason::LeadingZeroes => "leading_zeroes",
+        FallbackReason::InvalidForm => "invalid_form",
+        FallbackReason::ProtectedIdentifier => "protected_identifier",
+        FallbackReason::UnsupportedForm => "unsupported_form",
+        FallbackReason::UnapprovedAbbreviation => "unapproved_abbreviation",
+        FallbackReason::UnhandledSymbol => "unhandled_symbol",
+    };
+    let strategy = match record.strategy() {
+        FallbackStrategy::PreferredNumber => "preferred_number",
+        FallbackStrategy::PreferredDate => "preferred_date",
+        FallbackStrategy::PreferredTime => "preferred_time",
+        FallbackStrategy::SurfaceDate => "surface_date",
+        FallbackStrategy::SurfaceTime => "surface_time",
+        FallbackStrategy::Literal => "literal",
+        FallbackStrategy::UnicodeCodePoint => "unicode_code_point",
+    };
+    (
+        record.range().start(),
+        record.range().end(),
+        class,
+        reason,
+        record.original_category().map(issue_category),
+        strategy,
+    )
 }
 
 fn error(error: NormalizeError) -> PyErr {
@@ -85,6 +140,7 @@ fn segment_kind(kind: SegmentKind) -> &'static str {
         SegmentKind::Roman => "roman",
         SegmentKind::Electronic => "electronic",
         SegmentKind::Symbol => "symbol",
+        SegmentKind::Fallback => "fallback",
     }
 }
 
@@ -175,6 +231,7 @@ impl NativeNormalizer {
         let policy = match policy {
             "preserve" => AmbiguityPolicy::Preserve,
             "reject" => AmbiguityPolicy::Reject,
+            "fallback" => AmbiguityPolicy::Fallback,
             _ => {
                 return Err(pyo3::exceptions::PyValueError::new_err(
                     "invalid ambiguity policy",
@@ -245,6 +302,7 @@ impl NativeNormalizer {
             result.complete(),
             segments,
             issues(result.issues()),
+            result.fallbacks().iter().map(fallback_record).collect(),
         ))
     }
 }

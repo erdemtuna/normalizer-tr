@@ -3,6 +3,18 @@ use crate::morphology::{Harmony, Word, WordEnd};
 use Harmony::{BackFlat, BackRound, FrontFlat, FrontRound};
 use WordEnd::{Possessive, SoftensP, Voiced, Voiceless, Vowel};
 
+pub(crate) const MONTHS: [&str; 12] = [
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim",
+    "Kasım", "Aralık",
+];
+
+pub(crate) fn month_name(month: u8) -> Option<&'static str> {
+    month
+        .checked_sub(1)
+        .and_then(|index| MONTHS.get(usize::from(index)))
+        .copied()
+}
+
 /// Turkish casing is confined to explicit contextual lookup keys, never source rewriting.
 pub(crate) fn lookup_key(text: &str) -> String {
     text.chars()

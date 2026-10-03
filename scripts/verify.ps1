@@ -72,6 +72,7 @@ try {
     Invoke-Step 'python-format' $PythonPath @('-m','ruff','format','--check','bindings\python','benches','scripts')
     Invoke-Step 'typing' $PythonPath @('-m','mypy','bindings\python\python','--check-untyped-defs')
     Invoke-Step 'verification-machinery' $PythonPath @('scripts\test_verification.py')
+    Invoke-Step 'release-machinery' $PythonPath @('scripts\test_release_artifacts.py')
     $audit = Join-Path $root 'target\audit-tool\bin\cargo-audit.exe'
     if (-not (Test-Path -LiteralPath $audit)) {throw 'Missing local cargo-audit tool; provision it in the isolated target tool directory.'}
     Invoke-Step 'rust-advisories' $audit @('audit','--db',(Join-Path $root 'target\advisory-db'),'--no-fetch','--format','json')
@@ -89,6 +90,11 @@ try {
     Invoke-Step 'packaged-tests' 'cargo' @('test','--locked','--all-features','--manifest-path',$prepared.package_manifest)
     Invoke-Step 'build-wheel' $PythonPath @('-m','maturin','build','--release','--locked','--manifest-path','bindings\python\Cargo.toml','--interpreter',$PythonPath,'--out',(Join-Path $OutputDirectory 'packages'))
     Invoke-Step 'inspect-wheel' $PythonPath @('scripts\verification.py','wheel',$OutputDirectory)
+    Invoke-Step 'sdist-locked-metadata' 'cargo' @('metadata','--locked','--format-version','1')
+    Invoke-Step 'build-sdist' $PythonPath @('-m','maturin','sdist','--manifest-path','bindings\python\Cargo.toml','--out',(Join-Path $OutputDirectory 'packages'))
+    $sdist = (Get-ChildItem (Join-Path $OutputDirectory 'packages') -Filter '*.tar.gz').FullName
+    Invoke-Step 'inspect-sdist' $PythonPath @('-c','import sys; from pathlib import Path; sys.path.insert(0, "scripts"); from release_artifacts import inspect_python; print(inspect_python(Path(sys.argv[1])))',$sdist)
+    Invoke-Step 'build-sdist-consumer' $PythonPath @('-m','pip','wheel','--no-index','--no-deps','--no-build-isolation',$sdist,'--wheel-dir',(Join-Path $OutputDirectory 'sdist-wheels'))
     Invoke-Step 'fresh-python-env' $PythonPath @('-m','venv',(Join-Path $OutputDirectory 'py'))
     $consumerPython = Join-Path $OutputDirectory 'py\Scripts\python.exe'
     $wheel = (Get-ChildItem (Join-Path $OutputDirectory 'packages') -Filter '*.whl').FullName

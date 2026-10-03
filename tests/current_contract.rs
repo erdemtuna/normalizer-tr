@@ -56,6 +56,8 @@ fn current_readings_ranges_issues_and_errors_survive_refactoring() {
             };
             if let Some(result) = actual.get_mut("result").and_then(Value::as_object_mut) {
                 result.remove("normalizer_id");
+                assert_eq!(result.remove("fallbacks"), Some(json!([])));
+                assert_eq!(result.remove("fallback_used"), Some(json!(false)));
                 for segment in result.get_mut("segments").unwrap().as_array_mut().unwrap() {
                     segment.as_object_mut().unwrap().remove("rule_id");
                 }

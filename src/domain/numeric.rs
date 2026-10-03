@@ -12,6 +12,25 @@ pub(crate) struct Numeric {
     case: Option<Inflection>,
 }
 
+pub(crate) enum NumericPreference {
+    Number(Numeric),
+    SentenceNumber(Number),
+}
+
+pub(crate) struct NumericFailure {
+    pub(crate) category: IssueCategory,
+    pub(crate) preference: Option<NumericPreference>,
+}
+
+impl From<IssueCategory> for NumericFailure {
+    fn from(category: IssueCategory) -> Self {
+        Self {
+            category,
+            preference: None,
+        }
+    }
+}
+
 fn suffix_parts(text: &str) -> Option<(&str, Vec<&str>)> {
     let mut parts = text.split(['\'', '’']);
     let base = parts.next()?;
@@ -42,9 +61,9 @@ pub(crate) fn digits_hint(text: &str) -> Option<String> {
 }
 
 impl Numeric {
-    pub(crate) fn automatic(text: &str) -> Result<Self, IssueCategory> {
+    pub(crate) fn automatic(text: &str) -> Result<Self, NumericFailure> {
         if text.chars().any(|c| c.is_numeric() && !c.is_ascii_digit()) {
-            return Err(IssueCategory::Unsupported);
+            return Err(IssueCategory::Unsupported.into());
         }
         if let Some(value) = Self::parse(text, false) {
             return Ok(value);
@@ -52,22 +71,41 @@ impl Numeric {
         let (base, suffix) = split_suffix(text).ok_or(IssueCategory::InvalidExpression)?;
         if base.ends_with('.') && suffix.is_none() {
             return Err(
-                if Number::parse(&base[..base.len() - 1])
-                    .is_some_and(|n| n.fraction().is_empty() && !n.grouped())
+                match Number::parse(&base[..base.len() - 1])
+                    .filter(|number| number.fraction().is_empty() && !number.grouped())
                 {
-                    IssueCategory::Ambiguous
-                } else {
-                    IssueCategory::InvalidExpression
+                    Some(number) => NumericFailure {
+                        category: IssueCategory::Ambiguous,
+                        preference: Some(NumericPreference::SentenceNumber(number)),
+                    },
+                    None => IssueCategory::InvalidExpression.into(),
                 },
             );
         }
         let number = Number::parse(base).ok_or(IssueCategory::InvalidExpression)?;
         if number.grouped() {
-            return Err(IssueCategory::Ambiguous);
+            let case = suffix.map_or(Some(None), |suffix| {
+                number
+                    .fraction()
+                    .is_empty()
+                    .then(|| integer_inflection(&numerals::number(&number), suffix))
+                    .flatten()
+                    .map(Some)
+            });
+            return Err(NumericFailure {
+                category: IssueCategory::Ambiguous,
+                preference: case.map(|case| {
+                    NumericPreference::Number(Self {
+                        number,
+                        ordinal: case == Some(Inflection::Ordinal),
+                        case: case.filter(|family| *family != Inflection::Ordinal),
+                    })
+                }),
+            });
         }
         let case = if let Some(suffix) = suffix {
             if !number.fraction().is_empty() {
-                return Err(IssueCategory::Unsupported);
+                return Err(IssueCategory::Unsupported.into());
             }
             Some(
                 integer_inflection(&numerals::number(&number), suffix)

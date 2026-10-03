@@ -1,7 +1,9 @@
 //! Standalone packaged-core consumer. No Python or workspace source path.
 #[cfg(test)]
 mod tests {
-    use normalizer_tr::{Hint, HintKind, NORMALIZER_ID, NormalizeOptions, Normalizer, SourceRange};
+    use normalizer_tr::{
+        AmbiguityPolicy, Hint, HintKind, NORMALIZER_ID, NormalizeOptions, Normalizer, SourceRange,
+    };
     #[test]
     fn actual_readings_and_identity() {
         let n = Normalizer::new().unwrap();
@@ -37,6 +39,27 @@ mod tests {
         assert!(!r.complete());
         assert_eq!(r.normalized_text(), "AB12 yirmi beş Türk lirası");
         assert_eq!(r.issues()[0].range(), SourceRange::new(0, 4));
+    }
+    #[test]
+    fn fallback_is_available_from_packaged_core() {
+        let result = Normalizer::new()
+            .unwrap()
+            .normalize(
+                "AB12; 40.03.2026; 🫠",
+                &NormalizeOptions {
+                    ambiguity_policy: AmbiguityPolicy::Fallback,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            result.normalized_text(),
+            "a be bir iki; kırk Mart iki bin yirmi altı; unikod u artı bir fe a e sıfır"
+        );
+        assert!(result.complete());
+        assert!(result.issues().is_empty());
+        assert_eq!(result.fallbacks().len(), 3);
+        assert!(result.fallback_used());
     }
     #[test]
     fn financial_fixture_full_result() {

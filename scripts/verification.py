@@ -137,6 +137,15 @@ def consume(output):
     normalizer = normalizer_tr.Normalizer()
     if normalizer.normalize("25 TL").normalized_text != "yirmi beş Türk lirası":
         raise RuntimeError("installed-wheel IO differs")
+    fallback = normalizer.normalize("AB12; hello🙂", ambiguity_policy="fallback")
+    if (
+        fallback.normalized_text != "a be bir iki; hello gülümseyen yüz"
+        or not fallback.complete
+        or fallback.issues
+        or not fallback.fallback_used
+        or len(fallback.fallbacks) != 2
+    ):
+        raise RuntimeError("installed-wheel fallback IO differs")
     if hasattr(normalizer_tr, "LEGACY_RULESET_ID"):
         raise RuntimeError("removed public selector is still exported")
     write(
@@ -176,6 +185,7 @@ def finalize(output):
                 "per_class_policy": value["per_class_policy"],
                 "large": value["large"],
                 "limit_diagnostics": value["limit_diagnostics"],
+                "fallback_measurement": value["fallback_measurement"],
             }
         )
     if len(native) != 3:
@@ -188,6 +198,9 @@ def finalize(output):
         (output / "reports" / "python-consumer.json").read_text(encoding="utf-8")
     )
     authoritative = wheel(output)
+    source_distributions = list((output / "packages").glob("normalizer_tr-*.tar.gz"))
+    if len(source_distributions) != 1:
+        raise RuntimeError("expected one authoritative source distribution")
     with zipfile.ZipFile(authoritative) as zipfile_:
         binary = zipfile_.read(
             next(name for name in zipfile_.namelist() if name.endswith(".pyd"))

@@ -7,7 +7,11 @@ fn exact_financial_baseline_and_original_partition() {
     let expected = include_str!("fixtures/financial-output.txt").trim_end_matches(['\r', '\n']);
     assert_eq!(input.len(), 108);
     let normalizer = Normalizer::new().unwrap();
-    for policy in [AmbiguityPolicy::Preserve, AmbiguityPolicy::Reject] {
+    for policy in [
+        AmbiguityPolicy::Preserve,
+        AmbiguityPolicy::Reject,
+        AmbiguityPolicy::Fallback,
+    ] {
         let result = normalizer
             .normalize(
                 input,
@@ -20,6 +24,7 @@ fn exact_financial_baseline_and_original_partition() {
         assert_eq!(result.normalized_text(), expected);
         assert!(result.complete());
         assert!(result.issues().is_empty());
+        assert!(!result.fallback_used());
         let transformed: Vec<_> = result
             .segments()
             .iter()

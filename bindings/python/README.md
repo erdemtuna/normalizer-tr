@@ -1,6 +1,7 @@
 # Python binding
 
-Distribution `normalizer-tr` 0.3.0; import `normalizer_tr`, native submodule
+Distribution `normalizer-tr`: unreleased development 0.4.0, published 0.3.0;
+import `normalizer_tr`, native submodule
 `normalizer_tr._native`. This is the Python bridge to the same Rust engine, not a
 second implementation. Release target: ordinary CPython 3.11–3.14 on
 Windows/Linux x64 and macOS x64/arm64. Linux requires glibc 2.28+ and macOS
@@ -51,10 +52,28 @@ except NormalizationError as error:
 `Normalizer()` is the only constructor; there is no selector argument or older
 behavior mode. `normalizer_id` is diagnostic package/build metadata, not a
 configuration knob. Result properties: normalized_text, locale, normalizer_id,
-complete, immutable tuples of frozen segments/issues. Segment fields:
+complete, immutable tuples of frozen segments/issues/fallbacks, and the derived
+`fallback_used` property. Segment fields:
 start_byte/end_byte/kind/text/rule_id. Issue fields:
 start_byte/end_byte/category/explanation. All offsets are half-open
 **original UTF-8 bytes**, not Python character indices.
+
+The unreleased source accepts `ambiguity_policy="fallback"` as well as
+`"preserve"` (default) and `"reject"`. It keeps resolved readings unchanged,
+renders otherwise unresolved notation and symbols, and returns `complete=True`
+with separate handled-source diagnostics rather than unresolved issues:
+
+```python
+r = n.normalize("00042; hello🙂", ambiguity_policy="fallback")
+assert r.normalized_text == "sıfır sıfır sıfır dört iki; hello gülümseyen yüz"
+assert r.complete and r.fallback_used and not r.issues
+```
+
+`FallbackDiagnostic` is frozen and has start_byte/end_byte/attempted_class/
+reason/original_category/strategy. Completion is not logical-value validation,
+redaction or a voice-quality promise. The published 0.3.0 does not support
+fallback. See the [full contract](../../docs/fallback.md), including Rust Serde
+versus Python record naming.
 
 `normalize(text, *, ambiguity_policy="preserve", hints=(), cancellation=None,
 deadline_ms=None)` takes Python str, typed Hint objects, optional

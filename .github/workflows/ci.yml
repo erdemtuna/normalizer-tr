@@ -83,3 +83,34 @@ jobs:
         with:
           toolchain: "1.94.0"
       - run: cargo +1.94.0 test --locked --all-features
+
+  portable-binding:
+    name: Installed binding (${{ matrix.os }}, CPython ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: "3.11"
+          - os: macos-14
+            python: "3.14"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: "1.99.0"
+      - name: Install build and test tools
+        run: python -m pip install maturin==1.15.0 pytest==9.0.3
+      - name: Build and install reviewed native binding
+        run: |
+          python -m maturin build --release --locked --manifest-path bindings/python/Cargo.toml --interpreter python --out target/ci-wheels
+          python -m pip install --no-deps target/ci-wheels/*.whl
+      - name: Test installed public API
+        run: python -m pytest bindings/python/tests -q

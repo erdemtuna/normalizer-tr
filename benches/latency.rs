@@ -4,13 +4,9 @@ use std::{collections::BTreeMap, hint::black_box, time::Instant};
 use normalizer_tr::{AmbiguityPolicy, Hint, HintKind, NormalizeOptions, Normalizer, SourceRange};
 use serde_json::{Value, json};
 
-fn options(case: &Value, reject: bool) -> NormalizeOptions {
+fn options(case: &Value, policy: AmbiguityPolicy) -> NormalizeOptions {
     let mut options = NormalizeOptions {
-        ambiguity_policy: if reject {
-            AmbiguityPolicy::Reject
-        } else {
-            AmbiguityPolicy::Preserve
-        },
+        ambiguity_policy: policy,
         ..Default::default()
     };
     if let Some(hint) = case.get("hint") {
@@ -53,6 +49,58 @@ fn quantiles(values: &mut [u64]) -> Value {
     json!({"count":values.len(),"p50_ns":at(50),"p95_ns":at(95),"p99_ns":at(99),"max_ns":values[values.len()-1]})
 }
 
+fn fallback_measurements(normalizer: &Normalizer, corpus: &[Value]) -> Value {
+    let mut cohorts = BTreeMap::new();
+    let mut classes = BTreeMap::<String, Vec<u64>>::new();
+    let mut snapshots = BTreeMap::new();
+    for cohort in ["short", "medium"] {
+        let prepared: Vec<_> = corpus
+            .iter()
+            .filter(|case| case["cohort"] == cohort)
+            .map(|case| {
+                let text = case["text"].as_str().unwrap();
+                let options = options(case, AmbiguityPolicy::Fallback);
+                let expected = outcome(normalizer.normalize(text, &options));
+                snapshots.insert(case["id"].as_str().unwrap(), expected.clone());
+                (text, options, expected, case["class"].as_str().unwrap())
+            })
+            .collect();
+        for index in 0..2000 {
+            let (text, options, _, _) = &prepared[index % prepared.len()];
+            drop(black_box(
+                normalizer.normalize(black_box(text), black_box(options)),
+            ));
+        }
+        let mut samples = Vec::with_capacity(10000);
+        for index in 0..10000 {
+            let (text, options, expected, class) = &prepared[index % prepared.len()];
+            if index < prepared.len() {
+                assert_eq!(outcome(normalizer.normalize(text, options)), *expected);
+            }
+            let start = Instant::now();
+            drop(black_box(
+                normalizer.normalize(black_box(text), black_box(options)),
+            ));
+            let elapsed = start.elapsed().as_nanos() as u64;
+            samples.push(elapsed);
+            classes
+                .entry(format!("{cohort}:{class}:fallback"))
+                .or_default()
+                .push(elapsed);
+        }
+        for (text, options, expected, _) in &prepared {
+            assert_eq!(outcome(normalizer.normalize(text, options)), *expected);
+        }
+        cohorts.insert(cohort, quantiles(&mut samples));
+    }
+    let per_class: BTreeMap<_, _> = classes
+        .into_iter()
+        .map(|(class, mut samples)| (class, quantiles(&mut samples)))
+        .collect();
+    json!({"cohorts":cohorts, "per_class_policy":per_class, "snapshots":snapshots,
+        "method":"fallback only; same frozen cohorts; 2000 warmup and 10000 individually timed calls per cohort; no filtering or overhead subtraction"})
+}
+
 fn main() {
     // Cargo supplies --bench even when the target uses its own timing harness.
     let args: Vec<_> = std::env::args().filter(|arg| arg != "--bench").collect();
@@ -91,7 +139,14 @@ fn main() {
                     } else {
                         (257..=1024).contains(&text.len())
                     });
-                    let options = options(case, reject);
+                    let options = options(
+                        case,
+                        if reject {
+                            AmbiguityPolicy::Reject
+                        } else {
+                            AmbiguityPolicy::Preserve
+                        },
+                    );
                     let expected = outcome(normalizer.normalize(text, &options));
                     let key = format!(
                         "{}:{}",
@@ -226,6 +281,7 @@ fn main() {
         "cohorts":cohorts,"per_class_policy":per_class,
         "distribution":distributions,"clock_overhead":quantiles(&mut clock),"large":large,"limit_diagnostics":controls,
         "snapshots":snapshots,
+        "fallback_measurement":fallback_measurements(&normalizer, &corpus),
     });
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()

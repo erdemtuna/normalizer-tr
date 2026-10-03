@@ -236,7 +236,7 @@ pub(crate) fn digits(text: &str) -> String {
     for ch in text.chars() {
         let word = match ch {
             '+' => "artı",
-            '0'..='9' => DIGITS[(ch as u8 - b'0') as usize].text,
+            '0'..='9' => DIGITS[usize::from(ch as u8 - b'0')].text,
             _ => continue,
         };
         if !result.is_empty() {
@@ -245,6 +245,12 @@ pub(crate) fn digits(text: &str) -> String {
         result.push_str(word);
     }
     result
+}
+
+pub(crate) fn digit_name(digit: char) -> Option<&'static str> {
+    digit
+        .is_ascii_digit()
+        .then(|| DIGITS[usize::from(digit as u8 - b'0')].text)
 }
 
 #[cfg(test)]

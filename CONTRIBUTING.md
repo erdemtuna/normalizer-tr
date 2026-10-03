@@ -34,6 +34,9 @@ Core/binding development needs no Torch, model files or credentials.
 `src/domain` owns validated values; `src/numerals.rs`, `src/morphology.rs` and
 `src/verbalize.rs` share exact rendering and spoken-tail metadata.
 `src/source_map.rs` maps NFC recognition to original UTF-8/grapheme coordinates.
+`src/fallback` owns the finite resolver, distinct source-surface types,
+ordered literal parts, explicit spelling inventory and bounded emitter.
+`src/classify/symbols.rs` supplements unclaimed graphemes only in Fallback.
 `src/pipeline.rs` composes the source partition, diagnostics and budgets.
 The Python binding calls this engine; it does not duplicate language rules.
 
@@ -43,6 +46,11 @@ instead of rewriting their fragments. Reuse exact-number/morphology helpers;
 do not introduce unsafe Rust, floating-point money, global lowercasing,
 emitted-text reparsing or result caches. Review deliberate reading changes
 separately from refactors; do not regenerate fixtures just to pass.
+Fallback must not change successful primary readings or Preserve/Reject
+outcomes, silently drop symbols, certify invalid dates/accounts, or mask
+controls/limit errors as preservation. Add its handled reasons to `fallbacks`,
+not unresolved `issues`; assert that completion, provenance and source
+partitions agree. See [the fallback contract](docs/fallback.md).
 
 ## Checks
 

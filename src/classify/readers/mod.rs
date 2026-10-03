@@ -11,13 +11,14 @@ use super::{
     temporal,
 };
 use crate::{
-    HintKind, IssueCategory,
+    FallbackClass, HintKind, IssueCategory,
     domain::{
         electronic::Electronic,
         identifiers::Telephone,
         lexicon,
         numeric::{self as numbers, Numeric, NumericRange},
     },
+    fallback,
     model::Value,
 };
 
@@ -98,26 +99,58 @@ pub(super) fn read(
     index: usize,
     bounds: &Boundaries<'_>,
     contextual_role: bool,
-) -> Option<Attempt> {
+) -> Option<(super::Reading, usize)> {
+    let annotate = |attempt: Attempt, class| {
+        let (reading, end) = attempt;
+        let source = &ctx.text[ctx.tokens[index].range.start..ctx.tokens[end].range.end];
+        let reading = match reading {
+            Ok(value) => super::Reading::Resolved(value),
+            Err(category) => {
+                super::Reading::Unresolved(fallback::Request::unresolved(source, class, category))
+            }
+        };
+        (reading, end)
+    };
     electronic::whole(ctx, index)
-        .or_else(|| lexical::read(ctx, index))
-        .or_else(|| electronic::contextual(ctx, index))
-        .or_else(|| identifiers::read(ctx, index))
-        .or_else(|| numeric::read(ctx, index))
-        .or_else(|| quantities::read(ctx, index))
+        .map(|attempt| annotate(attempt, FallbackClass::Electronic))
+        .or_else(|| {
+            lexical::read(ctx, index).map(|attempt| annotate(attempt, FallbackClass::Abbreviation))
+        })
+        .or_else(|| {
+            electronic::contextual(ctx, index)
+                .map(|attempt| annotate(attempt, FallbackClass::Electronic))
+        })
+        .or_else(|| {
+            identifiers::read(ctx, index)
+                .map(|attempt| annotate(attempt, FallbackClass::Identifier))
+        })
+        .or_else(|| numeric::read(ctx, index).map(|(attempt, class)| annotate(attempt, class)))
+        .or_else(|| {
+            quantities::read(ctx, index).map(|attempt| annotate(attempt, FallbackClass::Quantity))
+        })
         .or_else(|| {
             bounds.phone_at(ctx.tokens[index].range.start).map(|phone| {
-                (
-                    Err(IssueCategory::Unsupported),
-                    bounds.next_at(phone.end) - 1,
+                annotate(
+                    (
+                        Err(IssueCategory::Unsupported),
+                        bounds.next_at(phone.end) - 1,
+                    ),
+                    FallbackClass::Identifier,
                 )
             })
         })
         .or_else(|| {
-            scan::spaced_compound(ctx.text, ctx.tokens, index)
-                .map(|end| (Err(IssueCategory::Unsupported), end))
+            scan::spaced_compound(ctx.text, ctx.tokens, index).map(|end| {
+                annotate(
+                    (Err(IssueCategory::Unsupported), end),
+                    FallbackClass::Expression,
+                )
+            })
         })
-        .or_else(|| unsupported_quantity(ctx, index))
+        .or_else(|| {
+            unsupported_quantity(ctx, index)
+                .map(|attempt| annotate(attempt, FallbackClass::Quantity))
+        })
         .or_else(|| token(ctx, index, contextual_role).map(|reading| (reading, index)))
 }
 
@@ -155,22 +188,42 @@ fn unsupported_quantity(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     None
 }
 
-fn token(
-    ctx: &Context<'_>,
-    index: usize,
-    contextual_role: bool,
-) -> Option<Result<Value, IssueCategory>> {
+fn token(ctx: &Context<'_>, index: usize, contextual_role: bool) -> Option<super::Reading> {
     let token = ctx.tokens[index];
+    let unresolved = |class, category| {
+        super::Reading::Unresolved(fallback::Request::unresolved(token.text, class, category))
+    };
     if scan::identifier(token.text) {
-        return Some(Err(IssueCategory::ProtectedIdentifier));
+        return Some(unresolved(
+            FallbackClass::Identifier,
+            IssueCategory::ProtectedIdentifier,
+        ));
     }
     if token.text.contains([':', '.', '-']) && token.text.chars().any(char::is_numeric) {
         return temporal::recognize(ctx.text, ctx.tokens, index)
-            .or_else(|| Some(Numeric::automatic(token.text).map(Value::Numeric)));
+            .map(|(reading, class)| match reading {
+                Ok(value) => super::Reading::Resolved(value),
+                Err(failure) => super::Reading::Unresolved(fallback::Request::temporal(
+                    token.text, class, failure,
+                )),
+            })
+            .or_else(|| Some(automatic_number(token.text)));
     }
     if token.text.starts_with('%') || token.text.chars().any(char::is_numeric) {
-        return Some(Numeric::automatic(token.text).map(Value::Numeric));
+        return Some(automatic_number(token.text));
     }
     (scan::unknown_abbreviation(token.text) && !contextual_role && !ctx.contextual_cue_word(index))
-        .then_some(Err(IssueCategory::UnknownAbbreviation))
+        .then(|| {
+            unresolved(
+                FallbackClass::Abbreviation,
+                IssueCategory::UnknownAbbreviation,
+            )
+        })
+}
+
+fn automatic_number(source: &str) -> super::Reading {
+    match Numeric::automatic(source) {
+        Ok(value) => super::Reading::Resolved(Value::Numeric(value)),
+        Err(failure) => super::Reading::Unresolved(fallback::Request::numeric(source, failure)),
+    }
 }

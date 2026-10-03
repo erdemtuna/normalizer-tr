@@ -1,6 +1,6 @@
 use crate::{
-    IssueCategory,
-    model::{Clock, Date, Value},
+    FallbackClass, IssueCategory,
+    model::{Clock, Date, TemporalFailure, TemporalPreference, Value},
     morphology::Inflection,
     verbalize::{date_spoken, time_spoken},
 };
@@ -11,33 +11,39 @@ use super::{
 };
 use crate::domain::numeric::split_suffix;
 
-pub(super) fn date(text: &str, permitted: bool) -> Result<Value, IssueCategory> {
+pub(super) fn date(text: &str, permitted: bool) -> Result<Value, TemporalFailure> {
     let (base, suffix) = split_suffix(text).ok_or(IssueCategory::InvalidExpression)?;
     let date = Date::parse(base).ok_or(IssueCategory::InvalidExpression)?;
     if suffix.is_some() && !date.dotted() {
-        return Err(IssueCategory::Unsupported);
+        return Err(IssueCategory::Unsupported.into());
     }
     if let Some(suffix) = suffix
         && date_spoken(date).source_suffix(Inflection::Locative) != suffix
     {
-        return Err(IssueCategory::InvalidExpression);
+        return Err(IssueCategory::InvalidExpression.into());
     }
     if !permitted {
-        return Err(IssueCategory::Ambiguous);
+        return Err(TemporalFailure {
+            category: IssueCategory::Ambiguous,
+            preference: Some(TemporalPreference::Date(date, suffix.is_some())),
+        });
     }
     Ok(Value::Date(date, suffix.is_some()))
 }
 
-pub(super) fn time(text: &str, permitted: bool) -> Result<Value, IssueCategory> {
+pub(super) fn time(text: &str, permitted: bool) -> Result<Value, TemporalFailure> {
     let (base, suffix) = split_suffix(text).ok_or(IssueCategory::InvalidExpression)?;
     let time = Clock::parse(base).ok_or(IssueCategory::InvalidExpression)?;
     if let Some(suffix) = suffix
         && time_spoken(time).source_suffix(Inflection::Locative) != suffix
     {
-        return Err(IssueCategory::InvalidExpression);
+        return Err(IssueCategory::InvalidExpression.into());
     }
     if !permitted {
-        return Err(IssueCategory::Ambiguous);
+        return Err(TemporalFailure {
+            category: IssueCategory::Ambiguous,
+            preference: Some(TemporalPreference::Time(time, suffix.is_some())),
+        });
     }
     Ok(Value::Time(time, suffix.is_some()))
 }
@@ -86,7 +92,7 @@ pub(super) fn recognize(
     text: &str,
     tokens: &[Token<'_>],
     index: usize,
-) -> Option<Result<Value, IssueCategory>> {
+) -> Option<(Result<Value, TemporalFailure>, FallbackClass)> {
     let token = tokens[index].text;
     let (base, _) = split_suffix(token)?;
     let dots = base.bytes().filter(|b| *b == b'.').count();
@@ -98,13 +104,19 @@ pub(super) fn recognize(
         {
             return None;
         }
-        return Some(date(
-            token,
-            frame(text, tokens, index) || cue(text, tokens, index, DATE_CUES),
+        return Some((
+            date(
+                token,
+                frame(text, tokens, index) || cue(text, tokens, index, DATE_CUES),
+            ),
+            FallbackClass::Date,
         ));
     }
     if base.contains(':') || (dots == 1 && cue(text, tokens, index, TIME_CUES)) {
-        return Some(time(token, cue(text, tokens, index, TIME_CUES)));
+        return Some((
+            time(token, cue(text, tokens, index, TIME_CUES)),
+            FallbackClass::Time,
+        ));
     }
     None
 }

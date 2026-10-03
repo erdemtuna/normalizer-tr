@@ -15,7 +15,9 @@ The same Rust engine powers both APIs. It is synchronous, works offline and
 requires no model, network service, Torch or async runtime. Exact decimal and
 money arithmetic uses integers, not floating point.
 
-**Status:** early-development 0.3.0, not a stable 1.0 API or a universal
+**Status:** unreleased development 0.4.0; registries still serve 0.3.0.
+Fallback examples below require this source checkout, not the published wheels.
+This is not a stable 1.0 API or a universal
 pronunciation guarantee. The Rust crate and Python distribution share the name
 `normalizer-tr`; both use `normalizer_tr` in code. The internal Rust/Python
 companion is not a separate crates.io product.
@@ -147,7 +149,43 @@ be grapheme-safe and not overlap. For a prefix in Python, compute its byte lengt
 with `len(prefix.encode("utf-8"))`.
 
 Invalid input/hints, cancellation, deadlines, resource limits and internal
-failures are errors in either policy, not successful preservation.
+failures are errors in every policy, not successful preservation.
+
+### Opt-in fallback (unreleased)
+
+Use fallback when source-faithful completion is preferable to leaving unresolved
+notation raw. Successful existing readings and hints still win:
+
+```python
+from normalizer_tr import Normalizer
+
+result = Normalizer().normalize("1.234; AB12; hello🙂", ambiguity_policy="fallback")
+assert result.normalized_text == "bin iki yüz otuz dört; a be bir iki; hello gülümseyen yüz"
+assert result.complete and not result.issues
+assert result.fallback_used
+print(result.fallbacks)  # Original-byte ranges, source reasons and applied strategies.
+```
+
+```rust
+use normalizer_tr::{AmbiguityPolicy, NormalizeOptions, Normalizer};
+
+let options = NormalizeOptions {
+    ambiguity_policy: AmbiguityPolicy::Fallback,
+    ..Default::default()
+};
+let result = Normalizer::new()?.normalize("00042; IV", &options)?;
+assert_eq!(result.normalized_text(), "sıfır sıfır sıfır dört iki; ı ve");
+assert!(result.complete() && result.fallback_used());
+assert!(result.issues().is_empty());
+# Ok::<(), normalizer_tr::NormalizeError>(())
+```
+
+Fallback prefers documented number/date/time formats, then literal letters,
+digits and symbol names, and finally spoken hexadecimal Unicode code points.
+It does **not** correct `40 Mart`, repair a checksum, guess unknown abbreviations,
+redact identifiers or guarantee a speech model's vocabulary. A result with
+`complete=true` can still contain invalid source facts; inspect `fallbacks`
+to decide whether to accept those readings. See the [fallback contract](docs/fallback.md).
 
 ## Supported expressions
 
@@ -200,7 +238,9 @@ See [PERFORMANCE.md](PERFORMANCE.md) for the measurement protocol and limits.
 ## Acknowledgements
 
 Thanks to [@canberk7](https://github.com/canberk7) for practical TTS feedback
-and suggestions on making the Python package easier to distribute.
+and suggestions on making the Python package easier to distribute, and for the
+literal-part, source-surface and common-name work selectively adapted from
+[PR #1](https://github.com/erdemtuna/normalizer-tr/pull/1).
 
 ## License and boundaries
 

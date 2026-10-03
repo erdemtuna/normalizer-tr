@@ -27,4 +27,5 @@ class NativeNormalizer:
         bool,
         list[tuple[int, int, str, str, str]],
         list[tuple[int, int, str, str]],
+        list[tuple[int, int, str, str, str | None, str]],
     ]: ...

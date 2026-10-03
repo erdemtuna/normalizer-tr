@@ -39,6 +39,8 @@ pub enum AmbiguityPolicy {
     Preserve,
     /// Return an error containing unresolved diagnostics, without partial output.
     Reject,
+    /// Render unresolved source faithfully and report handled fallback diagnostics.
+    Fallback,
 }
 
 /// Explicit interpretation of a whole original-source span.
@@ -87,10 +89,10 @@ impl Hint {
     }
 }
 
-/// Per-call options. No implicit guessing policy is provided.
+/// Per-call options. Source-faithful fallback is opt-in.
 #[derive(Clone, Debug, Default)]
 pub struct NormalizeOptions {
-    /// Preserve unresolved spans by default, or reject them explicitly.
+    /// Preserve by default; explicitly reject or apply source-faithful fallback.
     pub ambiguity_policy: AmbiguityPolicy,
     /// Non-overlapping, whole-expression hints in original-source coordinates.
     pub hints: Vec<Hint>,
@@ -136,6 +138,110 @@ pub enum SegmentKind {
     Electronic,
     /// Approved prose hashtag or ampersand.
     Symbol,
+    /// Source-faithful fallback, not certification of the source value.
+    Fallback,
+}
+
+/// Source family attempted before fallback rendering.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum FallbackClass {
+    /// Exact numeric notation.
+    Number,
+    /// Written date components, which may not form a valid calendar date.
+    Date,
+    /// Written clock components.
+    Time,
+    /// Percentage notation.
+    Percent,
+    /// Currency, measurement or rate notation.
+    Quantity,
+    /// Unapproved abbreviation.
+    Abbreviation,
+    /// Identifier-like source, including phone/account forms.
+    Identifier,
+    /// Roman-looking letters without established numeral intent.
+    Roman,
+    /// Address-like source.
+    Electronic,
+    /// Other structured notation, including ambiguous operators.
+    Expression,
+    /// Otherwise-unhandled symbolic graphemes.
+    Symbol,
+}
+
+/// Why a primary reading was unavailable; contains no copied source values.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum FallbackReason {
+    /// Insufficient source reading intent or context.
+    MissingIntent,
+    /// Significant leading zeroes require a faithful digit reading.
+    LeadingZeroes,
+    /// A supported family rejected source grammar or logical value.
+    InvalidForm,
+    /// An identifier has no approved normal reading.
+    ProtectedIdentifier,
+    /// A source form is outside the normal grammar.
+    UnsupportedForm,
+    /// No approved abbreviation expansion exists.
+    UnapprovedAbbreviation,
+    /// A grapheme otherwise would remain unhandled.
+    UnhandledSymbol,
+}
+
+/// Applied source-faithful rendering strategy.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum FallbackStrategy {
+    /// A validated number or neutral sentence-final numeric period.
+    PreferredNumber,
+    /// A validated date, adopting its written date format without an explicit cue.
+    PreferredDate,
+    /// A validated clock, adopting its written clock format without an explicit cue.
+    PreferredTime,
+    /// Date-shaped source components without calendar certification.
+    SurfaceDate,
+    /// Clock-shaped source components without clock certification.
+    SurfaceTime,
+    /// Ordered literal words, letters, digits and symbol names.
+    Literal,
+    /// One or more unnamed scalars spoken as conventional hexadecimal U+ codes.
+    UnicodeCodePoint,
+}
+
+/// Immutable provenance for one handled original-source fallback span.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct FallbackDiagnostic {
+    pub(crate) range: SourceRange,
+    pub(crate) attempted_class: FallbackClass,
+    pub(crate) reason: FallbackReason,
+    pub(crate) original_category: Option<IssueCategory>,
+    pub(crate) strategy: FallbackStrategy,
+}
+
+impl FallbackDiagnostic {
+    /// Original-source half-open UTF-8 range.
+    pub const fn range(&self) -> SourceRange {
+        self.range
+    }
+    /// Source family, not a claim that its value was valid.
+    pub const fn attempted_class(&self) -> FallbackClass {
+        self.attempted_class
+    }
+    /// Primary-reading reason or uncovered-symbol reason.
+    pub const fn reason(&self) -> FallbackReason {
+        self.reason
+    }
+    /// Original primary issue category, absent for newly covered symbols.
+    pub const fn original_category(&self) -> Option<IssueCategory> {
+        self.original_category
+    }
+    /// Strategy which completed the reading.
+    pub const fn strategy(&self) -> FallbackStrategy {
+        self.strategy
+    }
 }
 
 /// Machine-readable reason for preserved linguistic work.
@@ -209,7 +315,6 @@ impl Segment {
 
 /// Owned immutable result. Completeness concerns TN work, not voice quality.
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NormalizeResult {
     pub(crate) normalized_text: String,
     pub(crate) locale: &'static str,
@@ -217,6 +322,7 @@ pub struct NormalizeResult {
     pub(crate) complete: bool,
     pub(crate) segments: Vec<Segment>,
     pub(crate) issues: Vec<Issue>,
+    pub(crate) fallbacks: Vec<FallbackDiagnostic>,
 }
 
 impl NormalizeResult {
@@ -243,6 +349,34 @@ impl NormalizeResult {
     /// Ordered unresolved diagnostics.
     pub fn issues(&self) -> &[Issue] {
         &self.issues
+    }
+    /// Handled source-reading assumptions, separate from unresolved issues.
+    pub fn fallbacks(&self) -> &[FallbackDiagnostic] {
+        &self.fallbacks
+    }
+    /// Whether a fallback reading was used; derived from the diagnostic collection.
+    pub fn fallback_used(&self) -> bool {
+        !self.fallbacks.is_empty()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for NormalizeResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut result = serializer.serialize_struct("NormalizeResult", 8)?;
+        result.serialize_field("normalized_text", &self.normalized_text)?;
+        result.serialize_field("locale", &self.locale)?;
+        result.serialize_field("normalizer_id", &self.normalizer_id)?;
+        result.serialize_field("complete", &self.complete)?;
+        result.serialize_field("segments", &self.segments)?;
+        result.serialize_field("issues", &self.issues)?;
+        result.serialize_field("fallbacks", &self.fallbacks)?;
+        result.serialize_field("fallback_used", &self.fallback_used())?;
+        result.end()
     }
 }
 

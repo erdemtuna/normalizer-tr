@@ -2,24 +2,31 @@ mod boundaries;
 mod context;
 mod readers;
 mod scan;
+mod symbols;
 mod temporal;
 
 use crate::{
-    Hint, LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl, model::Value,
-    resources::Resources, source_map::SourceMap,
+    Hint, LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl, fallback,
+    model::Value, resources::Resources, source_map::SourceMap,
 };
 use boundaries::{Boundaries, Claim, overlaps_hint};
 use readers::Context;
+pub(crate) use symbols::supplement;
 
 pub(crate) struct Candidate {
     pub(crate) range: SourceRange,
-    pub(crate) reading: Result<Value, crate::IssueCategory>,
+    pub(crate) reading: Reading,
+}
+
+pub(crate) enum Reading {
+    Resolved(Value),
+    Unresolved(fallback::Request),
 }
 
 fn push(
     candidates: &mut Vec<Candidate>,
     claim: Claim,
-    reading: Result<Value, crate::IssueCategory>,
+    reading: Reading,
 ) -> Result<(), NormalizeError> {
     if candidates.len() == MAX_CANDIDATES {
         return Err(NormalizeError::LimitExceeded(LimitKind::Candidates));
@@ -65,7 +72,7 @@ pub(crate) fn collect(
                 role_until = ctx.roman_anchor_end(index).unwrap_or(role_until);
             }
             index = claim.next;
-            push(&mut candidates, claim, Ok(value))?;
+            push(&mut candidates, claim, Reading::Resolved(value))?;
             hint_index += 1;
             continue;
         }
@@ -80,7 +87,7 @@ pub(crate) fn collect(
             if overlaps_hint(hints, claim.range) {
                 return Err(NormalizeError::InvalidHint);
             }
-            if matches!(&reading, Ok(Value::Roman(_))) {
+            if matches!(&reading, Reading::Resolved(Value::Roman(_))) {
                 role_until = ctx.roman_anchor_end(index).unwrap_or(role_until);
             }
             index = claim.next;
@@ -109,7 +116,11 @@ mod tests {
                         range: SourceRange::new(0, 1),
                         next: 1
                     },
-                    Err(crate::IssueCategory::Ambiguous)
+                    Reading::Unresolved(fallback::Request::unresolved(
+                        "1.234",
+                        crate::FallbackClass::Number,
+                        crate::IssueCategory::Ambiguous
+                    ))
                 )
                 .is_ok()
             );
@@ -121,7 +132,11 @@ mod tests {
                     range: SourceRange::new(0, 1),
                     next: 1
                 },
-                Err(crate::IssueCategory::Ambiguous)
+                Reading::Unresolved(fallback::Request::unresolved(
+                    "1.234",
+                    crate::FallbackClass::Number,
+                    crate::IssueCategory::Ambiguous
+                ))
             ),
             Err(NormalizeError::LimitExceeded(LimitKind::Candidates))
         ));

@@ -1,9 +1,11 @@
 use std::mem::size_of;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    AmbiguityPolicy, Issue, IssueCategory, LimitKind, MAX_HINTS, MAX_INPUT_BYTES, MAX_RESULT_BYTES,
-    NormalizeError, NormalizeOptions, NormalizeResult, Segment, SegmentKind, SourceRange,
-    WorkControl, classify, resources::Resources, source_map::SourceMap, verbalize,
+    AmbiguityPolicy, FallbackDiagnostic, Issue, IssueCategory, LimitKind, MAX_HINTS,
+    MAX_INPUT_BYTES, MAX_RESULT_BYTES, NormalizeError, NormalizeOptions, NormalizeResult, Segment,
+    SegmentKind, SourceRange, WorkControl, classify, resources::Resources, source_map::SourceMap,
+    verbalize,
 };
 
 #[derive(Default)]
@@ -22,10 +24,22 @@ impl ResultBudget {
     }
     fn segment(&mut self, text_bytes: usize) -> Result<(), NormalizeError> {
         // Text is owned once per segment and once again by normalized_text.
-        self.charge(size_of::<Segment>() + text_bytes * 2)
+        self.charge(
+            text_bytes
+                .checked_mul(2)
+                .and_then(|bytes| bytes.checked_add(size_of::<Segment>()))
+                .ok_or(NormalizeError::LimitExceeded(LimitKind::Result))?,
+        )
     }
     fn issue(&mut self) -> Result<(), NormalizeError> {
         self.charge(size_of::<Issue>())
+    }
+    fn text_allowance(&self) -> Result<usize, NormalizeError> {
+        MAX_RESULT_BYTES
+            .checked_sub(self.used)
+            .and_then(|bytes| bytes.checked_sub(size_of::<Segment>()))
+            .map(|bytes| bytes / 2)
+            .ok_or(NormalizeError::LimitExceeded(LimitKind::Result))
     }
 }
 
@@ -58,6 +72,47 @@ fn verbatim(
     Ok(())
 }
 
+fn fallback_reading(
+    request: &crate::fallback::Request,
+    input: &str,
+    range: SourceRange,
+    recognition: &str,
+    budget: &mut ResultBudget,
+    control: &WorkControl,
+) -> Result<(String, FallbackDiagnostic), NormalizeError> {
+    budget.charge(size_of::<FallbackDiagnostic>())?;
+    let leading_space = input[..range.start]
+        .graphemes(true)
+        .next_back()
+        .is_some_and(|grapheme| grapheme.chars().any(char::is_alphanumeric));
+    let trailing_space = input[range.end..]
+        .graphemes(true)
+        .next()
+        .is_some_and(|grapheme| grapheme.chars().any(char::is_alphanumeric));
+    let padding = usize::from(leading_space) + usize::from(trailing_space);
+    let maximum = budget
+        .text_allowance()?
+        .checked_sub(padding)
+        .ok_or(NormalizeError::LimitExceeded(LimitKind::Result))?;
+    let (mut text, strategy) = request.render(recognition, maximum, control)?;
+    if leading_space {
+        text.insert(0, ' ');
+    }
+    if trailing_space {
+        text.push(' ');
+    }
+    Ok((
+        text,
+        FallbackDiagnostic {
+            range,
+            attempted_class: request.class(),
+            reason: request.reason(),
+            original_category: request.category(),
+            strategy,
+        },
+    ))
+}
+
 pub(crate) fn run(
     input: &str,
     options: &NormalizeOptions,
@@ -81,11 +136,15 @@ pub(crate) fn run(
     }
     let source = SourceMap::new(input, control)?;
     let hints = source.hints(&options.hints)?;
-    let candidates = classify::collect(&source, &hints, rules, control)?;
+    let mut candidates = classify::collect(&source, &hints, rules, control)?;
+    if options.ambiguity_policy == AmbiguityPolicy::Fallback {
+        classify::supplement(&source, &mut candidates, control)?;
+    }
     let mut budget = ResultBudget::default();
     budget.charge(size_of::<NormalizeResult>())?;
     let mut segments = Vec::new();
     let mut issues = Vec::new();
+    let mut fallbacks = Vec::new();
     let mut cursor = 0;
     for candidate in candidates {
         control.check()?;
@@ -97,8 +156,23 @@ pub(crate) fn run(
         }
         verbatim(input, cursor, range.start, &mut segments, &mut budget)?;
         let (kind, rule_id, text) = match candidate.reading {
-            Ok(value) => verbalize::render(&value),
-            Err(category) => {
+            classify::Reading::Resolved(value) => verbalize::render(&value),
+            classify::Reading::Unresolved(request)
+                if options.ambiguity_policy == AmbiguityPolicy::Fallback =>
+            {
+                let (text, diagnostic) = fallback_reading(
+                    &request,
+                    input,
+                    range,
+                    &source.text()[candidate.range.start..candidate.range.end],
+                    &mut budget,
+                    control,
+                )?;
+                fallbacks.push(diagnostic);
+                (SegmentKind::Fallback, "source.fallback", text)
+            }
+            classify::Reading::Unresolved(request) => {
+                let category = request.category().ok_or(NormalizeError::Internal)?;
                 budget.issue()?;
                 issues.push(Issue {
                     range,
@@ -139,6 +213,7 @@ pub(crate) fn run(
         complete: issues.is_empty(),
         segments,
         issues,
+        fallbacks,
     })
 }
 

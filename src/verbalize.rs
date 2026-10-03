@@ -1,14 +1,10 @@
 use crate::{
     SegmentKind,
+    domain::lexicon::MONTHS,
     model::{Clock, Date, Value},
     morphology::{Inflection, Spoken},
     numerals,
 };
-
-const MONTHS: [&str; 12] = [
-    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim",
-    "Kasım", "Aralık",
-];
 
 pub(crate) fn date_spoken(date: Date) -> Spoken {
     let mut year = numerals::cardinal(u64::from(date.year()));

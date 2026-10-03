@@ -38,7 +38,7 @@ def invoke(n, text, options):
         return (error.code, error.issues, error.limit_kind)
 
 
-def measure(corpus):
+def measure(corpus, policies=("preserve", "reject")):
     begin = time.perf_counter_ns()
     n = Normalizer()
     first = time.perf_counter_ns() - begin
@@ -56,7 +56,7 @@ def measure(corpus):
         for case in corpus:
             if case["cohort"] != cohort:
                 continue
-            for policy in ("preserve", "reject"):
+            for policy in policies:
                 options = {"ambiguity_policy": policy}
                 if "hint" in case:
                     h = case["hint"]
@@ -131,6 +131,8 @@ def main():
         "method": "10000 public calls/cohort after2000warmup; argument validation native Rust marshal/disposal included; deterministic preserve/reject; no outlier removal/overhead subtraction",
         "clock_overhead": quantiles(clock),
         "measurement": measure(corpus),
+        "fallback_measurement": measure(corpus, ("fallback",)),
+        "fallback_method": "separate fallback-only cohorts, same corpus; 10000 calls/cohort after 2000 warmup; no filtering or overhead subtraction; not equivalent to preserve/reject",
         "allocation_instrumentation": "unavailable for Rust native allocations; no inferred counts or peak-memory claim",
     }
     with args.output.open("x", encoding="utf-8") as stream:
