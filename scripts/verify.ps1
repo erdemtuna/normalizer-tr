@@ -9,7 +9,7 @@ $PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path $PSScriptRoot -Parent
 $oldLocation = Get-Location
 $saved = @{}
-foreach ($name in @('RUSTUP_HOME', 'PYO3_PYTHON', 'PYTHONIOENCODING', 'RUSTDOCFLAGS')) {
+foreach ($name in @('RUSTUP_HOME', 'PYO3_PYTHON', 'PYTHONIOENCODING', 'RUSTDOCFLAGS', 'PATH')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 $stages = [System.Collections.Generic.List[object]]::new()
@@ -45,6 +45,8 @@ try {
     $PythonPath = (Resolve-Path -LiteralPath $PythonPath).Path
     if ($RustupHome) {$env:RUSTUP_HOME = (Resolve-Path -LiteralPath $RustupHome).Path}
     $env:PYO3_PYTHON = $PythonPath
+    # PEP 517 invokes the installed maturin executable from this tool environment.
+    $env:PATH = (Split-Path $PythonPath -Parent) + [IO.Path]::PathSeparator + $env:PATH
     $env:PYTHONIOENCODING = 'utf-8'
     $env:RUSTDOCFLAGS = '-D warnings'
     New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
