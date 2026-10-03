@@ -86,6 +86,8 @@ jobs:
 
   portable-binding:
     name: Installed binding (${{ matrix.os }}, CPython ${{ matrix.python }})
+    env:
+      RUSTUP_HOME: ${{ runner.temp }}/normalizer-tr-rustup
     strategy:
       fail-fast: false
       matrix:
