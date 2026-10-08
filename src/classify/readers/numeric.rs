@@ -2,11 +2,8 @@ use super::super::scan::whitespace_between;
 use super::{Attempt, Context};
 use crate::{
     FallbackClass, IssueCategory,
-    domain::{
-        lexicon,
-        numeric::{self, Numeric},
-    },
-    model::Value,
+    domain::{lexicon, numeric::Numeric, quantities},
+    interpretation::Value,
 };
 pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<(Attempt, FallbackClass)> {
     let text = ctx.text;
@@ -21,13 +18,14 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<(Attempt, Fallback
     {
         return Some((
             (
-                numeric::percent_body(next.text).map(|(number, case)| Value::Percent(number, case)),
+                quantities::percent_body(next.text)
+                    .map(|(number, case)| Value::Percent(number, case)),
                 index + 1,
             ),
             FallbackClass::Percent,
         ));
     }
-    if let Some(percent) = numeric::percent(source) {
+    if let Some(percent) = quantities::percent(source) {
         return Some((
             (
                 percent.map(|(number, case)| Value::Percent(number, case)),

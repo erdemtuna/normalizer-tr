@@ -1,4 +1,9 @@
 use crate::morphology::{Harmony, Word, WordEnd};
+use crate::{
+    IssueCategory,
+    morphology::{Inflection, case_inflection},
+    notation::suffix_parts,
+};
 
 use Harmony::{BackFlat, BackRound, FrontFlat, FrontRound};
 use WordEnd::{Possessive, SoftensP, Voiced, Voiceless, Vowel};
@@ -222,4 +227,26 @@ impl Currency {
             Self::Gbp => Lexeme::same("peni", FrontFlat, Vowel),
         }
     }
+}
+
+pub(crate) fn lexical_reading(
+    text: &str,
+) -> Option<Result<(Lexeme, Option<Inflection>), IssueCategory>> {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    let entry = abbreviation(base)
+        .or_else(|| Currency::parse(base).map(|currency| currency.lexeme(base)))?;
+    let Some((_, suffixes)) = suffix_parts(text) else {
+        return Some(Err(IssueCategory::Unsupported));
+    };
+    if suffixes.len() > 1 {
+        return Some(Err(IssueCategory::Unsupported));
+    }
+    let case = match suffixes.first() {
+        Some(suffix) => match case_inflection(entry.source, suffix) {
+            Some(case) => Some(case),
+            None => return Some(Err(IssueCategory::InvalidExpression)),
+        },
+        None => None,
+    };
+    Some(Ok((entry, case)))
 }

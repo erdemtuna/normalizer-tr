@@ -1,5 +1,5 @@
 use super::scan::{Token, overlaps};
-use crate::{Hint, HintKind, NormalizeError, SourceRange, domain::numeric};
+use crate::{Hint, HintKind, NormalizeError, SourceRange, notation};
 
 /// The one source of cursor advancement, source claims and whole-hint ownership.
 pub(super) struct Boundaries<'a> {
@@ -81,10 +81,10 @@ pub(super) fn quantity_tail(text: &str) -> bool {
         return true;
     }
     let base = text.split(['\'', '’']).next().unwrap_or(text);
-    numeric::label(base)
-        || numeric::unsupported_label(base)
-        || numeric::unsupported_label(&base.to_ascii_uppercase())
-        || numeric::currency_marker(base)
+    notation::label(base)
+        || notation::unsupported_label(base)
+        || notation::unsupported_label(&base.to_ascii_uppercase())
+        || notation::currency_marker(base)
         || crate::domain::lexicon::unit_marker(base)
         || base == "%"
 }

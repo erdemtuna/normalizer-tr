@@ -1,13 +1,4 @@
-use crate::{
-    domain::{
-        electronic::Electronic,
-        identifiers::{Iban, Telephone},
-        numeric::{Numeric, NumericRange, Quantity},
-    },
-    morphology::Inflection,
-    numerals::Number,
-};
-
+//! Validated Gregorian dates and digital clocks.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum DateFormat {
     Dotted,
@@ -126,42 +117,6 @@ impl Clock {
     }
     pub(crate) fn minute(self) -> u8 {
         self.minute
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum Value {
-    Numeric(Numeric),
-    Digits(String),
-    Percent(Number, Option<Inflection>),
-    Date(Date, bool),
-    Time(Clock, bool),
-    Quantity(Quantity),
-    Lexical(crate::domain::lexicon::Lexeme, Option<Inflection>),
-    Range(NumericRange),
-    Telephone(Telephone),
-    Iban(Iban),
-    Roman(Numeric),
-    Electronic(Electronic),
-    Symbol(String),
-}
-
-pub(crate) enum TemporalPreference {
-    Date(Date, bool),
-    Time(Clock, bool),
-}
-
-pub(crate) struct TemporalFailure {
-    pub(crate) category: crate::IssueCategory,
-    pub(crate) preference: Option<TemporalPreference>,
-}
-
-impl From<crate::IssueCategory> for TemporalFailure {
-    fn from(category: crate::IssueCategory) -> Self {
-        Self {
-            category,
-            preference: None,
-        }
     }
 }
 

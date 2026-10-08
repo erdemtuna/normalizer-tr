@@ -30,14 +30,23 @@ Core/binding development needs no Torch, model files or credentials.
 
 ## Code layout
 
-`src/classify` owns scanning, fixed reader priority and whole-span claims;
-`src/domain` owns validated values; `src/numerals.rs`, `src/morphology.rs` and
-`src/verbalize.rs` share exact rendering and spoken-tail metadata.
+`src/api` groups the public contract behind unchanged crate-root re-exports.
+`src/classify` owns fixed reader priority and whole-span claims; its `scan`
+modules separate tokenization/indexing, punctuation and source signals.
+`src/domain` owns validated numeric, quantity, temporal, electronic and
+identifier values. `src/notation` owns shared written-form helpers, explicit
+character names and noncertifying source surfaces.
+`src/interpretation.rs` holds neutral findings and prevalidated alternatives;
+classification/domain code does not depend on the resolver.
+`src/numerals.rs`, `src/morphology.rs` and `src/verbalize.rs` share exact
+rendering and spoken-tail metadata.
 `src/source_map.rs` maps NFC recognition to original UTF-8/grapheme coordinates.
-`src/fallback` owns the finite resolver, distinct source-surface types,
-ordered literal parts, explicit spelling inventory and bounded emitter.
+`src/resolution` selects handling with static dispatch; its `fallback` engine
+owns alternative rendering, ordered literal parts and bounded emission.
 `src/classify/symbols.rs` supplements unclaimed graphemes only in Fallback.
-`src/pipeline.rs` composes the source partition, diagnostics and budgets.
+`src/pipeline.rs` composes the source partition, diagnostics and budgets, and
+finalizes Reject only after collecting all unresolved issues and checking
+engineering failures.
 The Python binding calls this engine; it does not duplicate language rules.
 The scanner indexes numeric-run ends once for bounded money lookahead and
 distinguishes paired quotation boundaries from suffix apostrophes. Keep surface

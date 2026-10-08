@@ -31,6 +31,11 @@ New shared Rust/Python goldens cover every policy. Performance reporting adds
 separate reviewed new-coverage and scaling measurements while retaining the
 original frozen corpora and their measurement rules.
 
+Internal modules are organized by public contract, notation, validated domain,
+classification, neutral interpretation and static resolution. The fallback
+renderer is no longer a dependency of recognition. This structural refactor
+does not add a reading change, public import, policy or serialization change.
+
 ## 0.4.0
 
 Opt into source faithful fallback with Python's `ambiguity_policy="fallback"`

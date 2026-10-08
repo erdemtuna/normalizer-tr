@@ -6,8 +6,8 @@ mod symbols;
 mod temporal;
 
 use crate::{
-    Hint, LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl, fallback,
-    model::Value, resources::Resources, source_map::SourceMap,
+    Hint, LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl,
+    resources::Resources, source_map::SourceMap,
 };
 use boundaries::{Boundaries, Claim, overlaps_hint};
 use readers::Context;
@@ -18,10 +18,7 @@ pub(crate) struct Candidate {
     pub(crate) reading: Reading,
 }
 
-pub(crate) enum Reading {
-    Resolved(Value),
-    Unresolved(fallback::Request),
-}
+pub(crate) use crate::interpretation::Reading;
 
 fn push(
     candidates: &mut Vec<Candidate>,
@@ -98,6 +95,7 @@ pub(crate) fn collect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::interpretation::UnresolvedFinding;
     #[test]
     fn candidate_limit_accepts_exact_boundary() {
         let mut candidates = Vec::new();
@@ -109,7 +107,7 @@ mod tests {
                         range: SourceRange::new(0, 1),
                         next: 1
                     },
-                    Reading::Unresolved(fallback::Request::unresolved(
+                    Reading::Unresolved(UnresolvedFinding::unresolved(
                         "1.234",
                         crate::FallbackClass::Number,
                         crate::IssueCategory::Ambiguous
@@ -125,7 +123,7 @@ mod tests {
                     range: SourceRange::new(0, 1),
                     next: 1
                 },
-                Reading::Unresolved(fallback::Request::unresolved(
+                Reading::Unresolved(UnresolvedFinding::unresolved(
                     "1.234",
                     crate::FallbackClass::Number,
                     crate::IssueCategory::Ambiguous

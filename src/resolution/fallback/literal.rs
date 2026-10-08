@@ -1,20 +1,14 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-use super::{
-    output::Output,
-    spelling::{letter_name, symbol_name},
-};
+use super::output::Output;
+use crate::notation::{letter_name, symbol_name};
 use crate::{
     NormalizeError,
     domain::lexicon::{self, Currency, Lexeme},
     numerals,
 };
 
-#[derive(Clone, Copy)]
-pub(super) enum LetterReading {
-    Spell,
-    PreserveWords,
-}
+use crate::interpretation::LiteralReading;
 
 enum Part<'a> {
     Number(numerals::Number),
@@ -77,8 +71,8 @@ fn code_point(scalar: char, output: &mut Output<'_>) -> Result<(), NormalizeErro
     Ok(())
 }
 
-fn word_part(source: &str, reading: LetterReading) -> Part<'_> {
-    if matches!(reading, LetterReading::Spell) {
+fn word_part(source: &str, reading: LiteralReading) -> Part<'_> {
+    if matches!(reading, LiteralReading::Spell) {
         return Part::Letters(source);
     }
     let label = lexicon::abbreviation(source)
@@ -93,7 +87,7 @@ fn word_part(source: &str, reading: LetterReading) -> Part<'_> {
 /// Ordered borrowed runs. Numeric interpretation never crosses a delimiter.
 pub(super) fn render(
     source: &str,
-    letters: LetterReading,
+    letters: LiteralReading,
     quantities: bool,
     output: &mut Output<'_>,
 ) -> Result<bool, NormalizeError> {
@@ -124,7 +118,7 @@ pub(super) fn render(
             let notation_length = remainder
                 .find(|scalar: char| !scalar.is_ascii_digit() && !matches!(scalar, '.' | ','))
                 .unwrap_or(remainder.len());
-            if matches!(letters, LetterReading::PreserveWords)
+            if matches!(letters, LiteralReading::PreserveWords)
                 && let Some(number) = numerals::Number::parse(&remainder[..notation_length])
             {
                 used_code_point |= emit(Part::Number(number), output)?;
@@ -137,8 +131,8 @@ pub(super) fn render(
                 .unwrap_or(remainder.len());
             let digits = &remainder[..length];
             let part = match letters {
-                LetterReading::Spell => Part::Digits(digits),
-                LetterReading::PreserveWords => {
+                LiteralReading::Spell => Part::Digits(digits),
+                LiteralReading::PreserveWords => {
                     numerals::Number::parse(digits).map_or(Part::Digits(digits), Part::Number)
                 }
             };

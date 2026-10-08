@@ -3,14 +3,15 @@ use super::super::{
     scan::{Token, group_whitespace, number_fragment, whitespace_between},
 };
 use super::{Attempt, Context};
-use crate::domain::numeric::split_suffix;
+use crate::notation::split_suffix;
 use crate::{
     IssueCategory,
     domain::{
         lexicon::{self, Currency},
-        numeric::{self, NumericRange, Quantity},
+        quantities::{NumericRange, Quantity},
     },
-    model::Value,
+    interpretation::Value,
+    notation,
 };
 pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     let text = ctx.text;
@@ -23,7 +24,7 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     let next = tokens
         .get(index + 1)
         .filter(|next| whitespace_between(text, token.range.end, next.range.start));
-    if numeric::label(source)
+    if notation::label(source)
         && let Some(next) = next.filter(|next| next.text.chars().any(|c| c.is_ascii_digit()))
     {
         let base = source.split(['\'', '’']).next().unwrap_or(source);
@@ -44,7 +45,7 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     if let Some(end) = ctx.money_end(index) {
         let label = tokens[end];
         let base = label.text.split(['\'', '’']).next().unwrap_or(label.text);
-        if let Some((last, currency)) = numeric::attached_quantity(label.text) {
+        if let Some((last, currency)) = notation::attached_quantity(label.text) {
             if Currency::parse(currency).is_none() {
                 return Some(finish(ctx, end, Err(IssueCategory::Unsupported)));
             }
@@ -71,8 +72,8 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
                 .ok_or(IssueCategory::InvalidExpression),
         ));
     }
-    if let Some((number, label)) = numeric::attached_quantity(source) {
-        if !numeric::label(label) {
+    if let Some((number, label)) = notation::attached_quantity(source) {
+        if !notation::label(label) {
             return Some((Err(IssueCategory::Unsupported), index));
         }
         if Currency::parse(label).is_some()
@@ -105,7 +106,7 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
         ));
     }
     let next = next?;
-    if numeric::label(next.text) && source.chars().any(|c| c.is_ascii_digit()) {
+    if notation::label(next.text) && source.chars().any(|c| c.is_ascii_digit()) {
         return Some(finish(
             ctx,
             index + 1,
@@ -211,7 +212,7 @@ fn quantity_math_end(text: &str, tokens: &[Token<'_>], mut end: usize) -> Option
         }
         end += 2;
         if tokens.get(end + 1).is_some_and(|tail| {
-            numeric::label(tail.text)
+            notation::label(tail.text)
                 && whitespace_between(text, tokens[end].range.end, tail.range.start)
         }) {
             end += 1;

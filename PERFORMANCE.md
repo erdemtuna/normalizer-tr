@@ -109,6 +109,22 @@ Reports/packages are local session artifacts, not published release evidence.
 The clean-revision full verifier remains a separate prerequisite for a release;
 this development comparison does not bypass it.
 
+### Module-refactor comparison
+
+The behavior-preserving module refactor was compared with the captured
+feature implementation committed as `a4e3055`, not the earlier 0.4 source.
+Three retained native repetitions had original-cohort p95 of
+27.1/40.2/20.8 microseconds for short inputs and 185.9/210.1/194.6 for medium.
+Baseline repetitions were 27.4/27.7/22.9 and 196.7/245.3/187.5 respectively.
+All refactored repetitions met the existing host-specific target.
+
+Additional alternating baseline/refactor runs retained class-level variability;
+this is not an assertion of identical code generation or a universal speedup.
+Installed Python p95 was 50.3/204.2 microseconds for short/medium versus
+56.6/232.3 before. Frozen inputs, complete benchmark snapshots and 351 additional
+serialized public outcomes were identical; budget-relevant record sizes were
+unchanged. Reports remain development artifacts outside Git.
+
 Retained mechanisms are borrowed already-NFC grapheme-safe mapping with an NFC
 fallback, indexed overlap windows, exact numerals and one immutable pattern
 cache. There is no input/result memoization. Optimize only a measured bottleneck

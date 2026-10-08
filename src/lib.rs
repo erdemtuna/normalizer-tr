@@ -19,12 +19,13 @@
 mod api;
 mod classify;
 mod domain;
-mod fallback;
-mod model;
+mod interpretation;
 mod morphology;
 mod normalizer;
+mod notation;
 mod numerals;
 mod pipeline;
+mod resolution;
 mod resources;
 mod source_map;
 mod verbalize;

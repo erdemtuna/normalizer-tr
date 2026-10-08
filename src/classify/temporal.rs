@@ -1,6 +1,7 @@
 use crate::{
     FallbackClass, IssueCategory,
-    model::{Clock, Date, TemporalFailure, TemporalPreference, Value},
+    domain::temporal::{Clock, Date},
+    interpretation::{TemporalFailure, TemporalPreference, Value},
     morphology::Inflection,
     verbalize::{date_spoken, time_spoken},
 };
@@ -9,7 +10,7 @@ use super::{
     context::{DATE_CUES, TIME_CUES, cue_key, is_clock_word},
     scan::{Token, whitespace_between},
 };
-use crate::domain::numeric::split_suffix;
+use crate::notation::split_suffix;
 
 pub(super) fn date(text: &str, permitted: bool) -> Result<Value, TemporalFailure> {
     let (base, suffix) = split_suffix(text).ok_or(IssueCategory::InvalidExpression)?;

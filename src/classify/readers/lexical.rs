@@ -3,9 +3,10 @@ use crate::{
     IssueCategory,
     domain::{
         electronic::{self},
-        numeric::{self},
+        lexicon,
     },
-    model::Value,
+    interpretation::Value,
+    notation,
 };
 pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     let tokens = ctx.tokens;
@@ -22,10 +23,9 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
             index,
         ));
     }
-    if !tokens
-        .get(index + 1)
-        .is_some_and(|next| numeric::label(source) && next.text.chars().any(|c| c.is_ascii_digit()))
-        && let Some(reading) = numeric::lexical_reading(source)
+    if !tokens.get(index + 1).is_some_and(|next| {
+        notation::label(source) && next.text.chars().any(|c| c.is_ascii_digit())
+    }) && let Some(reading) = lexicon::lexical_reading(source)
     {
         return Some((
             reading.map(|(entry, case)| Value::Lexical(entry, case)),

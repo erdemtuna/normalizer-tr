@@ -77,15 +77,19 @@ copies; amplified literals may fail with a real result-limit error.
 
 ## Responsibility boundaries
 
-Primary readers own precedence, validation and whole-span claims. Typed
-unresolved requests retain the family, original issue and available numeric
-alternative. Distinct surface types own date/time notation, without relaxing
-validated semantic constructors. The finite resolver selects number/surface/
-literal/code-point strategies; borrowed ordered literal parts reuse the exact
-numeric and approved-label helpers. The bounded emitter checks controls and
-capacity during traversal. Gap supplementation owns only unclaimed graphemes.
-Pipeline composition owns source coordinates, diagnostics and allocation
-accounting. Python performs no linguistic normalization.
+Primary readers own precedence, validation and whole-span claims. Neutral
+interpretation findings retain the family, original issue and prevalidated
+alternatives without depending on a renderer. Notation surface types own
+written date/time components without relaxing validated domain constructors.
+Static resolution selects primary/preserved/fallback handling; its alternative
+engine emits number/surface/literal/code-point strategies. Borrowed literal
+parts reuse the exact numeric and approved-label helpers, and the bounded
+emitter checks controls and capacity during traversal.
+Gap supplementation owns only unclaimed graphemes. Pipeline composition owns
+source coordinates, diagnostics, adjacency padding and allocation accounting;
+Reject still aggregates every issue after the existing engineering checks.
+Python performs no linguistic normalization. The module reorganization does
+not change public imports, reading behavior, provenance or policy outcomes.
 
 Available since 0.4.0. Fallback support incorporates parts of
 [Canberk's contribution](https://github.com/erdemtuna/normalizer-tr/pull/1).

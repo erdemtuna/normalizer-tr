@@ -1,7 +1,8 @@
 use crate::{
     SegmentKind,
     domain::lexicon::MONTHS,
-    model::{Clock, Date, Value},
+    domain::temporal::{Clock, Date},
+    interpretation::Value,
     morphology::{Inflection, Spoken},
     numerals,
 };

@@ -1,9 +1,9 @@
+use crate::interpretation::UnresolvedFinding;
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::{Candidate, Reading};
 use crate::{
-    LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl, fallback,
-    source_map::SourceMap,
+    LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl, source_map::SourceMap,
 };
 
 /// Supplement only unclaimed source; primary whole-expression ownership wins.
@@ -54,7 +54,7 @@ fn scan_gap(
             .graphemes(true)
             .next()
             .ok_or(NormalizeError::Internal)?;
-        let emoticon = fallback::emoticon_length(remaining);
+        let emoticon = crate::notation::emoticon_length(remaining);
         let length = emoticon.map_or(grapheme.len(), |length| {
             source.cover(SourceRange::new(cursor, cursor + length)).end - cursor
         });
@@ -69,7 +69,7 @@ fn scan_gap(
                 .chars()
                 .next()
                 .is_some_and(char::is_alphabetic);
-        if emoticon.is_some() || fallback::needs_reading(grapheme, within_word) {
+        if emoticon.is_some() || crate::notation::needs_reading(grapheme, within_word) {
             open.get_or_insert(cursor);
         } else if let Some(begin) = open.take() {
             append(added, SourceRange::new(begin, cursor), primary_count)?;
@@ -92,7 +92,7 @@ fn append(
     }
     added.push(Candidate {
         range,
-        reading: Reading::Unresolved(fallback::Request::symbols()),
+        reading: Reading::Unresolved(UnresolvedFinding::symbols()),
     });
     Ok(())
 }

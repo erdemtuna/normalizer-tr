@@ -8,7 +8,7 @@ older-version mode. Preserve/Reject/Fallback are per-call resolution policies.
 Fallback data and source rendering incorporate parts of Canberk Aslan's
 Apache-2.0 contribution: https://github.com/erdemtuna/normalizer-tr/pull/1,
 head `0a5de68286cacc4f95c754f519899d15fc2c5e73`.
-The inventory is in fallback/spelling.rs; THIRD_PARTY_NOTICES.md retains attribution.
+The inventory is in notation/symbols.rs; THIRD_PARTY_NOTICES.md retains attribution.
 
 Owned Rust code, unit/currency/abbreviation/character readings and finite
 source/target/derived-tail metadata are Apache-2.0. No bulk dictionary or

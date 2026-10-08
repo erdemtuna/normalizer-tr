@@ -13,12 +13,11 @@ use super::{
 use crate::{
     FallbackClass, HintKind, IssueCategory,
     domain::{
-        electronic::Electronic,
-        identifiers::Telephone,
-        numeric::{self as numbers, Numeric, NumericRange},
+        electronic::Electronic, identifiers::Telephone, numeric::Numeric, quantities::NumericRange,
     },
-    fallback,
-    model::Value,
+    interpretation::UnresolvedFinding,
+    interpretation::Value,
+    notation as numbers,
 };
 
 pub(super) type Attempt = (Result<Value, IssueCategory>, usize);
@@ -91,7 +90,7 @@ pub(super) fn read(
         let reading = match reading {
             Ok(value) => super::Reading::Resolved(value),
             Err(category) => {
-                super::Reading::Unresolved(fallback::Request::unresolved(source, class, category))
+                super::Reading::Unresolved(UnresolvedFinding::unresolved(source, class, category))
             }
         };
         (reading, end)
@@ -176,7 +175,7 @@ fn unsupported_quantity(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
 fn token(ctx: &Context<'_>, index: usize) -> Option<super::Reading> {
     let token = ctx.tokens[index];
     let unresolved = |class, category| {
-        super::Reading::Unresolved(fallback::Request::unresolved(token.text, class, category))
+        super::Reading::Unresolved(UnresolvedFinding::unresolved(token.text, class, category))
     };
     if scan::identifier(token.text) {
         return Some(unresolved(
@@ -188,7 +187,7 @@ fn token(ctx: &Context<'_>, index: usize) -> Option<super::Reading> {
         return temporal::recognize(ctx.text, ctx.tokens, index)
             .map(|(reading, class)| match reading {
                 Ok(value) => super::Reading::Resolved(value),
-                Err(failure) => super::Reading::Unresolved(fallback::Request::temporal(
+                Err(failure) => super::Reading::Unresolved(UnresolvedFinding::temporal(
                     token.text, class, failure,
                 )),
             })
@@ -203,6 +202,6 @@ fn token(ctx: &Context<'_>, index: usize) -> Option<super::Reading> {
 fn automatic_number(source: &str) -> super::Reading {
     match Numeric::automatic(source) {
         Ok(value) => super::Reading::Resolved(Value::Numeric(value)),
-        Err(failure) => super::Reading::Unresolved(fallback::Request::numeric(source, failure)),
+        Err(failure) => super::Reading::Unresolved(UnresolvedFinding::numeric(source, failure)),
     }
 }
