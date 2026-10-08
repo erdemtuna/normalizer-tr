@@ -1,4 +1,4 @@
-//! Reviewed shared cases exercise public outcomes in every policy.
+//! Normalization policy contracts and original-source partition invariants.
 use normalizer_tr::{
     AmbiguityPolicy, Hint, HintKind, NormalizeError, NormalizeOptions, Normalizer, SegmentKind,
     SourceRange,
@@ -6,10 +6,12 @@ use normalizer_tr::{
 use serde_json::Value;
 use unicode_segmentation::UnicodeSegmentation;
 
+#[path = "support/policy_contract.rs"]
+mod policy_fixtures;
+
 #[test]
-fn expanded_cases_have_exact_policy_outcomes_and_source_partitions() {
-    let cases: Vec<Value> =
-        serde_json::from_str(include_str!("fixtures/expanded-coverage.json")).unwrap();
+fn normalization_cases_have_exact_policy_outcomes_and_source_partitions() {
+    let cases: Vec<Value> = policy_fixtures::load().0;
     let normalizer = Normalizer::new().unwrap();
     for case in cases {
         let input = case["text"].as_str().unwrap();
@@ -118,7 +120,7 @@ fn expanded_cases_have_exact_policy_outcomes_and_source_partitions() {
 }
 
 #[test]
-fn new_compounds_cannot_be_cut_by_hints_in_any_policy() {
+fn compound_hints_cannot_cut_expressions_in_any_policy() {
     let n = Normalizer::new().unwrap();
     for policy in [
         AmbiguityPolicy::Preserve,
@@ -150,7 +152,7 @@ fn new_compounds_cannot_be_cut_by_hints_in_any_policy() {
 }
 
 #[test]
-fn new_surfaces_keep_nfd_hints_and_address_punctuation_intact() {
+fn source_notation_preserves_nfd_hint_coordinates_and_address_punctuation() {
     let n = Normalizer::new().unwrap();
     let text = "o\u{308} 03/04/2026";
     for policy in [
@@ -217,7 +219,7 @@ proptest::proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(128))]
     #[test]
     fn independent_cases_keep_policy_boundaries(indices in proptest::collection::vec(proptest::prelude::any::<usize>(), 1..8)) {
-        let cases: Vec<Value> = serde_json::from_str(include_str!("fixtures/expanded-coverage.json")).unwrap();
+        let cases: Vec<Value> = policy_fixtures::load().0;
         let selected: Vec<_> = indices.iter().map(|index| &cases[index % cases.len()]).filter(|case| case.get("hint").is_none()).collect();
         proptest::prop_assume!(!selected.is_empty());
         let source = selected.iter().map(|case| case["text"].as_str().unwrap()).collect::<Vec<_>>().join(" ; ");

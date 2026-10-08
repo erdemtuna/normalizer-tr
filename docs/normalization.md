@@ -5,6 +5,9 @@ profiles. `NORMALIZER_ID` / `normalizer_id` is diagnostic package metadata.
 `complete` means all recognized normalization work was resolved; it is not a
 claim about native-language or speech quality.
 
+This reference follows repository behavior. See the [changelog](../CHANGELOG.md)
+for differences between published packages and unreleased changes.
+
 ## Exact numbers and morphology
 
 Magnitudes are strictly below `1_000_000_000_000_000_000`. Comma decimals have
@@ -57,7 +60,7 @@ Aliases are explicit: there is no arbitrary case-folding or NFKC expansion.
 Rates are only `km/sa`, `km/h` and `m/s`, using `saatte` / `saniyede`.
 Number/label adjacency is supported: `5kg` -> `beş kilogram`.
 
-| New label | Reading in numeric quantity context |
+| Label | Reading in numeric quantity context |
 |---|---|
 | `°C` | `derece Santigrat` |
 | `V` | `volt` |
@@ -65,7 +68,7 @@ Number/label adjacency is supported: `5kg` -> `beş kilogram`.
 | `kWh` | `kilovat saat` |
 | `GB` | `gigabayt` |
 
-Bare symbols do not become unit readings. Existing case families are validated
+Bare symbols do not become unit readings. Supported case families are validated
 against the approved spoken names: `75 kW'tan` -> `yetmiş beş kilovattan`;
 `10 kWh'ten` -> `on kilovat saatten`. `KW`/`kw`, arbitrary suffix chains and
 unapproved units remain unsupported.
@@ -79,12 +82,12 @@ mathematical subtraction/equations and date/time/currency ranges are not guessed
 
 Gregorian dates accept dotted day-month-year with a four-digit nonzero year, or
 unsuffixed ISO dates, or fixed `DD/MM/YYYY` slash dates. A `tarih` / `tarihi` cue,
-including its supported colon form, or a Date hint establishes intent. Clocks are valid 24-hour values with
-a `saat` cue or Time hint.
+including its supported colon form, or a Date hint establishes intent. Clocks
+are valid 24-hour values with a `saat` cue or Time hint.
 `tarih 03/04/2026` -> `tarih üç Nisan iki bin yirmi altı`.
 Bare slash notation remains unresolved; Fallback reads its written components
 literally, not as a preferred/surface calendar date. US-order, two-digit-year
-and clock-seconds interpretation are not added.
+and clock-seconds interpretation are unsupported.
 
 The bounded date-locative + whitespace + `saat` + whitespace + clock-locative
 frame is also recognized. Date locative uses the spoken year; clock locative

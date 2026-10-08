@@ -1,0 +1,114 @@
+[
+  {
+    "id": "compact-unit",
+    "class": "unit",
+    "text": "5kg",
+    "expected": "beş kilogram",
+    "kind": "Unit"
+  },
+  {
+    "id": "compact-unit-suffix",
+    "class": "unit",
+    "text": "5kg'dan",
+    "expected": "beş kilogramdan",
+    "kind": "Unit"
+  },
+  {
+    "id": "compact-money",
+    "class": "money",
+    "text": "25TL",
+    "expected": "yirmi beş Türk lirası",
+    "kind": "Money"
+  },
+  {
+    "id": "compact-cents",
+    "class": "money",
+    "text": "25,50TL",
+    "expected": "yirmi beş Türk lirası elli kuruş",
+    "kind": "Money"
+  },
+  {
+    "id": "spaced-symbol",
+    "class": "money",
+    "text": "€ 14,05",
+    "expected": "on dört avro beş sent",
+    "kind": "Money"
+  },
+  {
+    "id": "trailing-percent",
+    "class": "percent",
+    "text": "12,5%",
+    "expected": "yüzde on iki virgül beş",
+    "kind": "Percent"
+  },
+  {
+    "id": "trailing-percent-suffix",
+    "class": "percent",
+    "text": "12,5%'lik",
+    "expected": "yüzde on iki virgül beşlik",
+    "kind": "Percent"
+  },
+  {
+    "id": "spaced-percent-suffix",
+    "class": "percent",
+    "text": "% 12,5'lik",
+    "expected": "yüzde on iki virgül beşlik",
+    "kind": "Percent"
+  },
+  {
+    "id": "spaced-range",
+    "class": "range",
+    "text": "10 - 15 kişi",
+    "expected": "on ila on beş kişi",
+    "kind": "Range"
+  },
+  {
+    "id": "signed-range",
+    "class": "range",
+    "text": "-5 - -2 gün",
+    "expected": "eksi beş ila eksi iki gün",
+    "kind": "Range"
+  },
+  {
+    "id": "negative-unit",
+    "class": "unit",
+    "text": "-5 kg",
+    "expected": "eksi beş kilogram",
+    "kind": "Unit"
+  },
+  {
+    "id": "temperature",
+    "class": "unit",
+    "text": "-5°C",
+    "expected": "eksi beş derece Santigrat",
+    "kind": "Unit"
+  },
+  {
+    "id": "voltage",
+    "class": "unit",
+    "text": "230 V",
+    "expected": "iki yüz otuz volt",
+    "kind": "Unit"
+  },
+  {
+    "id": "power-suffix",
+    "class": "unit",
+    "text": "75 kW'tan",
+    "expected": "yetmiş beş kilovattan",
+    "kind": "Unit"
+  },
+  {
+    "id": "energy-suffix",
+    "class": "unit",
+    "text": "10 kWh'ten",
+    "expected": "on kilovat saatten",
+    "kind": "Unit"
+  },
+  {
+    "id": "storage",
+    "class": "unit",
+    "text": "2 GB",
+    "expected": "iki gigabayt",
+    "kind": "Unit"
+  }
+]

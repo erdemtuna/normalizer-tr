@@ -4,6 +4,9 @@ use std::{collections::BTreeMap, hint::black_box, time::Instant};
 use normalizer_tr::{AmbiguityPolicy, Hint, HintKind, NormalizeOptions, Normalizer, SourceRange};
 use serde_json::{Value, json};
 
+#[path = "../tests/support/policy_contract.rs"]
+mod policy_fixtures;
+
 fn options(case: &Value, policy: AmbiguityPolicy) -> NormalizeOptions {
     let mut options = NormalizeOptions {
         ambiguity_policy: policy,
@@ -101,7 +104,7 @@ fn fallback_measurements(normalizer: &Normalizer, corpus: &[Value]) -> Value {
         "method":"fallback only; same frozen cohorts; 2000 warmup and 10000 individually timed calls per cohort; no filtering or overhead subtraction"})
 }
 
-fn check_expanded(
+fn check_policy_contract(
     case: &Value,
     policy: AmbiguityPolicy,
     prefix: &str,
@@ -144,15 +147,14 @@ fn check_expanded(
             );
         }
         other => panic!(
-            "expanded case {} has unexpected outcome: {other:?}",
+            "policy-contract case {} has unexpected outcome: {other:?}",
             case["id"]
         ),
     }
 }
 
-fn expanded_measurements(normalizer: &Normalizer) -> Value {
-    let source = include_str!("../tests/fixtures/expanded-coverage.json");
-    let cases: Vec<Value> = serde_json::from_str(source).unwrap();
+fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
+    let (cases, input_bytes) = policy_fixtures::load();
     let mut cohorts = BTreeMap::new();
     let mut classes = BTreeMap::<String, Vec<u64>>::new();
     for cohort in ["short", "medium"] {
@@ -187,7 +189,7 @@ fn expanded_measurements(normalizer: &Normalizer) -> Value {
                             hint.kind(),
                         );
                     }
-                    check_expanded(
+                    check_policy_contract(
                         case,
                         policy,
                         &prefix,
@@ -220,7 +222,7 @@ fn expanded_measurements(normalizer: &Normalizer) -> Value {
                     .push(elapsed);
             }
             for (case, text, options) in &prepared {
-                check_expanded(case, policy, &prefix, &normalizer.normalize(text, options));
+                check_policy_contract(case, policy, &prefix, &normalizer.normalize(text, options));
             }
             cohorts.insert(format!("{cohort}:{name}"), quantiles(&mut samples));
         }
@@ -263,7 +265,7 @@ fn expanded_measurements(normalizer: &Normalizer) -> Value {
         .into_iter()
         .map(|(key, mut values)| (key, quantiles(&mut values)))
         .collect();
-    json!({"input_source":"tests/fixtures/expanded-coverage.json","input_bytes":source.len(),"input_cases":cases,
+    json!({"input_source":"tests/fixtures/policy-contract.json","input_bytes":input_bytes,"input_cases":cases,
         "method":"separate policy cohorts; reviewed goldens before/after; 2000 warmups and 10000 calls including disposal; all outliers retained",
         "cohorts":cohorts,"per_class_policy":per_class,"scaling":scaling})
 }
@@ -449,7 +451,7 @@ fn main() {
         "distribution":distributions,"clock_overhead":quantiles(&mut clock),"large":large,"limit_diagnostics":controls,
         "snapshots":snapshots,
         "fallback_measurement":fallback_measurements(&normalizer, &corpus),
-        "expanded_coverage_measurement":expanded_measurements(&normalizer),
+        "expanded_coverage_measurement":policy_contract_measurements(&normalizer),
     });
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()

@@ -104,14 +104,21 @@ def measure(corpus, policies=("preserve", "reject")):
     }
 
 
-def expanded_measurement():
+def policy_contract_measurement():
     path = (
         Path(__file__).resolve().parents[1]
         / "tests"
         / "fixtures"
-        / "expanded-coverage.json"
+        / "policy-contract.json"
     )
-    cases = json.loads(path.read_text(encoding="utf-8"))
+    files = [path] + [
+        path.parent / name for name in json.loads(path.read_text(encoding="utf-8"))
+    ]
+    cases = [
+        case
+        for file in files[1:]
+        for case in json.loads(file.read_text(encoding="utf-8"))
+    ]
     n = Normalizer()
     cohorts = {}
     per_class = {}
@@ -176,7 +183,9 @@ def expanded_measurement():
                 assert invoke(n, text, options) == expected
             cohorts[f"{cohort}:{policy}"] = quantiles(samples)
     return {
-        "input_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "input_sha256": hashlib.sha256(
+            b"".join(file.read_bytes() for file in files)
+        ).hexdigest(),
         "input_cases": cases,
         "method": "separate policy cohorts; reviewed goldens; 2000 warmups and 10000 installed public calls including disposal; no filtering",
         "cohorts": cohorts,
@@ -214,7 +223,7 @@ def main():
         "clock_overhead": quantiles(clock),
         "measurement": measure(corpus),
         "fallback_measurement": measure(corpus, ("fallback",)),
-        "expanded_coverage_measurement": expanded_measurement(),
+        "expanded_coverage_measurement": policy_contract_measurement(),
         "fallback_method": "separate fallback-only cohorts, same corpus; 10000 calls/cohort after 2000 warmup; no filtering or overhead subtraction; not equivalent to preserve/reject",
         "allocation_instrumentation": "unavailable for Rust native allocations; no inferred counts or peak-memory claim",
     }

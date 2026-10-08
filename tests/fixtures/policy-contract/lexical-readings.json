@@ -1,0 +1,33 @@
+[
+  {
+    "id": "title-lower",
+    "class": "abbreviation",
+    "text": "dr. Ayşe",
+    "expected": "doktor Ayşe"
+  },
+  {
+    "id": "title-upper",
+    "class": "abbreviation",
+    "text": "PROF. Ali",
+    "expected": "profesör Ali"
+  },
+  {
+    "id": "title-docent",
+    "class": "abbreviation",
+    "text": "DOÇ. Ayşe",
+    "expected": "doçent Ayşe"
+  },
+  {
+    "id": "uppercase-prose",
+    "class": "prose",
+    "text": "BUGÜN 25 TL",
+    "expected": "BUGÜN yirmi beş Türk lirası"
+  },
+  {
+    "id": "uppercase-unknown",
+    "class": "prose",
+    "text": "ABC",
+    "expected": "ABC",
+    "kind": "Verbatim"
+  }
+]

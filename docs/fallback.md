@@ -2,7 +2,11 @@
 
 `ambiguity_policy="fallback"` / `AmbiguityPolicy::Fallback` opts into
 source-faithful rendering. Existing valid readings and hints retain precedence.
-Preserve remains the default; Reject and all real engineering errors are unchanged.
+Preserve remains the default. Fallback does not relax Reject's strictness or
+mask engineering errors.
+
+This guide follows repository behavior; see the [changelog](../CHANGELOG.md)
+for released and unreleased changes.
 
 The policy prefers clear source formats, then literal letters/digits/symbols,
 then conventional Unicode `U+...` identifiers spoken character by character.
@@ -18,8 +22,8 @@ vocabulary/pronunciation compatibility.
 
 Fallback-generated segments have kind `Fallback` / `"fallback"` and a
 `source.fallback` rule identifier. The strategy is carried in the diagnostic.
-Invalid source-shaped dates or
-identifiers are never labelled as validated calendar/checksum results.
+Invalid source-shaped dates or identifiers are never labelled as validated
+calendar/checksum results.
 
 | Source | Fallback reading | Strategy |
 |---|---|---|
@@ -39,14 +43,14 @@ parts. Account/identifier digits are spelled, including zeros, without checksum
 certification. Existing decimal, money, telephone and electronic readings do
 not change when they already succeed.
 
-Expanded primary coverage is shared by all three policies. `25TL`, valid
-space-grouped money and approved new units now receive primary readings even
-under Fallback, so those valid expressions no longer produce fallback records.
+Primary coverage is shared by all three policies. Valid compact quantities,
+space-grouped money and supported units receive primary readings under Fallback
+without fallback records. See the [normalization reference](normalization.md).
 Malformed compounds still own their full source span and carry the original
 failure category; their literal output is not a valid-money/unit certificate.
 
 Unknown uppercase prose such as `ABC` is preserved rather than spelled.
-Identifier `AB12` and uncued Roman `IV` still use their existing protected/literal
+Identifier `AB12` and uncued Roman `IV` use their protected/literal
 readings. Bare or invalid slash-date notation remains literal, without a
 PreferredDate or SurfaceDate assumption.
 
@@ -71,25 +75,10 @@ variants in Rust casing, for example `"SurfaceDate"`. It includes a computed
 so explicitly add it if needed when exporting Python records.
 
 No `fully_rendered` flag or second independently stored fallback boolean exists.
-All existing input, hint, cancellation/deadline and resource checks still apply.
+All input, hint, cancellation/deadline and resource checks apply.
 The 512 KiB logical result budget counts fallback records and both owned text
 copies; amplified literals may fail with a real result-limit error.
 
-## Responsibility boundaries
-
-Primary readers own precedence, validation and whole-span claims. Neutral
-interpretation findings retain the family, original issue and prevalidated
-alternatives without depending on a renderer. Notation surface types own
-written date/time components without relaxing validated domain constructors.
-Static resolution selects primary/preserved/fallback handling; its alternative
-engine emits number/surface/literal/code-point strategies. Borrowed literal
-parts reuse the exact numeric and approved-label helpers, and the bounded
-emitter checks controls and capacity during traversal.
-Gap supplementation owns only unclaimed graphemes. Pipeline composition owns
-source coordinates, diagnostics, adjacency padding and allocation accounting;
-Reject still aggregates every issue after the existing engineering checks.
-Python performs no linguistic normalization. The module reorganization does
-not change public imports, reading behavior, provenance or policy outcomes.
-
 Available since 0.4.0. Fallback support incorporates parts of
 [Canberk's contribution](https://github.com/erdemtuna/normalizer-tr/pull/1).
+Internal responsibility boundaries are in [CONTRIBUTING](../CONTRIBUTING.md#code-layout).

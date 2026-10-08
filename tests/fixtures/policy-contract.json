@@ -1,0 +1,10 @@
+[
+  "policy-contract/money-grouping.json",
+  "policy-contract/quantity-notation.json",
+  "policy-contract/lexical-readings.json",
+  "policy-contract/source-punctuation.json",
+  "policy-contract/date-intent.json",
+  "policy-contract/unresolved-outcomes.json",
+  "policy-contract/source-context.json",
+  "policy-contract/compound-boundaries.json"
+]

@@ -150,7 +150,7 @@ def consume(output):
                 or not result.complete
                 or result.fallback_used
             ):
-                raise RuntimeError("installed-wheel expanded primary IO differs")
+                raise RuntimeError("installed-wheel primary policy contract differs")
     fallback = normalizer.normalize("AB12; hello🙂", ambiguity_policy="fallback")
     if (
         fallback.normalized_text != "a be bir iki; hello gülümseyen yüz"
@@ -175,9 +175,24 @@ def consume(output):
     )
 
 
-def validate_expanded_measurement(value):
-    fixture = ROOT / "tests" / "fixtures" / "expanded-coverage.json"
-    cases = json.loads(fixture.read_text(encoding="utf-8"))
+def policy_contract_fixture():
+    catalog = ROOT / "tests" / "fixtures" / "policy-contract.json"
+    files = [catalog] + [
+        catalog.parent / name
+        for name in json.loads(catalog.read_text(encoding="utf-8"))
+    ]
+    cases = [
+        case
+        for file in files[1:]
+        for case in json.loads(file.read_text(encoding="utf-8"))
+    ]
+    if not cases or len({case["id"] for case in cases}) != len(cases):
+        raise RuntimeError("policy-contract fixture must have unique nonempty cases")
+    return cases, files
+
+
+def validate_policy_contract_measurement(value):
+    cases, _ = policy_contract_fixture()
     keys = {
         f"{cohort}:{policy}"
         for cohort in ("short", "medium")
@@ -190,15 +205,17 @@ def validate_expanded_measurement(value):
         for case in cases
     }
     if value.get("input_cases") != cases:
-        raise RuntimeError("expanded measurement inputs differ from reviewed fixture")
+        raise RuntimeError(
+            "policy-contract measurement inputs differ from reviewed fixture"
+        )
     if set(value.get("cohorts", {})) != keys or any(
         cohort["count"] != 10000 for cohort in value["cohorts"].values()
     ):
         raise RuntimeError(
-            "expanded measurement policy cohorts are missing or undersampled"
+            "policy-contract measurement cohorts are missing or undersampled"
         )
     if set(value.get("per_class_policy", {})) != classes:
-        raise RuntimeError("expanded measurement class/policy coverage differs")
+        raise RuntimeError("policy-contract measurement class/policy coverage differs")
     for key in keys:
         cohort, policy = key.split(":")
         count = sum(
@@ -207,7 +224,9 @@ def validate_expanded_measurement(value):
             if name.startswith(cohort + ":") and name.endswith(":" + policy)
         )
         if count != 10000:
-            raise RuntimeError("expanded measurement class counts differ from cohort")
+            raise RuntimeError(
+                "policy-contract measurement class counts differ from cohort"
+            )
 
 
 def finalize(output):
@@ -225,7 +244,7 @@ def finalize(output):
             for cohort in value["cohorts"].values()
         ):
             raise RuntimeError("warm short/medium Rust p95 regression")
-        validate_expanded_measurement(value["expanded_coverage_measurement"])
+        validate_policy_contract_measurement(value["expanded_coverage_measurement"])
         native.append(
             {
                 "file": record(path),
@@ -264,10 +283,13 @@ def finalize(output):
     python_report = json.loads(
         (output / "reports" / "python.json").read_text(encoding="utf-8")
     )
-    validate_expanded_measurement(python_report["expanded_coverage_measurement"])
-    fixture = ROOT / "tests" / "fixtures" / "expanded-coverage.json"
-    if python_report["expanded_coverage_measurement"]["input_sha256"] != sha(fixture):
-        raise RuntimeError("Python expanded measurement fixture hash differs")
+    validate_policy_contract_measurement(python_report["expanded_coverage_measurement"])
+    _, contract_files = policy_contract_fixture()
+    contract_hash = hashlib.sha256(
+        b"".join(file.read_bytes() for file in contract_files)
+    ).hexdigest()
+    if python_report["expanded_coverage_measurement"]["input_sha256"] != contract_hash:
+        raise RuntimeError("Python policy-contract measurement fixture hash differs")
     if any(
         json.loads(Path(row["file"]["path"]).read_text(encoding="utf-8"))[
             "normalizer_id"
@@ -298,7 +320,7 @@ def finalize(output):
             record(ROOT / "benches" / name)
             for name in ("corpus.json", "intent-corpus.json")
         ]
-        + [record(fixture)],
+        + [record(file) for file in contract_files],
         "consumer": installed,
         "artifact_files": [
             record(path) for path in sorted((output / "reports").iterdir())

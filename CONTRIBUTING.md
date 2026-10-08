@@ -30,28 +30,31 @@ Core/binding development needs no Torch, model files or credentials.
 
 ## Code layout
 
-`src/api` groups the public contract behind unchanged crate-root re-exports.
-`src/classify` owns fixed reader priority and whole-span claims; its `scan`
-modules separate tokenization/indexing, punctuation and source signals.
-`src/domain` owns validated numeric, quantity, temporal, electronic and
-identifier values. `src/notation` owns shared written-form helpers, explicit
-character names and noncertifying source surfaces.
-`src/interpretation.rs` holds neutral findings and prevalidated alternatives;
-classification/domain code does not depend on the resolver.
-`src/numerals.rs`, `src/morphology.rs` and `src/verbalize.rs` share exact
-rendering and spoken-tail metadata.
-`src/source_map.rs` maps NFC recognition to original UTF-8/grapheme coordinates.
-`src/resolution` selects handling with static dispatch; its `fallback` engine
-owns alternative rendering, ordered literal parts and bounded emission.
-`src/classify/symbols.rs` supplements unclaimed graphemes only in Fallback.
-`src/pipeline.rs` composes the source partition, diagnostics and budgets, and
-finalizes Reject only after collecting all unresolved issues and checking
-engineering failures.
-The Python binding calls this engine; it does not duplicate language rules.
+| Module | Responsibility |
+|---|---|
+| `src/api` | Public contract behind crate-root re-exports |
+| `src/classify` | Fixed reader priority, validation and whole-span claims; `scan` separates tokenization/indexing, punctuation and signals |
+| `src/domain` | Validated numeric, quantity, temporal, electronic and identifier values |
+| `src/notation` | Shared written-form helpers, explicit character names and noncertifying source surfaces |
+| `src/interpretation.rs` | Neutral findings retaining their family, original issue and prevalidated alternatives |
+| `src/resolution` | Static policy selection; `fallback` renders alternatives, ordered literals and code-point strategies with bounded emission |
+| `src/numerals.rs`, `src/morphology.rs`, `src/verbalize.rs` | Exact rendering and spoken-tail metadata |
+| `src/source_map.rs` | NFC recognition mapped to original UTF-8/grapheme coordinates |
+| `src/resources.rs` | Immutable patterns validated and cached once, not input/result memoization |
+| `src/pipeline.rs` | Source composition, diagnostics, adjacency padding and allocation budgets; aggregate Reject after engineering checks |
+
+Classification/domain code does not depend on the renderer. Source date/time
+surfaces do not relax validated domain constructors. Borrowed literal parts
+share exact numeric and approved-label helpers; the fallback emitter checks
+controls and capacity during traversal. `src/classify/symbols.rs` supplements
+only unclaimed graphemes in Fallback. Python calls this engine without duplicating
+language rules.
+
 The scanner indexes numeric-run ends once for bounded money lookahead and
-distinguishes paired quotation boundaries from suffix apostrophes. Keep surface
-recognition separate from strict value validation; share typed label metadata
-between readers and context-owned fallback parts.
+distinguishes paired quotation boundaries from suffix apostrophes. Keep
+recognition separate from strict value validation and share typed label metadata.
+
+## Change rules and tests
 
 Add positive, negative and mixed-sentence tests. Assert completeness, issue
 scope and byte ranges as well as text. Preserve matched-invalid compounds
@@ -65,10 +68,11 @@ controls/limit errors as preservation. Add its handled reasons to `fallbacks`,
 not unresolved `issues`; assert that completion, provenance and source
 partitions agree. See [the fallback contract](docs/fallback.md).
 
-`tests/fixtures/expanded-coverage.json` contains reviewed public examples shared
-by Rust, installed-Python tests and separate new-coverage measurements. Add
-cross-feature cases and exercise Preserve, Reject and Fallback independently.
-Do not alter the frozen benchmark inputs/order to improve an aggregate.
+`tests/fixtures/policy-contract.json` is an ordered catalog of logical groups
+under `tests/fixtures/policy-contract/`. Rust tests and benchmarks share a
+compiled fixture loader; installed-Python tests and verification consume the
+same catalog. Add cross-feature cases and exercise Preserve, Reject and Fallback
+independently. Do not alter the frozen benchmark inputs/order to improve an aggregate.
 
 ## Checks
 
@@ -85,6 +89,8 @@ cargo doc --locked --no-deps --all-features
 Rebuild/reinstall the binding after native/facade changes before running its
 tests. CI also checks default/no-default Rust configurations and installed-wheel
 tests, without models.
+
+## Full verification
 
 For full local package/consumer/audit/performance verification, provision:
 
@@ -106,8 +112,31 @@ toolchain. Keep the output/environment path short on Windows to avoid
 path-length limits. Outputs include logs, packages, consumers and a checksum manifest.
 See [PERFORMANCE.md](PERFORMANCE.md) for host-specific timing limits.
 
+## Releasing
+
+Maintain [CHANGELOG.md](CHANGELOG.md): leave changes under Unreleased until the
+next version and release date are agreed. Before publishing, update core/binding
+versions consistently and finalize that entry without rewriting past releases.
+Platform requirements are in the [Python guide](bindings/python/README.md#install).
+
+[release.yml](.github/workflows/release.yml) is manually dispatched. Its default
+is build/test only: 16 wheels, a tested source distribution, the core archive and
+an exact checksum manifest. No PR or ordinary push publishes packages.
+
+PyPI publication requires a matching `v<version>` tag, `publish=true`, the `pypi`
+environment and its configured Trusted Publisher. Only the publish job has OIDC
+permission; no persistent PyPI token is stored.
+
+Publish the core to crates.io using owner-configured Cargo authentication, from
+the same clean revision and byte-identical reviewed archive. The internal
+Rust/Python companion keeps `publish = false`. Verify fresh registry consumers
+and live checksums afterward.
+
+Never paste credentials into chat, command arguments or source. If an upload has
+an uncertain result, inspect the registry before retrying. Do not reuse a version
+for different artifacts. Registry publishing is owner-controlled after
+built-artifact verification, never an untrusted PR action.
+
 Owned contributions are Apache-2.0; retain third-party notices. Keep credentials,
-external model source/weights, audio, wheels, environments and reports out of
-Git. Only the core can publish to crates.io; the internal Rust/Python companion
-keeps `publish = false`. Registry publishing is a separate owner-controlled
-release action after built-artifact verification, never an untrusted PR action.
+models, integrations, private history, audio, wheels, environments and reports
+outside the public source/packages and Git.

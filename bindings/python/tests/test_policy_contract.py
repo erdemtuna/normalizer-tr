@@ -5,14 +5,13 @@ from pathlib import Path
 import pytest
 from normalizer_tr import Hint, NormalizationError, Normalizer
 
-CASES = json.loads(
-    (
-        Path(__file__).resolve().parents[3]
-        / "tests"
-        / "fixtures"
-        / "expanded-coverage.json"
-    ).read_text(encoding="utf-8")
-)
+FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
+GROUPS = json.loads((FIXTURES / "policy-contract.json").read_text(encoding="utf-8"))
+CASES = [
+    case
+    for group in GROUPS
+    for case in json.loads((FIXTURES / group).read_text(encoding="utf-8"))
+]
 
 
 def label(value):

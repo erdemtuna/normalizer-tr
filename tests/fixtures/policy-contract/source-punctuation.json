@@ -1,0 +1,39 @@
+[
+  {
+    "id": "quoted-double",
+    "class": "punctuation",
+    "text": "“25 TL”",
+    "expected": "“yirmi beş Türk lirası”"
+  },
+  {
+    "id": "quoted-single",
+    "class": "punctuation",
+    "text": "‘25 TL’",
+    "expected": "‘yirmi beş Türk lirası’"
+  },
+  {
+    "id": "quoted-straight",
+    "class": "punctuation",
+    "text": "'25 TL'",
+    "expected": "'yirmi beş Türk lirası'"
+  },
+  {
+    "id": "semicolon-list",
+    "class": "punctuation",
+    "text": "25 kg;30 kg",
+    "expected": "yirmi beş kilogram;otuz kilogram"
+  },
+  {
+    "id": "comma-list",
+    "class": "punctuation",
+    "text": "25kg,30kg",
+    "expected": "yirmi beş kilogram,otuz kilogram"
+  },
+  {
+    "id": "decimal-not-list",
+    "class": "unit",
+    "text": "25,30kg",
+    "expected": "yirmi beş virgül üç sıfır kilogram",
+    "kind": "Unit"
+  }
+]
