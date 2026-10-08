@@ -65,6 +65,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
         with:
           toolchain: "1.99.0"
+          components: rustfmt, clippy
       - name: Test native core on host
         run: cargo test --locked --all-features
       - name: Build interpreter-specific wheel
@@ -104,6 +105,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
         with:
           toolchain: "1.99.0"
+          components: rustfmt, clippy
       - name: Build and consume sdist
         run: |
           python -m pip install maturin==1.15.0 pytest==9.0.3 twine==7.0.0
