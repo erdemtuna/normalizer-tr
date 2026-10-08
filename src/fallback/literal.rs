@@ -81,13 +81,10 @@ fn word_part(source: &str, reading: LetterReading) -> Part<'_> {
     if matches!(reading, LetterReading::Spell) {
         return Part::Letters(source);
     }
-    let label = lexicon::unit(source)
-        .or_else(|| lexicon::abbreviation(source))
+    let label = lexicon::abbreviation(source)
         .or_else(|| Currency::parse(source).map(|currency| currency.lexeme(source)));
     if let Some(label) = label {
         Part::Label(label)
-    } else if source.chars().all(char::is_uppercase) {
-        Part::Letters(source)
     } else {
         Part::Word(source)
     }
@@ -97,10 +94,12 @@ fn word_part(source: &str, reading: LetterReading) -> Part<'_> {
 pub(super) fn render(
     source: &str,
     letters: LetterReading,
+    quantities: bool,
     output: &mut Output<'_>,
 ) -> Result<bool, NormalizeError> {
     let mut cursor = 0;
     let mut used_code_point = false;
+    let mut quantity_expected = false;
     while cursor < source.len() {
         let remainder = &source[cursor..];
         let first = remainder.chars().next().ok_or(NormalizeError::Internal)?;
@@ -112,6 +111,15 @@ pub(super) fn render(
             cursor += end;
             continue;
         }
+        if quantities
+            && quantity_expected
+            && let Some((symbol, label)) = lexicon::unit_prefix(remainder)
+        {
+            used_code_point |= emit(Part::Label(label), output)?;
+            cursor += symbol.len();
+            quantity_expected = false;
+            continue;
+        }
         let (part, length) = if first.is_ascii_digit() {
             let notation_length = remainder
                 .find(|scalar: char| !scalar.is_ascii_digit() && !matches!(scalar, '.' | ','))
@@ -121,6 +129,7 @@ pub(super) fn render(
             {
                 used_code_point |= emit(Part::Number(number), output)?;
                 cursor += notation_length;
+                quantity_expected = true;
                 continue;
             }
             let length = remainder
@@ -148,6 +157,7 @@ pub(super) fn render(
                 .ok_or(NormalizeError::Internal)?;
             (Part::Symbol(grapheme), grapheme.len())
         };
+        quantity_expected = matches!(&part, Part::Number(_) | Part::Digits(_));
         used_code_point |= emit(part, output)?;
         cursor += length;
     }

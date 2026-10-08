@@ -160,7 +160,12 @@ impl Request {
                 FallbackStrategy::SurfaceTime
             }
             Prepared::Literal(letters) => {
-                if literal::render(source, *letters, &mut output)? {
+                if literal::render(
+                    source,
+                    *letters,
+                    self.class == FallbackClass::Quantity,
+                    &mut output,
+                )? {
                     FallbackStrategy::UnicodeCodePoint
                 } else {
                     FallbackStrategy::Literal

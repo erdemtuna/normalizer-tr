@@ -137,6 +137,20 @@ def consume(output):
     normalizer = normalizer_tr.Normalizer()
     if normalizer.normalize("25 TL").normalized_text != "yirmi beş Türk lirası":
         raise RuntimeError("installed-wheel IO differs")
+    for policy in ("preserve", "reject", "fallback"):
+        for text, expected in (
+            ("1 234,50TL", "bin iki yüz otuz dört Türk lirası elli kuruş"),
+            ("5°C", "beş derece Santigrat"),
+            ("ABC", "ABC"),
+            ("tarih 03/04/2026", "tarih üç Nisan iki bin yirmi altı"),
+        ):
+            result = normalizer.normalize(text, ambiguity_policy=policy)
+            if (
+                result.normalized_text != expected
+                or not result.complete
+                or result.fallback_used
+            ):
+                raise RuntimeError("installed-wheel expanded primary IO differs")
     fallback = normalizer.normalize("AB12; hello🙂", ambiguity_policy="fallback")
     if (
         fallback.normalized_text != "a be bir iki; hello gülümseyen yüz"
@@ -161,6 +175,41 @@ def consume(output):
     )
 
 
+def validate_expanded_measurement(value):
+    fixture = ROOT / "tests" / "fixtures" / "expanded-coverage.json"
+    cases = json.loads(fixture.read_text(encoding="utf-8"))
+    keys = {
+        f"{cohort}:{policy}"
+        for cohort in ("short", "medium")
+        for policy in ("preserve", "reject", "fallback")
+    }
+    classes = {
+        f"{cohort}:{case['class']}:{policy}"
+        for cohort in ("short", "medium")
+        for policy in ("preserve", "reject", "fallback")
+        for case in cases
+    }
+    if value.get("input_cases") != cases:
+        raise RuntimeError("expanded measurement inputs differ from reviewed fixture")
+    if set(value.get("cohorts", {})) != keys or any(
+        cohort["count"] != 10000 for cohort in value["cohorts"].values()
+    ):
+        raise RuntimeError(
+            "expanded measurement policy cohorts are missing or undersampled"
+        )
+    if set(value.get("per_class_policy", {})) != classes:
+        raise RuntimeError("expanded measurement class/policy coverage differs")
+    for key in keys:
+        cohort, policy = key.split(":")
+        count = sum(
+            row["count"]
+            for name, row in value["per_class_policy"].items()
+            if name.startswith(cohort + ":") and name.endswith(":" + policy)
+        )
+        if count != 10000:
+            raise RuntimeError("expanded measurement class counts differ from cohort")
+
+
 def finalize(output):
     stages = json.loads((output / "stages.json").read_text(encoding="utf-8-sig"))
     if any(stage["status"] != "passed" for stage in stages):
@@ -176,6 +225,7 @@ def finalize(output):
             for cohort in value["cohorts"].values()
         ):
             raise RuntimeError("warm short/medium Rust p95 regression")
+        validate_expanded_measurement(value["expanded_coverage_measurement"])
         native.append(
             {
                 "file": record(path),
@@ -186,6 +236,7 @@ def finalize(output):
                 "large": value["large"],
                 "limit_diagnostics": value["limit_diagnostics"],
                 "fallback_measurement": value["fallback_measurement"],
+                "expanded_coverage_measurement": value["expanded_coverage_measurement"],
             }
         )
     if len(native) != 3:
@@ -210,6 +261,13 @@ def finalize(output):
                 "consumer native binary differs from authoritative wheel"
             )
     identity = installed["normalizer_id"]
+    python_report = json.loads(
+        (output / "reports" / "python.json").read_text(encoding="utf-8")
+    )
+    validate_expanded_measurement(python_report["expanded_coverage_measurement"])
+    fixture = ROOT / "tests" / "fixtures" / "expanded-coverage.json"
+    if python_report["expanded_coverage_measurement"]["input_sha256"] != sha(fixture):
+        raise RuntimeError("Python expanded measurement fixture hash differs")
     if any(
         json.loads(Path(row["file"]["path"]).read_text(encoding="utf-8"))[
             "normalizer_id"
@@ -239,7 +297,8 @@ def finalize(output):
         "corpora": [
             record(ROOT / "benches" / name)
             for name in ("corpus.json", "intent-corpus.json")
-        ],
+        ]
+        + [record(fixture)],
         "consumer": installed,
         "artifact_files": [
             record(path) for path in sorted((output / "reports").iterdir())

@@ -14,10 +14,29 @@ mod tests {
             ("10-15 kişi", "on ila on beş kişi"),
             ("info@ornek.com", "info et ornek nokta kom"),
             ("tren trafik", "tren trafik"),
+            ("1 234,50TL", "bin iki yüz otuz dört Türk lirası elli kuruş"),
+            ("5°C", "beş derece Santigrat"),
+            ("ABC", "ABC"),
+            ("tarih 03/04/2026", "tarih üç Nisan iki bin yirmi altı"),
         ] {
-            let r = n.normalize(input, &NormalizeOptions::default()).unwrap();
-            assert!(r.complete());
-            assert_eq!(r.normalized_text(), expected);
+            for policy in [
+                AmbiguityPolicy::Preserve,
+                AmbiguityPolicy::Reject,
+                AmbiguityPolicy::Fallback,
+            ] {
+                let r = n
+                    .normalize(
+                        input,
+                        &NormalizeOptions {
+                            ambiguity_policy: policy,
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
+                assert!(r.complete());
+                assert!(!r.fallback_used());
+                assert_eq!(r.normalized_text(), expected);
+            }
         }
     }
     #[test]

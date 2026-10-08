@@ -18,9 +18,12 @@ stem and a derived stem are distinct: `25 TL'den` becomes `yirmi beş Türk
 lirasından`, while `1.'nin` becomes `birincinin`. Emitted text is never reparsed
 to infer suffixes. Arbitrary suffix chains and invalid allomorphs are unresolved.
 
-Percentages use `%` followed by a valid exact number and supported suffix:
+Percentages accept prefix, spaced-prefix and trailing `%` with a valid exact
+number and the same supported suffix rules:
 `%37,5'lik` -> `yüzde otuz yedi virgül beşlik`;
-`%3,25'ten` -> `yüzde üç virgül iki beşten`.
+`%3,25'ten` -> `yüzde üç virgül iki beşten`;
+`12,5%'lik` and `% 12,5'lik` -> `yüzde on iki virgül beşlik`.
+Duplicate notation and incorrect allomorphs do not become valid by moving `%`.
 
 ## Currencies, units and ranges
 
@@ -37,32 +40,83 @@ conversion, exchange-rate lookup or currency catalog inference:
 Zero minor units are omitted. Unknown or malformed currency expressions remain
 whole unresolved spans.
 
+Supported currency labels may be compact or spaced: `25TL`, `25 TL`, `$25`,
+`$ 25` and `25$`. Currency context also permits space-grouped money such as
+`1 234,50 TL`, `$1 234,50` and `1 234,50TL`. The first group has 1-3 digits
+without a leading zero; continuation groups have exactly three digits. Use one
+consistent single separator: ordinary space (U+0020), nonbreaking space (U+00A0)
+or narrow nonbreaking space (U+202F). Mixed separators, invalid group widths and
+excess precision stay whole unresolved amounts. Tabs/newlines are not grouping
+separators, and bare numbers or measurements do not gain space-grouping intent.
+No global whitespace rewriting is performed.
+
 Approved unit labels are exactly `kg`, `g`, `km`, `m`, `cm`, `mm`, `L`, `mL`,
-`mg`, `µg`, `μg`, `gr`, `ml`, `lt`, `dk`, `sn`, `sa`, `m²`, `cm²`, `km²`, `m³`.
+`mg`, `µg`, `μg`, `gr`, `ml`, `lt`, `dk`, `sn`, `sa`, `m²`, `cm²`, `km²`, `m³`,
+`°C`, `V`, `kW`, `kWh` and `GB`.
 Aliases are explicit: there is no arbitrary case-folding or NFKC expansion.
 Rates are only `km/sa`, `km/h` and `m/s`, using `saatte` / `saniyede`.
+Number/label adjacency is supported: `5kg` -> `beş kilogram`.
 
-Ranges keep exact endpoint order and use `-` or `–` plus an approved unit or
-`kişi`, `adet`, `gün`, `yaş` context, or a whole Range hint. Bare `10-15`,
+| New label | Reading in numeric quantity context |
+|---|---|
+| `°C` | `derece Santigrat` |
+| `V` | `volt` |
+| `kW` | `kilovat` |
+| `kWh` | `kilovat saat` |
+| `GB` | `gigabayt` |
+
+Bare symbols do not become unit readings. Existing case families are validated
+against the approved spoken names: `75 kW'tan` -> `yetmiş beş kilovattan`;
+`10 kWh'ten` -> `on kilovat saatten`. `KW`/`kw`, arbitrary suffix chains and
+unapproved units remain unsupported.
+
+Ranges keep exact endpoint order and use compact or spaced `-` / `–` plus an
+approved unit or `kişi`, `adet`, `gün`, `yaş` context, or a whole Range hint. Bare `10-15`,
 mathematical subtraction/equations and date/time/currency ranges are not guessed.
+`10 - 15 kişi` -> `on ila on beş kişi`.
 
 ## Dates, clocks and abbreviations
 
 Gregorian dates accept dotted day-month-year with a four-digit nonzero year, or
-unsuffixed ISO dates. A `tarih` / `tarihi` cue, including its supported colon
-form, or a Date hint establishes intent. Clocks are valid 24-hour values with
+unsuffixed ISO dates, or fixed `DD/MM/YYYY` slash dates. A `tarih` / `tarihi` cue,
+including its supported colon form, or a Date hint establishes intent. Clocks are valid 24-hour values with
 a `saat` cue or Time hint.
+`tarih 03/04/2026` -> `tarih üç Nisan iki bin yirmi altı`.
+Bare slash notation remains unresolved; Fallback reads its written components
+literally, not as a preferred/surface calendar date. US-order, two-digit-year
+and clock-seconds interpretation are not added.
 
 The bounded date-locative + whitespace + `saat` + whitespace + clock-locative
 frame is also recognized. Date locative uses the spoken year; clock locative
-uses the minute, or hour when `:00` elides minutes. Suffixed ISO dates,
+uses the minute, or hour when `:00` elides minutes. Suffixed ISO/slash dates,
 arbitrary suffix chains and invalid calendar/clock values stay unresolved.
 `Toplam 25.` is not silently treated as an ordinal.
 
-The explicit abbreviation inventory includes `Dr.`, `Prof.`, `vb.`, `TBMM`,
-`PTT`, `NATO`, `IBAN` and bare `KDV`. Initialisms retain spaced letter readings.
-Suffix support is bounded per entry; arbitrary abbreviations and KDV suffixes
-are not inferred.
+The explicit abbreviation inventory includes `Dr.` / `dr.` / `DR.`,
+`Prof.` / `prof.` / `PROF.`, `Doç.` / `doç.` / `DOÇ.`, `vb.`, `TBMM`,
+`PTT`, `NATO`, `IBAN` and `KDV`. Initialisms retain spaced letter readings.
+Suffix support is bounded per entry, including approved `KDV'den` ->
+`katma değer vergisinden`. Arbitrary abbreviation meanings are not inferred.
+
+Unknown uppercase alphabetic prose such as `BUGÜN`, `İSTANBUL` and `ABC`
+remains verbatim without an uppercase-only issue or automatic letter spelling,
+in every policy. Recognized Roman-looking notation and protected identifiers
+retain their distinct intent and fallback rules. This is not an acronym or
+proper-name detector.
+
+## Quotation and list boundaries
+
+Smart double quotes and clearly paired smart/straight single quotes around
+quantities stay verbatim: `‘25 TL’` -> `‘yirmi beş Türk lirası’`.
+Apostrophes in supported suffixes remain part of their whole expression.
+Ambiguous/unmatched forms are not forcibly treated as paired quotations.
+
+Semicolon lists and clear comma boundaries after approved quantity labels are
+separated without inventing spaces: `25kg,30kg` ->
+`yirmi beş kilogram,otuz kilogram`.
+Decimal commas remain numeric: `25,30kg` ->
+`yirmi beş virgül üç sıfır kilogram`. This is not global splitting on commas.
+URL/address punctuation and genuine identifier interiors stay protected.
 
 ## Phones, IBANs and Romans
 
@@ -114,7 +168,7 @@ to `normalized_text`.
 Default Preserve returns useful partial work, `complete = false` and structured
 issues. Reject returns `NormalizeError::Unresolved` with the same diagnostics
 and no normalized result. Invalid input/hints/configuration, cancellation,
-deadlines, resource limits and internal failures remain real errors in both.
+deadlines, resource limits and internal failures remain real errors in every policy.
 
 | Limit | Bound |
 |---|---|

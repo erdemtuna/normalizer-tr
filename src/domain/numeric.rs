@@ -312,10 +312,14 @@ pub(crate) struct Quantity {
 
 impl Quantity {
     pub(crate) fn parse(number: &str, label: &str) -> Option<Self> {
-        let (base, suffixes) = suffix_parts(label)?;
-        if suffixes.len() > 1 {
-            return None;
-        }
+        let (base, suffix) = split_suffix(label)?;
+        Self::parse_with_suffix(number, base, suffix)
+    }
+    pub(crate) fn parse_with_suffix(
+        number: &str,
+        base: &str,
+        suffix: Option<&str>,
+    ) -> Option<Self> {
         let (value, lexeme, prefix) = if let Some(currency) = Currency::parse(base) {
             (
                 QuantityValue::Money(Amount::parse(number)?, currency),
@@ -323,7 +327,7 @@ impl Quantity {
                 None,
             )
         } else if let Some((prefix, lexeme)) = lexicon::rate(base) {
-            if !suffixes.is_empty() {
+            if suffix.is_some() {
                 return None;
             }
             (
@@ -338,9 +342,7 @@ impl Quantity {
                 None,
             )
         };
-        let case = suffixes
-            .first()
-            .map_or(Some(None), |s| case_inflection(lexeme.source, s).map(Some))?;
+        let case = suffix.map_or(Some(None), |s| case_inflection(lexeme.source, s).map(Some))?;
         Some(Self {
             value,
             lexeme,
@@ -387,6 +389,41 @@ pub(crate) fn label(text: &str) -> bool {
         || lexicon::rate(base).is_some()
 }
 
+/// Surface ownership only; values and suffixes are validated by Quantity.
+pub(crate) fn attached_quantity(text: &str) -> Option<(&str, &str)> {
+    let base = text.split(['\'', '’']).next()?;
+    if let Some(symbol) = base.chars().next().filter(|c| "₺$€£".contains(*c)) {
+        return Some((&base[symbol.len_utf8()..], &base[..symbol.len_utf8()]));
+    }
+    if let Some(symbol) = base.chars().last().filter(|c| "₺$€£".contains(*c)) {
+        let offset = base.len() - symbol.len_utf8();
+        return Some((&base[..offset], &base[offset..]));
+    }
+    if !base.starts_with(|c: char| c.is_ascii_digit() || matches!(c, '+' | '-')) {
+        return None;
+    }
+    let offset = base.find(|c: char| c.is_alphabetic() || matches!(c, '°' | 'µ' | 'μ'))?;
+    let tail = &base[offset..];
+    (label(tail) || lexicon::unit_marker(tail) || unsupported_label(tail))
+        .then_some((&base[..offset], tail))
+}
+
+pub(crate) fn quantity_piece(text: &str) -> bool {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    label(text)
+        || attached_quantity(text)
+            .is_some_and(|(number, label)| !number.is_empty() && base.ends_with(label))
+}
+
+pub(crate) fn currency_marker(text: &str) -> bool {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    Currency::parse(base).is_some()
+        || (base.len() == 3
+            && base.bytes().all(|byte| byte.is_ascii_uppercase())
+            && lexicon::abbreviation(base).is_none()
+            && !lexicon::unit_marker(base))
+}
+
 pub(crate) fn unsupported_label(text: &str) -> bool {
     matches!(
         text,
@@ -400,12 +437,9 @@ pub(crate) fn unsupported_label(text: &str) -> bool {
             | "kHz"
             | "MHz"
             | "GHz"
-            | "°C"
             | "°F"
             | "mph"
-            | "GB"
             | "MB"
-            | "V"
             | "A"
             | "W"
     )
@@ -435,13 +469,25 @@ pub(crate) fn lexical_reading(
 
 pub(crate) fn percent(text: &str) -> Option<Result<(Number, Option<Inflection>), IssueCategory>> {
     let (base, suffixes) = suffix_parts(text)?;
-    let body = base.strip_prefix('%')?;
+    let body = base.strip_prefix('%').or_else(|| base.strip_suffix('%'))?;
+    Some(percent_value(body, &suffixes))
+}
+
+pub(crate) fn percent_body(text: &str) -> Result<(Number, Option<Inflection>), IssueCategory> {
+    let (body, suffixes) = suffix_parts(text).ok_or(IssueCategory::Unsupported)?;
+    percent_value(body, &suffixes)
+}
+
+fn percent_value(
+    body: &str,
+    suffixes: &[&str],
+) -> Result<(Number, Option<Inflection>), IssueCategory> {
     let number = match Number::parse(body) {
         Some(n) => n,
-        None => return Some(Err(IssueCategory::InvalidExpression)),
+        None => return Err(IssueCategory::InvalidExpression),
     };
     if suffixes.len() > 1 {
-        return Some(Err(IssueCategory::Unsupported));
+        return Err(IssueCategory::Unsupported);
     }
     let spoken = numerals::number(&number);
     let inflection = match suffixes.first() {
@@ -450,12 +496,12 @@ pub(crate) fn percent(text: &str) -> Option<Result<(Number, Option<Inflection>),
         }
         Some(s) => match spoken_case(&spoken, s) {
             Some(case) => Some(case),
-            None => return Some(Err(IssueCategory::InvalidExpression)),
+            None => return Err(IssueCategory::InvalidExpression),
         },
         None => None,
     };
     // Keep the validated number and grammatical family, not parsed emitted text.
-    Some(Ok((number, inflection)))
+    Ok((number, inflection))
 }
 
 #[derive(Clone, Debug)]
@@ -474,8 +520,8 @@ impl NumericRange {
                 continue;
             }
             if let (Some(start), Some(end)) = (
-                Number::parse(&text[..offset]),
-                Number::parse(&text[offset + ch.len_utf8()..]),
+                Number::parse(text[..offset].trim()),
+                Number::parse(text[offset + ch.len_utf8()..].trim()),
             ) {
                 if found.is_some() {
                     return None;

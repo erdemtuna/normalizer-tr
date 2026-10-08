@@ -25,7 +25,7 @@ pub(super) fn date(text: &str, permitted: bool) -> Result<Value, TemporalFailure
     if !permitted {
         return Err(TemporalFailure {
             category: IssueCategory::Ambiguous,
-            preference: Some(TemporalPreference::Date(date, suffix.is_some())),
+            preference: (!date.slash()).then_some(TemporalPreference::Date(date, suffix.is_some())),
         });
     }
     Ok(Value::Date(date, suffix.is_some()))
@@ -97,7 +97,8 @@ pub(super) fn recognize(
     let (base, _) = split_suffix(token)?;
     let dots = base.bytes().filter(|b| *b == b'.').count();
     let hyphens = base.bytes().filter(|b| *b == b'-').count();
-    if dots == 2 || (hyphens == 2 && base.len() >= 8) {
+    let slashes = base.bytes().filter(|b| *b == b'/').count();
+    if dots == 2 || ((hyphens == 2 || slashes == 2) && base.len() >= 8) {
         if dots == 2
             && crate::numerals::Number::parse(base).is_some_and(|n| n.grouped())
             && !cue(text, tokens, index, DATE_CUES)

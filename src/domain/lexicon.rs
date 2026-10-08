@@ -73,6 +73,25 @@ const UNITS: &[(&str, Lexeme)] = &[
     ("cm²", Lexeme::same("santimetrekare", FrontFlat, Vowel)),
     ("km²", Lexeme::same("kilometrekare", FrontFlat, Vowel)),
     ("m³", Lexeme::same("metreküp", FrontRound, SoftensP)),
+    (
+        "°C",
+        Lexeme::distinct(
+            "derece Santigrat",
+            Word::new("Santigrat", BackFlat, Voiceless),
+            Word::new("Santigrat", BackFlat, Voiceless),
+        ),
+    ),
+    ("V", Lexeme::same("volt", BackRound, Voiceless)),
+    ("kW", Lexeme::same("kilovat", BackFlat, Voiceless)),
+    (
+        "kWh",
+        Lexeme::distinct(
+            "kilovat saat",
+            Word::new("saat", FrontFlat, Voiceless),
+            Word::new("saat", FrontFlat, Voiceless),
+        ),
+    ),
+    ("GB", Lexeme::same("gigabayt", BackFlat, Voiceless)),
 ];
 
 pub(crate) fn unit(symbol: &str) -> Option<Lexeme> {
@@ -89,6 +108,14 @@ pub(crate) fn unit_marker(symbol: &str) -> bool {
         .any(|(key, _)| key.eq_ignore_ascii_case(symbol))
 }
 
+pub(crate) fn unit_prefix(text: &str) -> Option<(&str, Lexeme)> {
+    UNITS.iter().find_map(|(symbol, entry)| {
+        text.strip_prefix(symbol)
+            .filter(|rest| !rest.starts_with(|ch: char| ch.is_alphanumeric() || ch == '_'))
+            .map(|_| (*symbol, *entry))
+    })
+}
+
 pub(crate) fn rate(symbol: &str) -> Option<(Lexeme, Lexeme)> {
     match symbol {
         "km/sa" | "km/h" => Some((unit("sa")?, unit("km")?)),
@@ -99,8 +126,9 @@ pub(crate) fn rate(symbol: &str) -> Option<(Lexeme, Lexeme)> {
 
 pub(crate) fn abbreviation(symbol: &str) -> Option<Lexeme> {
     Some(match symbol {
-        "Dr." => Lexeme::same("doktor", BackRound, Voiced),
-        "Prof." => Lexeme::same("profesör", FrontRound, Voiced),
+        "Dr." | "dr." | "DR." => Lexeme::same("doktor", BackRound, Voiced),
+        "Prof." | "prof." | "PROF." => Lexeme::same("profesör", FrontRound, Voiced),
+        "Doç." | "doç." | "DOÇ." => Lexeme::same("doçent", FrontFlat, Voiceless),
         "vb." => Lexeme::distinct(
             "ve benzeri",
             Word::new("be", FrontFlat, Vowel),

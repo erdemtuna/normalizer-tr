@@ -104,6 +104,88 @@ def measure(corpus, policies=("preserve", "reject")):
     }
 
 
+def expanded_measurement():
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "tests"
+        / "fixtures"
+        / "expanded-coverage.json"
+    )
+    cases = json.loads(path.read_text(encoding="utf-8"))
+    n = Normalizer()
+    cohorts = {}
+    per_class = {}
+    for cohort in ("short", "medium"):
+        prefix = (
+            (
+                "Bu sentetik paragraf kaynak metnin ve miktarların birlikte okunmasını kontrol eder. "
+                * 4
+            )
+            if cohort == "medium"
+            else ""
+        )
+        for policy in ("preserve", "reject", "fallback"):
+            prepared = []
+            for case in cases:
+                text = prefix + case["text"]
+                assert (
+                    len(text.encode("utf-8")) <= 256
+                    if cohort == "short"
+                    else 257 <= len(text.encode("utf-8")) <= 1024
+                )
+                options = {"ambiguity_policy": policy}
+                if "hint" in case:
+                    hint = case["hint"]
+                    shift = len(prefix.encode("utf-8"))
+                    options["hints"] = (
+                        Hint(hint["start"] + shift, hint["end"] + shift, hint["kind"]),
+                    )
+                expected = invoke(n, text, options)
+                unresolved = "category" in case
+                if unresolved and policy == "reject":
+                    assert isinstance(expected, tuple) and expected[0] == "unresolved"
+                else:
+                    written = (
+                        case["fallback"]
+                        if unresolved and policy == "fallback"
+                        else case["text"]
+                        if unresolved
+                        else case["expected"]
+                    )
+                    assert expected.normalized_text == prefix + written
+                    assert expected.complete == (not unresolved or policy == "fallback")
+                    assert expected.fallback_used == (
+                        unresolved and policy == "fallback"
+                    )
+                prepared.append((case, text, options, expected))
+            for index in range(2000):
+                _, text, options, _ = prepared[index % len(prepared)]
+                invoke(n, text, options)
+            samples = []
+            for index in range(10000):
+                case, text, options, _ = prepared[index % len(prepared)]
+                start = time.perf_counter_ns()
+                result = invoke(n, text, options)
+                del result
+                elapsed = time.perf_counter_ns() - start
+                samples.append(elapsed)
+                per_class.setdefault(f"{cohort}:{case['class']}:{policy}", []).append(
+                    elapsed
+                )
+            for _, text, options, expected in prepared:
+                assert invoke(n, text, options) == expected
+            cohorts[f"{cohort}:{policy}"] = quantiles(samples)
+    return {
+        "input_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "input_cases": cases,
+        "method": "separate policy cohorts; reviewed goldens; 2000 warmups and 10000 installed public calls including disposal; no filtering",
+        "cohorts": cohorts,
+        "per_class_policy": {
+            key: quantiles(values) for key, values in per_class.items()
+        },
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
@@ -132,6 +214,7 @@ def main():
         "clock_overhead": quantiles(clock),
         "measurement": measure(corpus),
         "fallback_measurement": measure(corpus, ("fallback",)),
+        "expanded_coverage_measurement": expanded_measurement(),
         "fallback_method": "separate fallback-only cohorts, same corpus; 10000 calls/cohort after 2000 warmup; no filtering or overhead subtraction; not equivalent to preserve/reject",
         "allocation_instrumentation": "unavailable for Rust native allocations; no inferred counts or peak-memory claim",
     }

@@ -81,6 +81,14 @@ are TypeError/ValueError, never partial success. Hint kinds:
 cardinal/digits/date/time/ordinal/roman/range/telephone/electronic.
 Whole-span/grapheme/overlap/content checks are authoritative in Rust.
 
+The current core reads `25TL` as `yirmi beş Türk lirası` in every policy and
+preserves `ABC` verbatim without an uppercase-only issue. Valid new primary
+formats do not produce fallback diagnostics. Fixed slash dates require a cue
+or whole Date hint; unhinted slash notation stays literal in Fallback.
+Compact codes that exactly match an approved quantity are interpreted as
+quantities. Review diagnostic counts and partial-hint ranges when migrating;
+the public record shapes and argument defaults are unchanged.
+
 `NormalizationError` has code, immutable issues and limit_kind. Codes:
 invalid_input, invalid_hint, invalid_configuration, limit_exceeded, cancelled,
 unresolved, internal. Strict errors contain issues, no normalized result.

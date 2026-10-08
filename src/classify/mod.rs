@@ -55,22 +55,18 @@ pub(crate) fn collect(
     let mut candidates = Vec::new();
     let mut index = 0;
     let mut hint_index = 0;
-    let mut role_until = 0;
     while index < tokens.len() {
         control.check()?;
         if let Some(hint) = hints
             .get(hint_index)
             .filter(|h| h.range.start <= tokens[index].range.start)
         {
-            let detected = readers::read(&ctx, index, &bounds, index < role_until)
+            let detected = readers::read(&ctx, index, &bounds)
                 .map(|(_, end)| bounds.claim(index, end))
                 .transpose()?;
             let claim = bounds.hint_claim(*hint, detected.as_ref())?;
             let text = &text[claim.range.start..claim.range.end];
             let value = readers::hint(text, hint.kind).ok_or(NormalizeError::InvalidHint)?;
-            if matches!(value, Value::Roman(_)) {
-                role_until = ctx.roman_anchor_end(index).unwrap_or(role_until);
-            }
             index = claim.next;
             push(&mut candidates, claim, Reading::Resolved(value))?;
             hint_index += 1;
@@ -82,13 +78,10 @@ pub(crate) fn collect(
         {
             return Err(NormalizeError::InvalidHint);
         }
-        if let Some((reading, end)) = readers::read(&ctx, index, &bounds, index < role_until) {
+        if let Some((reading, end)) = readers::read(&ctx, index, &bounds) {
             let claim = bounds.claim(index, end)?;
             if overlaps_hint(hints, claim.range) {
                 return Err(NormalizeError::InvalidHint);
-            }
-            if matches!(&reading, Reading::Resolved(Value::Roman(_))) {
-                role_until = ctx.roman_anchor_end(index).unwrap_or(role_until);
             }
             index = claim.next;
             push(&mut candidates, claim, reading)?;

@@ -7,10 +7,48 @@ import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from verification import write, wheel, prepare
+from verification import write, wheel, prepare, validate_expanded_measurement
 
 
 class VerificationTests(unittest.TestCase):
+    def test_expanded_reports_require_every_policy_and_reviewed_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixtures = root / "tests" / "fixtures"
+            fixtures.mkdir(parents=True)
+            cases = [
+                {"class": "money", "text": "25TL", "expected": "yirmi beş Türk lirası"}
+            ]
+            (fixtures / "expanded-coverage.json").write_text(
+                json.dumps(cases), encoding="utf-8"
+            )
+            keys = [
+                f"{cohort}:{policy}"
+                for cohort in ("short", "medium")
+                for policy in ("preserve", "reject", "fallback")
+            ]
+            value = {
+                "input_cases": cases,
+                "cohorts": {key: {"count": 10000} for key in keys},
+                "per_class_policy": {
+                    key.replace(":", ":money:"): {"count": 10000} for key in keys
+                },
+            }
+            with patch("verification.ROOT", root):
+                validate_expanded_measurement(value)
+                broken = {**value, "input_cases": []}
+                with self.assertRaisesRegex(RuntimeError, "reviewed fixture"):
+                    validate_expanded_measurement(broken)
+                broken = {
+                    **value,
+                    "cohorts": {**value["cohorts"], "short:fallback": {"count": 9999}},
+                }
+                with self.assertRaisesRegex(RuntimeError, "undersampled"):
+                    validate_expanded_measurement(broken)
+                broken = {**value, "per_class_policy": {}}
+                with self.assertRaisesRegex(RuntimeError, "class/policy"):
+                    validate_expanded_measurement(broken)
+
     def test_reports_refuse_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "report.json"

@@ -123,6 +123,7 @@ pub(super) fn prose_punctuation(symbol: char) -> bool {
             | '"'
             | '\''
             | '’'
+            | '‘'
             | '“'
             | '”'
             | '…'

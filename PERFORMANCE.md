@@ -54,6 +54,15 @@ mix their samples into that aggregate or label differences as an optimization.
 Python reports follow the same separation, including fallback-only concurrent
 calls. No new universal latency promise is made for amplified code-point output.
 
+Current source adds `expanded_coverage_measurement` without changing the frozen
+inputs, original aggregate/order or existing report fields. Reviewed cases come
+from `tests/fixtures/expanded-coverage.json`, shared with Rust/Python tests.
+Each short/medium policy cohort is separate, with 2,000 warmups and 10,000 calls.
+Golden outcomes are checked before/after timing; class counts and exact inputs
+are validated by the verifier. Native reports also retain 4/16/32 KiB grouping,
+quotation/list, malformed-input and decomposed-Unicode scaling diagnostics.
+Python reports hash the fixture; the final manifest includes its hash too.
+
 The first process initialization is recorded separately from 100 later cached
 same-process constructor calls. Those later calls are **not cold starts**.
 Large 4/16/32 KiB inputs, maximum hints, candidate/result errors and long
@@ -71,6 +80,34 @@ Inspected host: AMD Ryzen AI 7 PRO 350, 8 cores / 16 logical processors,
 Windows 11 Enterprise 26200, Rust 1.94 x64 MSVC. Shared-host power/load/noise
 context is recorded without changing settings or stopping other work. Timings
 on GitHub-hosted runners or other hardware are not assumed equivalent.
+
+### Current-source development comparison
+
+On the same host using pinned Rust 1.99.0 x64 MSVC, the unchanged
+`d0bc1bc` baseline and current uncommitted implementation produced these warm
+original Preserve/Reject p95 values, in microseconds:
+
+| Cohort | Baseline repetitions | Current-source repetitions |
+|---|---|---|
+| Short | 23.6, 28.8, 26.1 | 22.6, 18.1, 21.5 |
+| Medium | 155.1, 159.8, 239.1 | 171.1, 155.9, 154.6 |
+
+All current repetitions met the existing host-specific 1 ms target. Additional
+isolated-baseline comparisons showed substantial shared-host variability, so
+these results are not a universal improvement claim. A no-single-quote fast
+path avoids unnecessary quotation traversal; numeric-run indexing avoids
+repeated grouping lookahead. Original corpora and their hashes were unchanged.
+
+The final separate expanded-coverage repetition had native p95 values of
+9.4/9.2/9.6 microseconds for short Preserve/Reject/Fallback and
+100.3/94.5/144.4 for medium. Installed CPython 3.13 original-cohort p95 was
+63.0/236.5 microseconds for short/medium, compared with baseline 53.7/223.1.
+These retain host noise, marshaling and disposal rather than hiding them.
+Large-input/result-limit diagnostics are not covered by the 1 ms target.
+
+Reports/packages are local session artifacts, not published release evidence.
+The clean-revision full verifier remains a separate prerequisite for a release;
+this development comparison does not bypass it.
 
 Retained mechanisms are borrowed already-NFC grapheme-safe mapping with an NFC
 fallback, indexed overlap windows, exact numerals and one immutable pattern

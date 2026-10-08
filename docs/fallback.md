@@ -39,6 +39,23 @@ parts. Account/identifier digits are spelled, including zeros, without checksum
 certification. Existing decimal, money, telephone and electronic readings do
 not change when they already succeed.
 
+Expanded primary coverage is shared by all three policies. `25TL`, valid
+space-grouped money and approved new units now receive primary readings even
+under Fallback, so those valid expressions no longer produce fallback records.
+Malformed compounds still own their full source span and carry the original
+failure category; their literal output is not a valid-money/unit certificate.
+
+Unknown uppercase prose such as `ABC` is preserved rather than spelled.
+Identifier `AB12` and uncued Roman `IV` still use their existing protected/literal
+readings. Bare or invalid slash-date notation remains literal, without a
+PreferredDate or SurfaceDate assumption.
+
+In failed quantity expressions, approved labels are recognized in numeric
+context before symbol/letter splitting: `01 °C` reads
+`sıfır bir derece Santigrat` with an InvalidForm diagnostic, not a validated
+Unit segment. Bare `V`/`GB` do not gain unit meanings.
+Paired quote/list punctuation in unclaimed prose gaps remains punctuation.
+
 ## Diagnostics and serialization
 
 Rust exposes `fallbacks()` and derived `fallback_used()`. Each immutable record

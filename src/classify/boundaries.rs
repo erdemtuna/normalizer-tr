@@ -84,9 +84,7 @@ pub(super) fn quantity_tail(text: &str) -> bool {
     numeric::label(base)
         || numeric::unsupported_label(base)
         || numeric::unsupported_label(&base.to_ascii_uppercase())
-        || (base.len() == 3
-            && base.bytes().all(|b| b.is_ascii_uppercase())
-            && crate::domain::lexicon::abbreviation(base).is_none())
+        || numeric::currency_marker(base)
         || crate::domain::lexicon::unit_marker(base)
         || base == "%"
 }

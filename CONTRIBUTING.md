@@ -39,6 +39,10 @@ ordered literal parts, explicit spelling inventory and bounded emitter.
 `src/classify/symbols.rs` supplements unclaimed graphemes only in Fallback.
 `src/pipeline.rs` composes the source partition, diagnostics and budgets.
 The Python binding calls this engine; it does not duplicate language rules.
+The scanner indexes numeric-run ends once for bounded money lookahead and
+distinguishes paired quotation boundaries from suffix apostrophes. Keep surface
+recognition separate from strict value validation; share typed label metadata
+between readers and context-owned fallback parts.
 
 Add positive, negative and mixed-sentence tests. Assert completeness, issue
 scope and byte ranges as well as text. Preserve matched-invalid compounds
@@ -51,6 +55,11 @@ outcomes, silently drop symbols, certify invalid dates/accounts, or mask
 controls/limit errors as preservation. Add its handled reasons to `fallbacks`,
 not unresolved `issues`; assert that completion, provenance and source
 partitions agree. See [the fallback contract](docs/fallback.md).
+
+`tests/fixtures/expanded-coverage.json` contains reviewed public examples shared
+by Rust, installed-Python tests and separate new-coverage measurements. Add
+cross-feature cases and exercise Preserve, Reject and Fallback independently.
+Do not alter the frozen benchmark inputs/order to improve an aggregate.
 
 ## Checks
 

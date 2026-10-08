@@ -1,5 +1,36 @@
 # Release notes
 
+## Unreleased
+
+The Rust core now recognizes compact quantities, supported spaced currency
+symbols, validated space-grouped money, additional percent positions and
+spaced contextual ranges. Number/label/suffix validation remains exact and
+malformed compounds stay whole.
+
+Adds numeric-context `°C` (`derece Santigrat`), `V`, `kW`, `kWh` and `GB`, their
+validated existing case families, and explicit capitalization aliases for
+doctor/professor/doçent titles. Supports fixed `DD/MM/YYYY` only with a date cue
+or whole Date hint; bare/invalid slash notation remains literal under Fallback.
+Clock seconds are still outside coverage.
+
+Smart double quotes, clearly paired single quotes and unambiguous quantity-list
+boundaries preserve punctuation without confusing decimal commas or suffix
+apostrophes. Unknown uppercase prose such as `ABC` is now verbatim in every
+policy; protected identifiers and recognized Roman-looking notation keep their
+existing rules.
+
+Public signatures, result/diagnostic shapes, policy defaults and limits are
+unchanged, but these are deliberate behavioral changes: previously unresolved
+forms may now resolve, Reject may succeed, and fallback counts/readings can
+change. A fragment hint inside a newly recognized compound is invalid.
+Update output snapshots and review diagnostic-dependent consumer logic.
+No spelling-override hint, global casing/whitespace rewrite, rounding, currency
+conversion or dependency is introduced.
+
+New shared Rust/Python goldens cover every policy. Performance reporting adds
+separate reviewed new-coverage and scaling measurements while retaining the
+original frozen corpora and their measurement rules.
+
 ## 0.4.0
 
 Opt into source faithful fallback with Python's `ambiguity_policy="fallback"`

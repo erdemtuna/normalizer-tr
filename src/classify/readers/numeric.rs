@@ -13,6 +13,20 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<(Attempt, Fallback
     let tokens = ctx.tokens;
     let token = tokens[index];
     let source = token.text;
+    if source == "%"
+        && let Some(next) = tokens.get(index + 1).filter(|next| {
+            whitespace_between(text, token.range.end, next.range.start)
+                && next.text.chars().any(|ch| ch.is_ascii_digit())
+        })
+    {
+        return Some((
+            (
+                numeric::percent_body(next.text).map(|(number, case)| Value::Percent(number, case)),
+                index + 1,
+            ),
+            FallbackClass::Percent,
+        ));
+    }
     if let Some(percent) = numeric::percent(source) {
         return Some((
             (

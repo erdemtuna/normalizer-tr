@@ -93,6 +93,11 @@ This is a pre 1.0 library with bounded coverage, not a universal pronunciation
 engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) for measurements and
 [release notes](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/release.md) for changes.
 
+Current source also supports compact quantities (`5kg`, `25TL`), validated
+space-grouped money and intent-gated slash dates. Unknown uppercase prose is
+preserved, not automatically spelled; Roman-looking notation and identifiers
+keep their separate rules. See the normalization reference for exact boundaries.
+
 ## License
 
 [Apache-2.0](https://github.com/erdemtuna/normalizer-tr/blob/main/LICENSE),

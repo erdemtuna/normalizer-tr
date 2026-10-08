@@ -91,8 +91,12 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
                 || national_shape
                 || phone_cue)
         {
+            let phone = Telephone::parse(whole, phone_cue);
+            if phone.is_none() && ctx.money_end(index).is_some() {
+                return None;
+            }
             return Some((
-                Telephone::parse(whole, phone_cue)
+                phone
                     .map(Value::Telephone)
                     .ok_or(IssueCategory::InvalidExpression),
                 end,
