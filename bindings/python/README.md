@@ -3,9 +3,9 @@
 Distribution `normalizer-tr`; import `normalizer_tr`, native submodule
 `normalizer_tr._native`. This is the Python bridge to the Rust engine, not a
 second implementation. This guide follows the repository API; see the
-[changelog](../../CHANGELOG.md) for released and unreleased changes.
+[changelog](../../CHANGELOG.md) for release status and migration notes.
 The curated initialism/name additions and `"pronunciation"` labels below are
-**Unreleased**, not available in published 0.4.0.
+included in **0.5.0**; review the migration notes before upgrading.
 
 ## Install
 
@@ -87,7 +87,7 @@ Aliases are Turkish-readable text, not phonemes. For exact casing, phrase and
 suffix boundaries, see [approved foreign names](../../docs/normalization.md#approved-foreign-names).
 Invalid suffixes are not repaired; handled name failures have fallback
 `attempted_class="pronunciation"`. Update strict kind/class allowlists when
-adopting the unreleased API.
+adopting the 0.5.0 API.
 
 `FallbackDiagnostic` is frozen and has start_byte/end_byte/attempted_class/
 reason/original_category/strategy. Completion is not logical-value validation,
@@ -111,7 +111,7 @@ work executes pure Rust detached from the interpreter after copying/validating
 arguments; records marshal afterward.
 
 Deadlines/cancellation are cooperative, not hard call-duration limits; see
-[reviewed boundary regressions](../../docs/normalization.md#reviewed-boundary-regressions-unreleased).
+[reviewed boundary regressions](../../docs/normalization.md#reviewed-boundary-regressions-050).
 
 ## Development and verification
 

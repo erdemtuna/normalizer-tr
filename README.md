@@ -37,7 +37,7 @@ Requires Rust 1.94 or newer. Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-normalizer-tr = "0.4"
+normalizer-tr = "0.5"
 ```
 
 ```rust
@@ -93,11 +93,12 @@ UTF-8 byte offsets, not character positions.
 
 This is a pre 1.0 library with bounded coverage, not a universal pronunciation
 engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) for measurements and
-[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for released and unreleased changes.
+[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for release status and migration notes.
 
 The guides track repository behavior: expanded initialism coverage and
 [foreign-name speech aliases](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#approved-foreign-names)
-are **Unreleased**, not part of published 0.4.0.
+are included in **0.5.0**. Review the changelog's migration notes before upgrading,
+especially exhaustive Rust enum matches and strict serialized allowlists.
 
 ## License
 

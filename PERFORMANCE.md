@@ -11,7 +11,7 @@ improvement. Current semantic outcomes are checked independently by the
 characterization and class tests.
 
 Passing those frozen cohorts does not cover every scaling path. The
-[reviewed boundary regressions](docs/normalization.md#reviewed-boundary-regressions-unreleased)
+[reviewed boundary regressions](docs/normalization.md#reviewed-boundary-regressions-050)
 also exercise single malformed numeric tokens and cooperative control checks.
 Cooperative deadlines are not hard latency guarantees.
 
@@ -106,7 +106,7 @@ revision. Both builds reported `normalizer-tr/0.4.0`; that identity alone does
 not distinguish these source snapshots.
 
 This historical snapshot predates the initialism and foreign-name additions;
-it is not a measurement of the current Unreleased head.
+it is not a measurement of the 0.5.0 release revision.
 
 Host: AMD Ryzen AI 7 PRO 350, 8 cores / 16 logical processors, Windows 11
 Enterprise 26200. Native builds used Rust 1.99.0 x64 MSVC, optimized bench

@@ -6,7 +6,7 @@ profiles. `NORMALIZER_ID` / `normalizer_id` is diagnostic package metadata.
 claim about native-language or speech quality.
 
 This reference follows repository behavior. See the [changelog](../CHANGELOG.md)
-for differences between published packages and unreleased changes.
+for versioned changes and migration requirements.
 
 ## Exact numbers and morphology
 
@@ -42,7 +42,7 @@ conversion, exchange-rate lookup or currency catalog inference:
 
 Zero minor units are omitted. Unknown or malformed currency expressions remain
 whole unresolved spans; see the
-[reviewed boundary regressions](#reviewed-boundary-regressions-unreleased).
+[reviewed boundary regressions](#reviewed-boundary-regressions-050).
 
 Supported currency labels may be compact or spaced: `25TL`, `25 TL`, `$25`,
 `$ 25` and `25$`. Currency context also permits space-grouped money such as
@@ -210,7 +210,7 @@ Unknown, protected or empty members block successful catalog rewrites throughout
 a tight group. Genuine unresolved findings and literal fallback remain available.
 Comma-separated spaced prose is normalized independently; a tight group ends
 at a space after the comma or an established semicolon boundary. See
-[reviewed boundary regressions](#reviewed-boundary-regressions-unreleased).
+[reviewed boundary regressions](#reviewed-boundary-regressions-050).
 
 ## Phones, IBANs and Romans
 
@@ -277,7 +277,7 @@ controls are invalid. Cancellation/deadlines are cooperative between bounded
 steps, not hard wall-clock guarantees. Outputs contain input text, but the core
 does not log it; issue explanations contain no copied input values.
 
-## Reviewed boundary regressions (Unreleased)
+## Reviewed boundary regressions (0.5.0)
 
 The [full-PR review](https://github.com/erdemtuna/normalizer-tr/pull/2#pullrequestreview-5466509996)
 and [pronunciation review](https://github.com/erdemtuna/normalizer-tr/pull/2#pullrequestreview-5467492566)
