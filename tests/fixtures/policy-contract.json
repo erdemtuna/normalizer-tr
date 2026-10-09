@@ -6,5 +6,8 @@
   "policy-contract/date-intent.json",
   "policy-contract/unresolved-outcomes.json",
   "policy-contract/source-context.json",
-  "policy-contract/compound-boundaries.json"
+  "policy-contract/compound-boundaries.json",
+  "policy-contract/initialisms.json",
+  "policy-contract/pronunciation-variants.json",
+  "policy-contract/initialism-boundaries.json"
 ]

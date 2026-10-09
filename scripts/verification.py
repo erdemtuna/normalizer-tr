@@ -143,6 +143,10 @@ def consume(output):
             ("5°C", "beş derece Santigrat"),
             ("ABC", "ABC"),
             ("tarih 03/04/2026", "tarih üç Nisan iki bin yirmi altı"),
+            ("CHP ve AKP", "ce he pe ve a ke pe"),
+            ("SGK'ya", "se ge kaya"),
+            ("PDF'ten", "pe de eften"),
+            ("CHP,AKP:", "ce he pe,a ke pe:"),
         ):
             result = normalizer.normalize(text, ambiguity_policy=policy)
             if (

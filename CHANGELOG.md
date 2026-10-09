@@ -7,6 +7,13 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Add 65 reviewed uppercase initialisms with typed pronunciation tails. `SGK`
+  defaults to `se ge ka`; approved suffixes select `ke`/`ka` alternatives and
+  PDF's `fe`/`ef` alternative without silently canonicalizing the reading.
+  API/IP/HDMI use an explicit international `i` reading.
+- Recognize guarded no-space abbreviation lists and trailing colon/period
+  punctuation while protecting unknown prose, identifiers, electronic text and
+  canonical Roman intent.
 - Recognize compact quantities, supported spaced currency symbols, validated
   space-grouped money, additional percent positions and spaced contextual ranges.
   Validation remains exact; malformed compounds stay whole.
@@ -31,7 +38,9 @@ change: previously unresolved forms may resolve, Reject may succeed, and
 fallback counts/readings may change. Fragment hints inside recognized compounds
 are invalid. Compact strings matching an approved quantity are treated as
 quantities, not opaque codes. Review output snapshots, diagnostic-dependent logic
-and hint ranges.
+and hint ranges. Approved initialisms previously left verbatim now receive
+primary Abbreviation segments. Their unmatched suffixes produce structured
+issues (or Reject errors) instead of being accepted as ordinary prose.
 No spelling override, global casing/whitespace rewrite, rounding or currency
 conversion is added. See the [normalization reference](docs/normalization.md)
 for exact boundaries.

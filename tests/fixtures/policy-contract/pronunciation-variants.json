@@ -1,0 +1,72 @@
+[
+  {
+    "id": "initialism-sgk-ka-dative",
+    "class": "abbreviation",
+    "text": "SGK’ya",
+    "expected": "se ge kaya",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-sgk-ke-dative",
+    "class": "abbreviation",
+    "text": "SGK’ye",
+    "expected": "se ge keye",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-sgk-ka-genitive",
+    "class": "abbreviation",
+    "text": "SGK'nın",
+    "expected": "se ge kanın",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-sgk-ke-genitive",
+    "class": "abbreviation",
+    "text": "SGK'nin",
+    "expected": "se ge kenin",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-pdf-ef",
+    "class": "abbreviation",
+    "text": "PDF’ten",
+    "expected": "pe de eften",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-pdf-fe",
+    "class": "abbreviation",
+    "text": "PDF’den",
+    "expected": "pe de feden",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-tdk-ka",
+    "class": "abbreviation",
+    "text": "TDK'ya",
+    "expected": "te de kaya",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-gpu-round",
+    "class": "abbreviation",
+    "text": "GPU'ya",
+    "expected": "ge pe uya",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-itu-front-round",
+    "class": "abbreviation",
+    "text": "İTÜ'nün",
+    "expected": "i te ünün",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-api-suffix",
+    "class": "abbreviation",
+    "text": "API'ye",
+    "expected": "a pe iye",
+    "kind": "Abbreviation"
+  }
+]

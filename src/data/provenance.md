@@ -12,6 +12,11 @@ head `0a5de68286cacc4f95c754f519899d15fc2c5e73`.
 The inventory is in [notation/symbols.rs](../notation/symbols.rs);
 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) retains attribution.
 
+The [initialism catalog](../domain/lexicon/abbreviations.rs) was reviewed against
+that contribution, with a bounded set of exact keys and explicitly approved
+pronunciation variants. Suffixes select typed readings; the catalog is not an
+acronym detector or a copy of the contribution's contextual abbreviation engine.
+
 Owned Rust code, unit/currency/abbreviation/character readings and finite
 source/target/derived-tail metadata are Apache-2.0. No bulk dictionary or
 third-party normalizer source was copied. Exact numeral behavior was

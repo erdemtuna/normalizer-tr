@@ -1,5 +1,6 @@
 //! Source-local quotation, trimming and quantity-list boundaries.
 use crate::SourceRange;
+use crate::domain::lexicon;
 
 fn delimiter(ch: char) -> bool {
     matches!(
@@ -59,13 +60,20 @@ pub(super) fn trimmed_range(text: &str, offset: usize, quotes: &[usize]) -> Opti
     if body.ends_with(',') && !body.ends_with(",,") {
         body = &body[..body.len() - 1];
     }
+    if let Some(before) = body.strip_suffix(':')
+        && !before.contains([':', ','])
+        && lexicon::plain_abbreviation(before)
+    {
+        body = before;
+    }
 
     if body.ends_with('.')
         && !body.ends_with("..")
         && !lexical_period(body)
-        && !body[..body.len() - 1]
+        && (!body[..body.len() - 1]
             .bytes()
             .all(|b| b"IVXLCDM".contains(&b))
+            || lexicon::plain_abbreviation(&body[..body.len() - 1]))
         && !body[..body.len() - 1].bytes().all(|b| b.is_ascii_digit())
     {
         body = &body[..body.len() - 1];
@@ -113,7 +121,25 @@ pub(super) fn expression_range(text: &str, offset: usize, quotes: &[usize]) -> O
 }
 
 pub(super) fn lexical_period(text: &str) -> bool {
-    crate::domain::lexicon::abbreviation(text.split(['\'', '’']).next().unwrap_or(text)).is_some()
+    text.ends_with('.') && lexicon::abbreviation(text).is_some()
+}
+
+pub(super) fn abbreviation_list(text: &str, offset: usize, quotes: &[usize]) -> bool {
+    text.contains(',')
+        && text
+            .split(',')
+            .scan(offset, |start, member| {
+                let member_start = *start;
+                *start += member.len() + 1;
+                Some(
+                    trimmed_range(member, member_start, quotes).is_some_and(|range| {
+                        lexicon::plain_abbreviation(
+                            &member[range.start - member_start..range.end - member_start],
+                        )
+                    }),
+                )
+            })
+            .all(|approved| approved)
 }
 
 pub(super) fn numeric_parenthesis_compound(raw: &str) -> bool {

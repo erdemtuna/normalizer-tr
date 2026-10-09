@@ -101,6 +101,23 @@ The explicit abbreviation inventory includes `Dr.` / `dr.` / `DR.`,
 Suffix support is bounded per entry, including approved `KDV'den` ->
 `katma değer vergisinden`. Arbitrary abbreviation meanings are not inferred.
 
+The [approved catalog](../src/domain/lexicon/abbreviations.rs) also contains
+65 exact uppercase initialisms, including `CHP`, `TRT`, `SGK`, `GPU`, `USB` and
+`PDF`. They use explicit Turkish letter readings, not full-name expansions.
+`SGK` defaults to `se ge ka`; the approved international entries `API`, `IP`
+and `HDMI` read `I` as `i`. This does not change literal Turkish `I`, Roman intent
+or source casing.
+
+Only the five existing case families are accepted. Suffixes select an approved
+pronunciation rather than being repaired:
+`SGK'ya` -> `se ge kaya`, `SGK'ye` -> `se ge keye`;
+`PDF'ten` -> `pe de eften`, `PDF'den` -> `pe de feden`.
+The `ke`/`ka` alternatives are limited to `SGK`, `BDDK`, `BTK`, `KVKK`, `SPK`,
+`TCK`, `TDK`, `TSK`, `YSK` and `SSK`; the `fe`/`ef` alternative is PDF-only.
+Other K-ending defaults use `ke`. Invalid or multiple suffixes stay whole
+unresolved spans. Word-read acronyms, dotted aliases and other pronunciations
+are not inferred from the new catalog.
+
 Unknown uppercase alphabetic prose such as `BUGÜN`, `İSTANBUL` and `ABC`
 remains verbatim without an uppercase-only issue or automatic letter spelling,
 in every policy. Recognized Roman-looking notation and protected identifiers
@@ -120,6 +137,16 @@ separated without inventing spaces: `25kg,30kg` ->
 Decimal commas remain numeric: `25,30kg` ->
 `yirmi beş virgül üç sıfır kilogram`. This is not global splitting on commas.
 URL/address punctuation and genuine identifier interiors stay protected.
+
+No-space comma lists split only when every member has an approved uppercase
+abbreviation base: `CHP,AKP` -> `ce he pe,a ke pe`. Existing forms such as
+`TBMM,PTT` use the same rule. A malformed suffix on a known member retains its
+own whole-span diagnostic. Mixed unknown lists such as `CHP,UNKNOWN` are not
+partially interpreted.
+Standalone approved abbreviations also preserve a trailing colon or sentence
+period: `TRT:` -> `te re te:`, `LCD.` -> `le ce de.`.
+Canonical Roman notation, `GPU:123`, opaque identifiers and electronic interiors
+retain their existing ownership and intent rules.
 
 ## Phones, IBANs and Romans
 

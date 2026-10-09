@@ -1,0 +1,65 @@
+[
+  {
+    "id": "initialism-parties",
+    "class": "abbreviation",
+    "text": "CHP ve AKP",
+    "expected": "ce he pe ve a ke pe"
+  },
+  {
+    "id": "initialism-broadcast",
+    "class": "abbreviation",
+    "text": "TRT haber",
+    "expected": "te re te haber"
+  },
+  {
+    "id": "initialism-sgk-default",
+    "class": "abbreviation",
+    "text": "SGK",
+    "expected": "se ge ka",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-gpu",
+    "class": "abbreviation",
+    "text": "GPU",
+    "expected": "ge pe u",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-yks",
+    "class": "abbreviation",
+    "text": "YKS",
+    "expected": "ye ke se",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-countries",
+    "class": "abbreviation",
+    "text": "ABD ve AB",
+    "expected": "a be de ve a be"
+  },
+  {
+    "id": "initialism-file-codes",
+    "class": "abbreviation",
+    "text": "USB, PDF, TC",
+    "expected": "u se be, pe de fe, te ce"
+  },
+  {
+    "id": "initialism-international-i",
+    "class": "abbreviation",
+    "text": "API ve IP, HDMI",
+    "expected": "a pe i ve i pe, he de me i"
+  },
+  {
+    "id": "initialism-turkish-letters",
+    "class": "abbreviation",
+    "text": "ÖSYM, İBB, AİHM",
+    "expected": "ö se ye me, i be be, a i he me"
+  },
+  {
+    "id": "initialism-education",
+    "class": "abbreviation",
+    "text": "KPSS ve LGS",
+    "expected": "ke pe se se ve le ge se"
+  }
+]

@@ -49,6 +49,12 @@ without fallback records. See the [normalization reference](normalization.md).
 Malformed compounds still own their full source span and carry the original
 failure category; their literal output is not a valid-money/unit certificate.
 
+Approved initialisms and suffix-selected pronunciations are primary readings in
+every policy, without fallback records: `SGK’ya` -> `se ge kaya` and
+`PDF’ten` -> `pe de eften`. An unapproved suffix remains an unresolved whole
+expression; Fallback spells its written letters and suffix literally, not using
+an inferred pronunciation to repair it.
+
 Unknown uppercase prose such as `ABC` is preserved rather than spelled.
 Identifier `AB12` and uncued Roman `IV` use their protected/literal
 readings. Bare or invalid slash-date notation remains literal, without a

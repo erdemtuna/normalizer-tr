@@ -1,8 +1,10 @@
+mod abbreviations;
+
 use crate::morphology::{Harmony, Word, WordEnd};
 use crate::{
     IssueCategory,
     morphology::{Inflection, case_inflection},
-    notation::suffix_parts,
+    notation::split_suffix,
 };
 
 use Harmony::{BackFlat, BackRound, FrontFlat, FrontRound};
@@ -130,34 +132,12 @@ pub(crate) fn rate(symbol: &str) -> Option<(Lexeme, Lexeme)> {
 }
 
 pub(crate) fn abbreviation(symbol: &str) -> Option<Lexeme> {
-    Some(match symbol {
-        "Dr." | "dr." | "DR." => Lexeme::same("doktor", BackRound, Voiced),
-        "Prof." | "prof." | "PROF." => Lexeme::same("profesör", FrontRound, Voiced),
-        "Doç." | "doç." | "DOÇ." => Lexeme::same("doçent", FrontFlat, Voiceless),
-        "vb." => Lexeme::distinct(
-            "ve benzeri",
-            Word::new("be", FrontFlat, Vowel),
-            Word::new("benzeri", FrontFlat, Vowel),
-        ),
-        "TBMM" => Lexeme::distinct(
-            "te be me me",
-            Word::new("me", FrontFlat, Vowel),
-            Word::new("me", FrontFlat, Vowel),
-        ),
-        "PTT" => Lexeme::distinct(
-            "pe te te",
-            Word::new("te", FrontFlat, Vowel),
-            Word::new("te", FrontFlat, Vowel),
-        ),
-        "NATO" => Lexeme::same("nato", BackRound, Vowel),
-        "IBAN" => Lexeme::same("iban", BackFlat, Voiced),
-        "KDV" => Lexeme::distinct(
-            "katma değer vergisi",
-            Word::new("ve", FrontFlat, Vowel),
-            Word::new("vergisi", FrontFlat, Possessive),
-        ),
-        _ => return None,
-    })
+    abbreviations::lookup(symbol).map(abbreviations::Definition::default)
+}
+
+pub(crate) fn plain_abbreviation(text: &str) -> bool {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    abbreviation(base).is_some() && base.chars().all(char::is_uppercase)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -233,20 +213,24 @@ pub(crate) fn lexical_reading(
     text: &str,
 ) -> Option<Result<(Lexeme, Option<Inflection>), IssueCategory>> {
     let base = text.split(['\'', '’']).next().unwrap_or(text);
-    let entry = abbreviation(base)
+    let definition = abbreviations::lookup(base);
+    let entry = definition
+        .map(abbreviations::Definition::default)
         .or_else(|| Currency::parse(base).map(|currency| currency.lexeme(base)))?;
-    let Some((_, suffixes)) = suffix_parts(text) else {
+    let Some((_, suffix)) = split_suffix(text) else {
         return Some(Err(IssueCategory::Unsupported));
     };
-    if suffixes.len() > 1 {
-        return Some(Err(IssueCategory::Unsupported));
-    }
-    let case = match suffixes.first() {
-        Some(suffix) => match case_inflection(entry.source, suffix) {
-            Some(case) => Some(case),
-            None => return Some(Err(IssueCategory::InvalidExpression)),
-        },
-        None => None,
+    let Some(suffix) = suffix else {
+        return Some(Ok((entry, None)));
     };
-    Some(Ok((entry, case)))
+    let selected = if let Some(definition) = definition {
+        definition.inflected(suffix)
+    } else {
+        case_inflection(entry.source, suffix).map(|case| (entry, case))
+    };
+    Some(
+        selected
+            .map(|(entry, case)| (entry, Some(case)))
+            .ok_or(IssueCategory::InvalidExpression),
+    )
 }

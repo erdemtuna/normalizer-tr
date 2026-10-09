@@ -50,6 +50,12 @@ controls and capacity during traversal. `src/classify/symbols.rs` supplements
 only unclaimed graphemes in Fallback. Python calls this engine without duplicating
 language rules.
 
+`src/domain/lexicon/abbreviations.rs` is the single static abbreviation catalog.
+It owns default and alternate Lexemes with typed source/target tails. The parent
+lexicon validates suffixes and selects a reading; scanners use approved bases
+only for source boundaries. Keep new names out of scanner, rendering and Python
+special cases, and test catalog ordering plus unambiguous variant suffixes.
+
 The scanner indexes numeric-run ends once for bounded money lookahead and
 distinguishes paired quotation boundaries from suffix apostrophes. Keep
 recognition separate from strict value validation and share typed label metadata.

@@ -1,0 +1,69 @@
+[
+  {
+    "id": "initialism-comma-list",
+    "class": "abbreviation",
+    "text": "CHP,AKP",
+    "expected": "ce he pe,a ke pe"
+  },
+  {
+    "id": "initialism-variant-list",
+    "class": "abbreviation",
+    "text": "SGK'ya,PDF'ten:",
+    "expected": "se ge kaya,pe de eften:"
+  },
+  {
+    "id": "initialism-legacy-list",
+    "class": "abbreviation",
+    "text": "TBMM,PTT",
+    "expected": "te be me me,pe te te"
+  },
+  {
+    "id": "initialism-roman-shaped-period",
+    "class": "abbreviation",
+    "text": "LCD.",
+    "expected": "le ce de."
+  },
+  {
+    "id": "initialism-colon",
+    "class": "abbreviation",
+    "text": "TRT:",
+    "expected": "te re te:"
+  },
+  {
+    "id": "initialism-quoted-suffix",
+    "class": "abbreviation",
+    "text": "‘SGK’ya’",
+    "expected": "‘se ge kaya’"
+  },
+  {
+    "id": "initialism-unicode-prefix",
+    "class": "abbreviation",
+    "text": "ö SGK’ya!",
+    "expected": "ö se ge kaya!"
+  },
+  {
+    "id": "initialism-nfd",
+    "class": "abbreviation",
+    "text": "O\u0308SYM’ye",
+    "expected": "ö se ye meye",
+    "kind": "Abbreviation"
+  },
+  {
+    "id": "initialism-invalid-suffix",
+    "class": "abbreviation",
+    "text": "SGK'a",
+    "category": "InvalidExpression",
+    "fallback": "se ge ke kesme a",
+    "fallback_class": "Abbreviation",
+    "strategy": "Literal"
+  },
+  {
+    "id": "initialism-multiple-suffixes",
+    "class": "abbreviation",
+    "text": "SGK'ya'nın",
+    "category": "Unsupported",
+    "fallback": "se ge ke kesme ye a kesme ne ı ne",
+    "fallback_class": "Abbreviation",
+    "strategy": "Literal"
+  }
+]

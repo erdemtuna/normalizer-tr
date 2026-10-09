@@ -7,8 +7,8 @@ use crate::{
     NormalizeError, SourceRange, WorkControl, resources::Resources, source_map::SourceMap,
 };
 use punctuation::{
-    boundary, expression_range, lexical_period, numeric_parenthesis_compound, quantity_separators,
-    quotation_boundaries, trimmed_range,
+    abbreviation_list, boundary, expression_range, lexical_period, numeric_parenthesis_compound,
+    quantity_separators, quotation_boundaries, trimmed_range,
 };
 pub(super) use signals::{
     group_whitespace, identifier, math_operator, number_fragment, phones, spaced_compound,
@@ -75,10 +75,11 @@ pub(super) fn tokens<'a>(
         };
         if crate::domain::electronic::looks_like(&text[range.start..range.end])
             || lexical_period(&text[range.start..range.end])
-            || text[range.start..range.end]
+            || (text[range.start..range.end]
                 .trim_end_matches('.')
                 .bytes()
                 .all(|b| b"IVXLCDM".contains(&b))
+                && !crate::domain::lexicon::plain_abbreviation(&text[range.start..range.end]))
         {
             append_token(&mut tokens, source, range);
             continue;
@@ -108,6 +109,8 @@ pub(super) fn tokens<'a>(
         }
         // Identifier punctuation (including URL queries) must not split the token.
         let protected = identifier(&text[range.start..range.end]);
+        let mut abbreviations = !protected
+            && abbreviation_list(body.split(';').next().unwrap_or(body), range.start, &quotes);
         let list =
             protected && quantity_separators(&text[range.start..range.end], range.start, &quotes);
         if protected && !list {
@@ -117,9 +120,10 @@ pub(super) fn tokens<'a>(
         let mut start = 0;
         for (offset, ch) in raw.char_indices() {
             let comma = ch == ','
-                && crate::notation::quantity_piece(&raw[start..offset])
-                && raw[offset + 1..]
-                    .starts_with(|c: char| c.is_ascii_digit() || "+-₺$€£".contains(c));
+                && (abbreviations
+                    || (raw[offset + 1..]
+                        .starts_with(|c: char| c.is_ascii_digit() || "+-₺$€£".contains(c))
+                        && crate::notation::quantity_piece(&raw[start..offset])));
             if !boundary(ch, matched.start() + offset, &quotes) && !comma {
                 continue;
             }
@@ -137,6 +141,14 @@ pub(super) fn tokens<'a>(
                 append_token(&mut tokens, source, range);
             }
             start = offset + ch.len_utf8();
+            if ch == ';' && !protected {
+                let remaining = &raw[start..];
+                abbreviations = abbreviation_list(
+                    remaining.split(';').next().unwrap_or(remaining),
+                    matched.start() + start,
+                    &quotes,
+                );
+            }
         }
         if let Some(range) = trimmed_range(&raw[start..], matched.start() + start, &quotes) {
             append_token(&mut tokens, source, range);
