@@ -43,6 +43,8 @@ pub enum SegmentKind {
     Symbol,
     /// Source-faithful fallback, not certification of the source value.
     Fallback,
+    /// Approved foreign-name spoken alias with validated inflection.
+    Pronunciation,
 }
 
 /// One member of an ordered, contiguous original-source partition.

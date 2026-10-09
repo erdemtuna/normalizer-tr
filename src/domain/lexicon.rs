@@ -1,4 +1,8 @@
 mod abbreviations;
+mod pronunciations;
+mod static_index;
+
+pub(crate) const MAX_PRONUNCIATION_WORDS: usize = pronunciations::MAX_WORDS;
 
 use crate::morphology::{Harmony, Word, WordEnd};
 use crate::{
@@ -138,6 +142,30 @@ pub(crate) fn abbreviation(symbol: &str) -> Option<Lexeme> {
 pub(crate) fn plain_abbreviation(text: &str) -> bool {
     let base = text.split(['\'', '’']).next().unwrap_or(text);
     abbreviation(base).is_some() && base.chars().all(char::is_uppercase)
+}
+
+pub(crate) fn pronunciation_candidates(first: &str) -> &'static [(&'static str, &'static Lexeme)] {
+    pronunciations::candidates(first)
+}
+
+pub(crate) fn pronunciation_word(text: &str) -> bool {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    pronunciations::lookup(base).is_some()
+}
+
+pub(crate) fn pronunciation_boundary(text: &str) -> bool {
+    pronunciations::boundary_word(text)
+}
+
+pub(crate) fn pronunciation_reading(
+    entry: Lexeme,
+    text: &str,
+) -> Result<(Lexeme, Option<Inflection>), IssueCategory> {
+    let (_, suffix) = split_suffix(text).ok_or(IssueCategory::Unsupported)?;
+    let case = suffix
+        .map(|suffix| case_inflection(entry.source, suffix).ok_or(IssueCategory::InvalidExpression))
+        .transpose()?;
+    Ok((entry, case))
 }
 
 #[derive(Clone, Copy, Debug)]

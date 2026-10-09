@@ -22,6 +22,9 @@ mod tests {
             ("SGK'ya", "se ge kaya"),
             ("PDF'ten", "pe de eften"),
             ("CHP,AKP:", "ce he pe,a ke pe:"),
+            ("Claude'a", "kloda"),
+            ("ChatGPT", "çet ci pi ti"),
+            ("GitHub Copilot", "git hab ko paylıt"),
         ] {
             for policy in [
                 AmbiguityPolicy::Preserve,

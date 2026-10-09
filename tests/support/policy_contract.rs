@@ -48,6 +48,22 @@ const GROUPS: &[(&str, &str)] = &[
         "policy-contract/initialism-boundaries.json",
         include_str!("../fixtures/policy-contract/initialism-boundaries.json"),
     ),
+    (
+        "policy-contract/pronunciation-ai.json",
+        include_str!("../fixtures/policy-contract/pronunciation-ai.json"),
+    ),
+    (
+        "policy-contract/pronunciation-developer.json",
+        include_str!("../fixtures/policy-contract/pronunciation-developer.json"),
+    ),
+    (
+        "policy-contract/pronunciation-consumer.json",
+        include_str!("../fixtures/policy-contract/pronunciation-consumer.json"),
+    ),
+    (
+        "policy-contract/pronunciation-boundaries.json",
+        include_str!("../fixtures/policy-contract/pronunciation-boundaries.json"),
+    ),
 ];
 
 pub fn load() -> (Vec<Value>, usize) {

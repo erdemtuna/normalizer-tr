@@ -2,6 +2,7 @@ mod electronic;
 mod identifiers;
 mod lexical;
 mod numeric;
+mod pronunciation;
 mod quantities;
 
 use super::{
@@ -97,6 +98,10 @@ pub(super) fn read(
     };
     electronic::whole(ctx, index)
         .map(|attempt| annotate(attempt, FallbackClass::Electronic))
+        .or_else(|| {
+            pronunciation::read(ctx, index)
+                .map(|attempt| annotate(attempt, FallbackClass::Pronunciation))
+        })
         .or_else(|| {
             lexical::read(ctx, index).map(|attempt| annotate(attempt, FallbackClass::Abbreviation))
         })

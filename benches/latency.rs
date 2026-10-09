@@ -236,6 +236,10 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
             ("unmatched-quotes", "'25TL 123 "),
             ("invalid-group", "12 34,50 TL; "),
             ("decomposed", "o\u{308} 5kg; "),
+            ("pronunciation-name", "Claude; "),
+            ("pronunciation-phrase", "GitHub Copilot; "),
+            ("pronunciation-prefix-miss", "Visual Studio Nope; "),
+            ("pronunciation-list", "ChatGPT,Claude; "),
         ] {
             let mut text = pattern.repeat(size / pattern.len());
             text.push_str(&" ".repeat(size - text.len()));

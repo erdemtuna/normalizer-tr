@@ -9,5 +9,9 @@
   "policy-contract/compound-boundaries.json",
   "policy-contract/initialisms.json",
   "policy-contract/pronunciation-variants.json",
-  "policy-contract/initialism-boundaries.json"
+  "policy-contract/initialism-boundaries.json",
+  "policy-contract/pronunciation-ai.json",
+  "policy-contract/pronunciation-developer.json",
+  "policy-contract/pronunciation-consumer.json",
+  "policy-contract/pronunciation-boundaries.json"
 ]

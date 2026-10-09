@@ -54,7 +54,10 @@ language rules.
 It owns default and alternate Lexemes with typed source/target tails. The parent
 lexicon validates suffixes and selects a reading; scanners use approved bases
 only for source boundaries. Keep new names out of scanner, rendering and Python
-special cases, and test catalog ordering plus unambiguous variant suffixes.
+special cases. Definitions live in thematic `titles`, `civic`, `education`,
+`finance` and `technology` modules; maintain them in logical order, not alphabetical
+order. A compile-time index combines the groups for allocation-free binary lookup.
+Test global key uniqueness, index coverage and unambiguous variant suffixes.
 
 The scanner indexes numeric-run ends once for bounded money lookahead and
 distinguishes paired quotation boundaries from suffix apostrophes. Keep

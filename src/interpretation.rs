@@ -22,6 +22,7 @@ pub(crate) enum Value {
     Time(Clock, bool),
     Quantity(Quantity),
     Lexical(crate::domain::lexicon::Lexeme, Option<Inflection>),
+    Pronunciation(crate::domain::lexicon::Lexeme, Option<Inflection>),
     Range(NumericRange),
     Telephone(Telephone),
     Iban(Iban),
@@ -100,6 +101,7 @@ impl UnresolvedFinding {
             class,
             FallbackClass::Identifier
                 | FallbackClass::Abbreviation
+                | FallbackClass::Pronunciation
                 | FallbackClass::Roman
                 | FallbackClass::Electronic
         );

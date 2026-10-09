@@ -27,6 +27,8 @@ pub enum FallbackClass {
     Expression,
     /// Otherwise-unhandled symbolic graphemes.
     Symbol,
+    /// Approved foreign-name family with an unsupported or invalid source form.
+    Pronunciation,
 }
 
 /// Why a primary reading was unavailable; contains no copied source values.

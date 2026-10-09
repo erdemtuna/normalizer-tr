@@ -1,0 +1,14 @@
+[
+  {"id":"name-github","class":"pronunciation","text":"GitHub","expected":"git hab","kind":"Pronunciation"},
+  {"id":"name-copilot","class":"pronunciation","text":"Copilot","expected":"ko paylıt","kind":"Pronunciation"},
+  {"id":"name-docker","class":"pronunciation","text":"Docker","expected":"dokır","kind":"Pronunciation"},
+  {"id":"name-kubernetes","class":"pronunciation","text":"Kubernetes","expected":"kubırnetiz","kind":"Pronunciation"},
+  {"id":"name-python","class":"pronunciation","text":"Python","expected":"paytın","kind":"Pronunciation"},
+  {"id":"name-javascript","class":"pronunciation","text":"JavaScript","expected":"cava skript","kind":"Pronunciation"},
+  {"id":"name-typescript","class":"pronunciation","text":"TypeScript","expected":"tayp skript","kind":"Pronunciation"},
+  {"id":"name-rust","class":"pronunciation","text":"Rust","expected":"rast","kind":"Pronunciation"},
+  {"id":"name-react","class":"pronunciation","text":"React","expected":"ri ekt","kind":"Pronunciation"},
+  {"id":"name-github-copilot","class":"pronunciation","text":"GitHub Copilot","expected":"git hab ko paylıt","kind":"Pronunciation"},
+  {"id":"name-visual-studio-code","class":"pronunciation","text":"Visual Studio Code","expected":"vijuıl stüdyo kod","kind":"Pronunciation"},
+  {"id":"name-vs-code","class":"pronunciation","text":"VS Code","expected":"vi es kod","kind":"Pronunciation"}
+]

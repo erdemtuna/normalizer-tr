@@ -7,7 +7,7 @@ use crate::{
     NormalizeError, SourceRange, WorkControl, resources::Resources, source_map::SourceMap,
 };
 use punctuation::{
-    abbreviation_list, boundary, expression_range, lexical_period, numeric_parenthesis_compound,
+    boundary, expression_range, lexical_list, lexical_period, numeric_parenthesis_compound,
     quantity_separators, quotation_boundaries, trimmed_range,
 };
 pub(super) use signals::{
@@ -109,8 +109,14 @@ pub(super) fn tokens<'a>(
         }
         // Identifier punctuation (including URL queries) must not split the token.
         let protected = identifier(&text[range.start..range.end]);
-        let mut abbreviations = !protected
-            && abbreviation_list(body.split(';').next().unwrap_or(body), range.start, &quotes);
+        let mut approved_list = !protected
+            && lexical_list(
+                body.split(';').next().unwrap_or(body),
+                range.start,
+                &quotes,
+                text,
+                &tokens,
+            );
         let list =
             protected && quantity_separators(&text[range.start..range.end], range.start, &quotes);
         if protected && !list {
@@ -120,7 +126,7 @@ pub(super) fn tokens<'a>(
         let mut start = 0;
         for (offset, ch) in raw.char_indices() {
             let comma = ch == ','
-                && (abbreviations
+                && (approved_list
                     || (raw[offset + 1..]
                         .starts_with(|c: char| c.is_ascii_digit() || "+-₺$€£".contains(c))
                         && crate::notation::quantity_piece(&raw[start..offset])));
@@ -143,10 +149,12 @@ pub(super) fn tokens<'a>(
             start = offset + ch.len_utf8();
             if ch == ';' && !protected {
                 let remaining = &raw[start..];
-                abbreviations = abbreviation_list(
+                approved_list = lexical_list(
                     remaining.split(';').next().unwrap_or(remaining),
                     matched.start() + start,
                     &quotes,
+                    text,
+                    &tokens,
                 );
             }
         }

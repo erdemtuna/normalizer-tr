@@ -1,0 +1,21 @@
+[
+  {"id":"name-claude-dative","class":"pronunciation","text":"Claude’a","expected":"kloda","kind":"Pronunciation"},
+  {"id":"name-claude-genitive","class":"pronunciation","text":"Claude’un","expected":"klodun","kind":"Pronunciation"},
+  {"id":"name-codex-ablative","class":"pronunciation","text":"Codex’ten","expected":"kodeksten","kind":"Pronunciation"},
+  {"id":"name-chatgpt-dative","class":"pronunciation","text":"ChatGPT’ye","expected":"çet ci pi tiye","kind":"Pronunciation"},
+  {"id":"name-openai-dative","class":"pronunciation","text":"OpenAI’a","expected":"opın ey aya","kind":"Pronunciation"},
+  {"id":"name-phrase-dative","class":"pronunciation","text":"GitHub Copilot’a","expected":"git hab ko paylıta","kind":"Pronunciation"},
+  {"id":"name-phrase-genitive","class":"pronunciation","text":"Visual Studio Code’un","expected":"vijuıl stüdyo kodun","kind":"Pronunciation"},
+  {"id":"name-phrase-colon","class":"pronunciation","text":"Visual Studio Code:","expected":"vijuıl stüdyo kod:"},
+  {"id":"name-list","class":"pronunciation","text":"ChatGPT,Claude","expected":"çet ci pi ti,klod"},
+  {"id":"name-unknown-list","class":"pronunciation","text":"Claude,UNKNOWN","expected":"Claude,UNKNOWN"},
+  {"id":"name-casing-collisions","class":"pronunciation","text":"apple react codex rust python","expected":"apple react codex rust python"},
+  {"id":"name-generic-components","class":"pronunciation","text":"Face Studio Code","expected":"Face Studio Code"},
+  {"id":"name-unicode-gap","class":"pronunciation","text":"o\u0308 Claude’un!","expected":"o\u0308 klodun!"},
+  {"id":"name-invalid-suffix","class":"pronunciation","text":"Claude'ye","category":"InvalidExpression","fallback":"ce le a u de e kesme ye e","fallback_class":"Pronunciation","strategy":"Literal"},
+  {"id":"name-unsupported-chain","class":"pronunciation","text":"ChatGPT'ye'nin","category":"Unsupported","fallback":"ce he a te ge pe te kesme ye e kesme ne i ne","fallback_class":"Pronunciation","strategy":"Literal"},
+  {"id":"name-phrase-list-left","class":"pronunciation","text":"Hugging Face,Claude","expected":"haging feys,klod"},
+  {"id":"name-phrase-list-right","class":"pronunciation","text":"Claude,Hugging Face","expected":"klod,haging feys"},
+  {"id":"name-phrase-list-period","class":"pronunciation","text":"Claude,Visual Studio Code.","expected":"klod,vijuıl stüdyo kod."},
+  {"id":"name-generic-list","class":"pronunciation","text":"Face,Claude","expected":"Face,Claude"}
+]

@@ -1,4 +1,5 @@
-//! Source-local quotation, trimming and quantity-list boundaries.
+//! Source-local quotation, trimming and approved-list boundaries.
+use super::Token;
 use crate::SourceRange;
 use crate::domain::lexicon;
 
@@ -62,7 +63,7 @@ pub(super) fn trimmed_range(text: &str, offset: usize, quotes: &[usize]) -> Opti
     }
     if let Some(before) = body.strip_suffix(':')
         && !before.contains([':', ','])
-        && lexicon::plain_abbreviation(before)
+        && (lexicon::plain_abbreviation(before) || lexicon::pronunciation_boundary(before))
     {
         body = before;
     }
@@ -124,7 +125,13 @@ pub(super) fn lexical_period(text: &str) -> bool {
     text.ends_with('.') && lexicon::abbreviation(text).is_some()
 }
 
-pub(super) fn abbreviation_list(text: &str, offset: usize, quotes: &[usize]) -> bool {
+pub(super) fn lexical_list(
+    text: &str,
+    offset: usize,
+    quotes: &[usize],
+    source: &str,
+    previous: &[Token<'_>],
+) -> bool {
     text.contains(',')
         && text
             .split(',')
@@ -133,13 +140,58 @@ pub(super) fn abbreviation_list(text: &str, offset: usize, quotes: &[usize]) -> 
                 *start += member.len() + 1;
                 Some(
                     trimmed_range(member, member_start, quotes).is_some_and(|range| {
-                        lexicon::plain_abbreviation(
-                            &member[range.start - member_start..range.end - member_start],
-                        )
+                        let text = &member[range.start - member_start..range.end - member_start];
+                        lexicon::plain_abbreviation(text)
+                            || pronunciation_member(source, range, previous)
                     }),
                 )
             })
             .all(|approved| approved)
+}
+
+fn pronunciation_member(source: &str, range: SourceRange, previous: &[Token<'_>]) -> bool {
+    let member = &source[range.start..range.end];
+    if lexicon::pronunciation_word(member) {
+        return true;
+    }
+    let base = member.split(['\'', '’']).next().unwrap_or(member);
+    let base_end = range.start + base.len();
+    for token in previous
+        .iter()
+        .rev()
+        .take(lexicon::MAX_PRONUNCIATION_WORDS - 1)
+    {
+        let phrase = &source[token.range.start..base_end];
+        if !phrase.contains(['\'', '’']) && lexicon::pronunciation_word(phrase) {
+            return true;
+        }
+    }
+    if base != member {
+        return false;
+    }
+    lexicon::pronunciation_candidates(base)
+        .iter()
+        .any(|(key, _)| {
+            if !key.contains(' ') || source.get(range.start..range.start + key.len()) != Some(*key)
+            {
+                return false;
+            }
+            let last_start = range.start + key.len() - key.rsplit(' ').next().unwrap().len();
+            let endpoint = source[last_start..].split_whitespace().next().unwrap();
+            if crate::domain::electronic::looks_like(endpoint) {
+                return false;
+            }
+            let remainder = &source[range.start + key.len()..];
+            let mut chars = remainder.chars();
+            match chars.next() {
+                None => true,
+                Some(ch) if ch.is_whitespace() || matches!(ch, ',' | ';' | '\'' | '’') => true,
+                Some('.' | ':' | '!' | '?' | ')' | ']' | '}' | '"' | '”') => chars
+                    .next()
+                    .is_none_or(|ch| ch.is_whitespace() || matches!(ch, ',' | ';')),
+                _ => false,
+            }
+        })
 }
 
 pub(super) fn numeric_parenthesis_compound(raw: &str) -> bool {
