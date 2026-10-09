@@ -6,8 +6,8 @@ mod symbols;
 mod temporal;
 
 use crate::{
-    Hint, LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl, fallback,
-    model::Value, resources::Resources, source_map::SourceMap,
+    Hint, LimitKind, MAX_CANDIDATES, NormalizeError, SourceRange, WorkControl,
+    resources::Resources, source_map::SourceMap,
 };
 use boundaries::{Boundaries, Claim, overlaps_hint};
 use readers::Context;
@@ -18,10 +18,7 @@ pub(crate) struct Candidate {
     pub(crate) reading: Reading,
 }
 
-pub(crate) enum Reading {
-    Resolved(Value),
-    Unresolved(fallback::Request),
-}
+pub(crate) use crate::interpretation::Reading;
 
 fn push(
     candidates: &mut Vec<Candidate>,
@@ -45,9 +42,10 @@ pub(crate) fn collect(
     control: &WorkControl,
 ) -> Result<Vec<Candidate>, NormalizeError> {
     let text = source.text();
-    let tokens = scan::tokens(source, resources, control)?;
+    let scanned = scan::tokens(source, resources, control)?;
+    let tokens = scanned.tokens;
     let phone_like = scan::phones(text, &tokens, resources, control)?;
-    let bounds = Boundaries::new(&tokens, &phone_like);
+    let bounds = Boundaries::new(&tokens, &phone_like, &scanned.catalog_groups);
     let ctx = Context {
         text,
         tokens: &tokens,
@@ -55,22 +53,18 @@ pub(crate) fn collect(
     let mut candidates = Vec::new();
     let mut index = 0;
     let mut hint_index = 0;
-    let mut role_until = 0;
     while index < tokens.len() {
         control.check()?;
         if let Some(hint) = hints
             .get(hint_index)
             .filter(|h| h.range.start <= tokens[index].range.start)
         {
-            let detected = readers::read(&ctx, index, &bounds, index < role_until)
+            let detected = readers::read(&ctx, index, &bounds)
                 .map(|(_, end)| bounds.claim(index, end))
                 .transpose()?;
             let claim = bounds.hint_claim(*hint, detected.as_ref())?;
             let text = &text[claim.range.start..claim.range.end];
             let value = readers::hint(text, hint.kind).ok_or(NormalizeError::InvalidHint)?;
-            if matches!(value, Value::Roman(_)) {
-                role_until = ctx.roman_anchor_end(index).unwrap_or(role_until);
-            }
             index = claim.next;
             push(&mut candidates, claim, Reading::Resolved(value))?;
             hint_index += 1;
@@ -82,13 +76,10 @@ pub(crate) fn collect(
         {
             return Err(NormalizeError::InvalidHint);
         }
-        if let Some((reading, end)) = readers::read(&ctx, index, &bounds, index < role_until) {
+        if let Some((reading, end)) = readers::read(&ctx, index, &bounds) {
             let claim = bounds.claim(index, end)?;
             if overlaps_hint(hints, claim.range) {
                 return Err(NormalizeError::InvalidHint);
-            }
-            if matches!(&reading, Reading::Resolved(Value::Roman(_))) {
-                role_until = ctx.roman_anchor_end(index).unwrap_or(role_until);
             }
             index = claim.next;
             push(&mut candidates, claim, reading)?;
@@ -105,6 +96,7 @@ pub(crate) fn collect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::interpretation::UnresolvedFinding;
     #[test]
     fn candidate_limit_accepts_exact_boundary() {
         let mut candidates = Vec::new();
@@ -116,7 +108,7 @@ mod tests {
                         range: SourceRange::new(0, 1),
                         next: 1
                     },
-                    Reading::Unresolved(fallback::Request::unresolved(
+                    Reading::Unresolved(UnresolvedFinding::unresolved(
                         "1.234",
                         crate::FallbackClass::Number,
                         crate::IssueCategory::Ambiguous
@@ -132,7 +124,7 @@ mod tests {
                     range: SourceRange::new(0, 1),
                     next: 1
                 },
-                Reading::Unresolved(fallback::Request::unresolved(
+                Reading::Unresolved(UnresolvedFinding::unresolved(
                     "1.234",
                     crate::FallbackClass::Number,
                     crate::IssueCategory::Ambiguous

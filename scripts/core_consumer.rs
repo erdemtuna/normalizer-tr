@@ -14,10 +14,38 @@ mod tests {
             ("10-15 kişi", "on ila on beş kişi"),
             ("info@ornek.com", "info et ornek nokta kom"),
             ("tren trafik", "tren trafik"),
+            ("1 234,50TL", "bin iki yüz otuz dört Türk lirası elli kuruş"),
+            ("5°C", "beş derece Santigrat"),
+            ("ABC", "ABC"),
+            ("tarih 03/04/2026", "tarih üç Nisan iki bin yirmi altı"),
+            ("CHP ve AKP", "ce he pe ve a ke pe"),
+            ("SGK'ya", "se ge kaya"),
+            ("PDF'ten", "pe de eften"),
+            ("CHP,AKP:", "ce he pe,a ke pe:"),
+            ("Claude'a", "kloda"),
+            ("ChatGPT", "çet ci pi ti"),
+            ("GitHub Copilot", "git hab ko paylıt"),
+            ("25kg;CHP,AKP", "yirmi beş kilogram;ce he pe,a ke pe"),
+            ("Claude,Hugging Face,UNKNOWN", "Claude,Hugging Face,UNKNOWN"),
         ] {
-            let r = n.normalize(input, &NormalizeOptions::default()).unwrap();
-            assert!(r.complete());
-            assert_eq!(r.normalized_text(), expected);
+            for policy in [
+                AmbiguityPolicy::Preserve,
+                AmbiguityPolicy::Reject,
+                AmbiguityPolicy::Fallback,
+            ] {
+                let r = n
+                    .normalize(
+                        input,
+                        &NormalizeOptions {
+                            ambiguity_policy: policy,
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
+                assert!(r.complete());
+                assert!(!r.fallback_used());
+                assert_eq!(r.normalized_text(), expected);
+            }
         }
     }
     #[test]

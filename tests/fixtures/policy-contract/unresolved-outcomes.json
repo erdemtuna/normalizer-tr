@@ -1,0 +1,92 @@
+[
+  {
+    "id": "slash-bare",
+    "class": "date",
+    "text": "14/03/2026",
+    "category": "Ambiguous",
+    "fallback": "on dört eğik çizgi sıfır üç eğik çizgi iki bin yirmi altı",
+    "fallback_class": "Date",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-group",
+    "class": "invalid",
+    "text": "12 34,50 TL",
+    "category": "InvalidExpression",
+    "fallback": "on iki otuz dört virgül beş sıfır Türk lirası",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-cents",
+    "class": "invalid",
+    "text": "1 234,567 TL",
+    "category": "InvalidExpression",
+    "fallback": "bir iki yüz otuz dört virgül beş altı yedi Türk lirası",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "mixed-grouping",
+    "class": "invalid",
+    "text": "1 234 567 TL",
+    "category": "InvalidExpression",
+    "fallback": "bir iki yüz otuz dört beş yüz altmış yedi Türk lirası",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "conflicting-currency",
+    "class": "invalid",
+    "text": "$ 25 USD",
+    "category": "InvalidExpression",
+    "fallback": "dolar işareti yirmi beş dolar",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-percent-suffix",
+    "class": "invalid",
+    "text": "12,5%'den",
+    "category": "InvalidExpression",
+    "fallback": "on iki virgül beş yüzde kesme den",
+    "fallback_class": "Percent",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-compact-case",
+    "class": "invalid",
+    "text": "5KG",
+    "category": "Unsupported",
+    "fallback": "beş KG",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "identifier",
+    "class": "identifier",
+    "text": "AB12",
+    "category": "ProtectedIdentifier",
+    "fallback": "a be bir iki",
+    "fallback_class": "Identifier",
+    "strategy": "Literal"
+  },
+  {
+    "id": "roman-intent",
+    "class": "roman",
+    "text": "IV",
+    "category": "Ambiguous",
+    "fallback": "ı ve",
+    "fallback_class": "Roman",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-temperature",
+    "class": "invalid",
+    "text": "01 °C",
+    "category": "InvalidExpression",
+    "fallback": "sıfır bir derece Santigrat",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  }
+]

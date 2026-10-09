@@ -1,0 +1,10 @@
+[
+  {"id":"review-phrase-later-unknown","class":"pronunciation","text":"Claude,Hugging Face,UNKNOWN","expected":"Claude,Hugging Face,UNKNOWN"},
+  {"id":"review-long-phrase-later-unknown","class":"pronunciation","text":"Claude,Visual Studio Code,UNKNOWN","expected":"Claude,Visual Studio Code,UNKNOWN"},
+  {"id":"review-phrase-later-empty","class":"pronunciation","text":"Claude,Hugging Face,,","expected":"Claude,Hugging Face,,"},
+  {"id":"review-phrase-earlier-unknown","class":"pronunciation","text":"UNKNOWN,Hugging Face,Claude","expected":"UNKNOWN,Hugging Face,Claude"},
+  {"id":"review-known-multiple-phrases","class":"pronunciation","text":"Claude,Hugging Face,GitHub Copilot","expected":"klod,haging feys,git hab ko paylıt"},
+  {"id":"review-spaced-prose","class":"pronunciation","text":"Claude, Hugging Face, UNKNOWN","expected":"klod, haging feys, UNKNOWN"},
+  {"id":"review-valid-suffix-rejected-group","class":"pronunciation","text":"Claude'a,Hugging Face,UNKNOWN","expected":"Claude'a,Hugging Face,UNKNOWN"},
+  {"id":"review-independent-semicolon-group","class":"pronunciation","text":"Claude,Hugging Face;UNKNOWN","expected":"klod,haging feys;UNKNOWN"}
+]

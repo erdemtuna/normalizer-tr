@@ -4,8 +4,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::{
     AmbiguityPolicy, FallbackDiagnostic, Issue, IssueCategory, LimitKind, MAX_HINTS,
     MAX_INPUT_BYTES, MAX_RESULT_BYTES, NormalizeError, NormalizeOptions, NormalizeResult, Segment,
-    SegmentKind, SourceRange, WorkControl, classify, resources::Resources, source_map::SourceMap,
-    verbalize,
+    SegmentKind, SourceRange, WorkControl, classify, resolution, resources::Resources,
+    source_map::SourceMap, verbalize,
 };
 
 #[derive(Default)]
@@ -73,7 +73,7 @@ fn verbatim(
 }
 
 fn fallback_reading(
-    request: &crate::fallback::Request,
+    request: &crate::interpretation::UnresolvedFinding,
     input: &str,
     range: SourceRange,
     recognition: &str,
@@ -94,7 +94,7 @@ fn fallback_reading(
         .text_allowance()?
         .checked_sub(padding)
         .ok_or(NormalizeError::LimitExceeded(LimitKind::Result))?;
-    let (mut text, strategy) = request.render(recognition, maximum, control)?;
+    let (mut text, strategy) = resolution::render_fallback(request, recognition, maximum, control)?;
     if leading_space {
         text.insert(0, ' ');
     }
@@ -155,37 +155,36 @@ pub(crate) fn run(
             return Err(NormalizeError::Internal);
         }
         verbatim(input, cursor, range.start, &mut segments, &mut budget)?;
-        let (kind, rule_id, text) = match candidate.reading {
-            classify::Reading::Resolved(value) => verbalize::render(&value),
-            classify::Reading::Unresolved(request)
-                if options.ambiguity_policy == AmbiguityPolicy::Fallback =>
-            {
-                let (text, diagnostic) = fallback_reading(
-                    &request,
-                    input,
-                    range,
-                    &source.text()[candidate.range.start..candidate.range.end],
-                    &mut budget,
-                    control,
-                )?;
-                fallbacks.push(diagnostic);
-                (SegmentKind::Fallback, "source.fallback", text)
-            }
-            classify::Reading::Unresolved(request) => {
-                let category = request.category().ok_or(NormalizeError::Internal)?;
-                budget.issue()?;
-                issues.push(Issue {
-                    range,
-                    category,
-                    explanation: explanation(category),
-                });
-                (
-                    SegmentKind::Unresolved,
-                    "source.unresolved",
-                    input[range.start..range.end].to_owned(),
-                )
-            }
-        };
+        let (kind, rule_id, text) =
+            match resolution::select(&candidate.reading, options.ambiguity_policy) {
+                resolution::Selected::Primary(value) => verbalize::render(value),
+                resolution::Selected::Fallback(request) => {
+                    let (text, diagnostic) = fallback_reading(
+                        request,
+                        input,
+                        range,
+                        &source.text()[candidate.range.start..candidate.range.end],
+                        &mut budget,
+                        control,
+                    )?;
+                    fallbacks.push(diagnostic);
+                    (SegmentKind::Fallback, "source.fallback", text)
+                }
+                resolution::Selected::Preserved(request) => {
+                    let category = request.category().ok_or(NormalizeError::Internal)?;
+                    budget.issue()?;
+                    issues.push(Issue {
+                        range,
+                        category,
+                        explanation: explanation(category),
+                    });
+                    (
+                        SegmentKind::Unresolved,
+                        "source.unresolved",
+                        input[range.start..range.end].to_owned(),
+                    )
+                }
+            };
         budget.segment(text.len())?;
         segments.push(Segment {
             range,

@@ -41,13 +41,15 @@ normalizer-tr = "0.4"
 ```
 
 ```rust
-use normalizer_tr::{NormalizeOptions, Normalizer};
+use normalizer_tr::{NormalizeError, NormalizeOptions, Normalizer};
 
-let normalizer = Normalizer::new()?;
-let result = normalizer.normalize("25 TL; 5 kg", &NormalizeOptions::default())?;
-assert_eq!(result.normalized_text(), "yirmi beş Türk lirası; beş kilogram");
-assert!(result.complete());
-# Ok::<(), normalizer_tr::NormalizeError>(())
+fn main() -> Result<(), NormalizeError> {
+    let normalizer = Normalizer::new()?;
+    let result = normalizer.normalize("25 TL; 5 kg", &NormalizeOptions::default())?;
+    assert_eq!(result.normalized_text(), "yirmi beş Türk lirası; beş kilogram");
+    assert!(result.complete());
+    Ok(())
+}
 ```
 
 Reuse a `Normalizer` across calls. It is cloneable and `Send + Sync`.
@@ -91,7 +93,11 @@ UTF-8 byte offsets, not character positions.
 
 This is a pre 1.0 library with bounded coverage, not a universal pronunciation
 engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) for measurements and
-[release notes](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/release.md) for changes.
+[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for released and unreleased changes.
+
+The guides track repository behavior: expanded initialism coverage and
+[foreign-name speech aliases](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#approved-foreign-names)
+are **Unreleased**, not part of published 0.4.0.
 
 ## License
 

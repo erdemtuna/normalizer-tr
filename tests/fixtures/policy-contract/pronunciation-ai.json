@@ -1,0 +1,12 @@
+[
+  {"id":"name-claude","class":"pronunciation","text":"Claude","expected":"klod","kind":"Pronunciation"},
+  {"id":"name-codex","class":"pronunciation","text":"Codex","expected":"kodeks","kind":"Pronunciation"},
+  {"id":"name-chatgpt","class":"pronunciation","text":"ChatGPT","expected":"çet ci pi ti","kind":"Pronunciation"},
+  {"id":"name-openai","class":"pronunciation","text":"OpenAI","expected":"opın ey ay","kind":"Pronunciation"},
+  {"id":"name-gemini","class":"pronunciation","text":"Gemini","expected":"ceminay","kind":"Pronunciation"},
+  {"id":"name-anthropic","class":"pronunciation","text":"Anthropic","expected":"entropik","kind":"Pronunciation"},
+  {"id":"name-hugging-face","class":"pronunciation","text":"Hugging Face","expected":"haging feys","kind":"Pronunciation"},
+  {"id":"name-claude-uppercase","class":"pronunciation","text":"CLAUDE","expected":"klod","kind":"Pronunciation"},
+  {"id":"name-chatgpt-lowercase","class":"pronunciation","text":"chatgpt","expected":"çet ci pi ti","kind":"Pronunciation"},
+  {"id":"name-openai-uppercase","class":"pronunciation","text":"OPENAI","expected":"opın ey ay","kind":"Pronunciation"}
+]

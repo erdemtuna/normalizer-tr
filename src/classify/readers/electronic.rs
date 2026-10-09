@@ -2,7 +2,7 @@ use super::{Attempt, Context};
 use crate::{
     IssueCategory,
     domain::electronic::{self, Electronic},
-    model::Value,
+    interpretation::Value,
 };
 pub(super) fn whole(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     let tokens = ctx.tokens;

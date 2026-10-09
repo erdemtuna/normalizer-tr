@@ -1,116 +1,204 @@
-use super::super::scan::{Token, whitespace_between};
+use super::super::{
+    boundaries::quantity_tail,
+    scan::{Token, group_whitespace, number_fragment, whitespace_between},
+};
 use super::{Attempt, Context};
-use crate::domain::numeric::split_suffix;
+use crate::notation::split_suffix;
 use crate::{
     IssueCategory,
     domain::{
-        lexicon,
-        numeric::{self, NumericRange, Quantity},
+        lexicon::{self, Currency},
+        quantities::{NumericRange, Quantity},
     },
-    model::Value,
+    interpretation::Value,
+    notation,
 };
 pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     let text = ctx.text;
     let tokens = ctx.tokens;
     let token = tokens[index];
     let source = token.text;
-    // Prefix/suffix symbols are whole quantities; no fragment fallback for malformed values.
-    if let Some(ch) = source.chars().next().filter(|c| "₺$€£".contains(*c)) {
-        if let Some(end) = quantity_math_end(text, tokens, index) {
-            return Some((Err(IssueCategory::Unsupported), end));
-        }
-        if tokens.get(index + 1).is_some_and(|tail| {
-            numeric::label(tail.text) && whitespace_between(text, token.range.end, tail.range.start)
-        }) {
-            return Some((Err(IssueCategory::InvalidExpression), index + 1));
-        }
-        let (number, case) = split_suffix(&source[ch.len_utf8()..]).unwrap_or(("", None));
-        let label = format!("{ch}{}", case.map_or(String::new(), |s| format!("'{s}")));
-        return Some((
-            Quantity::parse(number, &label)
-                .map(Value::Quantity)
-                .ok_or(IssueCategory::InvalidExpression),
-            index,
-        ));
+    if let Some(attempt) = contextual_range(ctx, index) {
+        return Some(attempt);
     }
-    let (symbol_base, symbol_case) = split_suffix(source).unwrap_or((source, None));
-    if let Some(ch) = symbol_base.chars().last().filter(|c| "₺$€£".contains(*c)) {
-        if let Some(end) = quantity_math_end(text, tokens, index) {
-            return Some((Err(IssueCategory::Unsupported), end));
-        }
-        if tokens.get(index + 1).is_some_and(|tail| {
-            numeric::label(tail.text) && whitespace_between(text, token.range.end, tail.range.start)
-        }) {
-            return Some((Err(IssueCategory::InvalidExpression), index + 1));
-        }
-        let label = format!(
-            "{ch}{}",
-            symbol_case.map_or(String::new(), |case| format!("'{case}"))
-        );
-        return Some((
-            Quantity::parse(&symbol_base[..symbol_base.len() - ch.len_utf8()], &label)
-                .map(Value::Quantity)
-                .ok_or(IssueCategory::InvalidExpression),
-            index,
-        ));
-    }
-    let next = tokens.get(index + 1)?;
-    if !whitespace_between(text, token.range.end, next.range.start) {
-        return None;
-    }
-    if source.chars().any(|c| c.is_ascii_digit())
-        && source.contains(['-', '–'])
-        && (lexicon::unit(next.text).is_some()
-            || ["kişi", "adet", "gün", "yaş"].contains(&lexicon::lookup_key(next.text).as_str()))
+    let next = tokens
+        .get(index + 1)
+        .filter(|next| whitespace_between(text, token.range.end, next.range.start));
+    if notation::label(source)
+        && let Some(next) = next.filter(|next| next.text.chars().any(|c| c.is_ascii_digit()))
     {
-        let end = index + 1;
-        if let Some(end) = quantity_math_end(text, tokens, end) {
-            return Some((Err(IssueCategory::Unsupported), end));
-        }
-        return Some((
-            NumericRange::parse(source, Some(next.text))
-                .map(Value::Range)
-                .ok_or(IssueCategory::InvalidExpression),
+        let base = source.split(['\'', '’']).next().unwrap_or(source);
+        let end = if Currency::parse(base).is_some() {
+            amount_end(ctx, index + 1)
+        } else {
+            index + 1
+        };
+        let number = &text[next.range.start..tokens[end].range.end];
+        return Some(finish(
+            ctx,
             end,
+            prefixed_quantity(number, source)
+                .map(Value::Quantity)
+                .ok_or(IssueCategory::InvalidExpression),
         ));
     }
-    if numeric::label(next.text) && source.chars().any(|c| c.is_ascii_digit()) {
-        if let Some(end) = quantity_math_end(text, tokens, index + 1) {
-            return Some((Err(IssueCategory::Unsupported), end));
+    if let Some(end) = ctx.money_end(index) {
+        let label = tokens[end];
+        let base = label.text.split(['\'', '’']).next().unwrap_or(label.text);
+        if let Some((last, currency)) = notation::attached_quantity(label.text) {
+            if Currency::parse(currency).is_none() {
+                return Some(finish(ctx, end, Err(IssueCategory::Unsupported)));
+            }
+            let number = &text[token.range.start..label.range.start + last.len()];
+            let quantity = split_suffix(label.text)
+                .and_then(|(_, suffix)| Quantity::parse_with_suffix(number, currency, suffix));
+            return Some(finish(
+                ctx,
+                end,
+                quantity
+                    .map(Value::Quantity)
+                    .ok_or(IssueCategory::InvalidExpression),
+            ));
         }
-        if tokens.get(index + 2).is_some_and(|tail| {
-            numeric::label(tail.text) && whitespace_between(text, next.range.end, tail.range.start)
-        }) {
-            return Some((Err(IssueCategory::InvalidExpression), index + 2));
+        if Currency::parse(base).is_none() {
+            return Some(finish(ctx, end, Err(IssueCategory::Unsupported)));
         }
-        return Some((
+        let number = &text[token.range.start..tokens[end - 1].range.end];
+        return Some(finish(
+            ctx,
+            end,
+            Quantity::parse(number, label.text)
+                .map(Value::Quantity)
+                .ok_or(IssueCategory::InvalidExpression),
+        ));
+    }
+    if let Some((number, label)) = notation::attached_quantity(source) {
+        if !notation::label(label) {
+            return Some((Err(IssueCategory::Unsupported), index));
+        }
+        if Currency::parse(label).is_some()
+            && source.starts_with(label)
+            && split_suffix(source).is_some_and(|(_, suffix)| suffix.is_none())
+            && number_fragment(number)
+            && next.is_some_and(|next| {
+                group_whitespace(text, token.range.end, next.range.start)
+                    && (split_suffix(next.text).is_some_and(|(body, _)| number_fragment(body))
+                        || notation::attached_money_tail(next.text).is_some())
+            })
+        {
+            let end = amount_end(ctx, index + 1);
+            let body = &text[token.range.start + label.len()..tokens[end].range.end];
+            return Some(finish(
+                ctx,
+                end,
+                prefixed_quantity(body, label)
+                    .map(Value::Quantity)
+                    .ok_or(IssueCategory::InvalidExpression),
+            ));
+        }
+        let quantity = split_suffix(source)
+            .and_then(|(_, suffix)| Quantity::parse_with_suffix(number, label, suffix));
+        return Some(finish(
+            ctx,
+            index,
+            quantity
+                .map(Value::Quantity)
+                .ok_or(IssueCategory::InvalidExpression),
+        ));
+    }
+    let next = next?;
+    if notation::label(next.text) && source.chars().any(|c| c.is_ascii_digit()) {
+        return Some(finish(
+            ctx,
+            index + 1,
             Quantity::parse(source, next.text)
                 .map(Value::Quantity)
                 .ok_or(IssueCategory::InvalidExpression),
-            index + 1,
         ));
     }
     if source.chars().any(|c| c.is_ascii_digit())
-        && lexicon::unit(&next.text.to_ascii_lowercase()).is_some()
+        && (lexicon::unit_marker(next.text)
+            || (next.text.starts_with(char::is_alphabetic)
+                && (next.text.contains(['/', '^', '²', '³'])
+                    || ["Μg", "μG", "µG", "ug", "oz", "cl", "dl", "ms"].contains(&next.text))))
     {
         return Some((Err(IssueCategory::Unsupported), index + 1));
     }
-    if source.chars().any(|c| c.is_ascii_digit())
-        && next.text.starts_with(char::is_alphabetic)
-        && (next.text.contains(['/', '^', '²', '³'])
-            || ["Μg", "μG", "µG", "ug", "oz", "cl", "dl", "ms"].contains(&next.text))
-    {
-        return Some((Err(IssueCategory::Unsupported), index + 1));
-    }
-    if numeric::label(source) && next.text.chars().any(|c| c.is_ascii_digit()) {
-        return Some((
-            Quantity::parse(next.text, source)
-                .map(Value::Quantity)
-                .ok_or(IssueCategory::InvalidExpression),
-            index + 1,
-        ));
-    }
+    None
+}
 
+fn prefixed_quantity(number: &str, label: &str) -> Option<Quantity> {
+    if matches!(label, "₺" | "$" | "€" | "£") {
+        let (body, suffix) = split_suffix(number)?;
+        Quantity::parse_with_suffix(body, label, suffix)
+    } else {
+        Quantity::parse(number, label)
+    }
+}
+
+fn amount_end(ctx: &Context<'_>, index: usize) -> usize {
+    let end = ctx.tokens[index].number_run_end;
+    ctx.tokens
+        .get(end + 1)
+        .filter(|next| {
+            group_whitespace(ctx.text, ctx.tokens[end].range.end, next.range.start)
+                && (notation::attached_money_tail(next.text).is_some()
+                    || split_suffix(next.text)
+                        .is_some_and(|(body, suffix)| suffix.is_some() && number_fragment(body)))
+        })
+        .map_or(end, |_| end + 1)
+}
+
+fn finish(ctx: &Context<'_>, end: usize, value: Result<Value, IssueCategory>) -> Attempt {
+    if let Some(end) = quantity_math_end(ctx.text, ctx.tokens, end) {
+        return (Err(IssueCategory::Unsupported), end);
+    }
+    if ctx.tokens.get(end + 1).is_some_and(|next| {
+        quantity_tail(next.text)
+            && whitespace_between(ctx.text, ctx.tokens[end].range.end, next.range.start)
+    }) {
+        return (Err(IssueCategory::InvalidExpression), end + 1);
+    }
+    (value, end)
+}
+
+fn contextual_range(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
+    if !number_fragment(ctx.tokens[index].text) {
+        return None;
+    }
+    for end in index..=(index + 2).min(ctx.tokens.len().saturating_sub(1)) {
+        let label = ctx.tokens.get(end + 1)?;
+        if !ctx.tokens[index..=end]
+            .iter()
+            .all(|token| number_fragment(token.text) || matches!(token.text, "-" | "–"))
+            || ctx.tokens[index..=end]
+                .windows(2)
+                .any(|pair| !whitespace_between(ctx.text, pair[0].range.end, pair[1].range.start))
+        {
+            continue;
+        }
+        let body = &ctx.text[ctx.tokens[index].range.start..ctx.tokens[end].range.end];
+        if !body
+            .char_indices()
+            .any(|(i, ch)| i > 0 && matches!(ch, '-' | '–'))
+        {
+            continue;
+        }
+        if !whitespace_between(ctx.text, ctx.tokens[end].range.end, label.range.start)
+            || !(lexicon::unit(label.text).is_some()
+                || ["kişi", "adet", "gün", "yaş"]
+                    .contains(&lexicon::lookup_key(label.text).as_str()))
+        {
+            continue;
+        }
+        return Some(finish(
+            ctx,
+            end + 1,
+            NumericRange::parse(body, Some(label.text))
+                .map(Value::Range)
+                .ok_or(IssueCategory::InvalidExpression),
+        ));
+    }
     None
 }
 
@@ -126,7 +214,7 @@ fn quantity_math_end(text: &str, tokens: &[Token<'_>], mut end: usize) -> Option
         }
         end += 2;
         if tokens.get(end + 1).is_some_and(|tail| {
-            numeric::label(tail.text)
+            notation::label(tail.text)
                 && whitespace_between(text, tokens[end].range.end, tail.range.start)
         }) {
             end += 1;

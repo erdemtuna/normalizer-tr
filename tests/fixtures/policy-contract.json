@@ -1,0 +1,21 @@
+[
+  "policy-contract/money-grouping.json",
+  "policy-contract/quantity-notation.json",
+  "policy-contract/lexical-readings.json",
+  "policy-contract/source-punctuation.json",
+  "policy-contract/date-intent.json",
+  "policy-contract/unresolved-outcomes.json",
+  "policy-contract/source-context.json",
+  "policy-contract/compound-boundaries.json",
+  "policy-contract/initialisms.json",
+  "policy-contract/pronunciation-variants.json",
+  "policy-contract/initialism-boundaries.json",
+  "policy-contract/pronunciation-ai.json",
+  "policy-contract/pronunciation-developer.json",
+  "policy-contract/pronunciation-consumer.json",
+  "policy-contract/pronunciation-boundaries.json",
+  "policy-contract/review-money-ownership.json",
+  "policy-contract/review-mixed-members.json",
+  "policy-contract/review-tight-admission.json",
+  "policy-contract/pronunciation-ema-lightning.json"
+]

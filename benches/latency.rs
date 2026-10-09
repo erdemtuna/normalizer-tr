@@ -4,6 +4,9 @@ use std::{collections::BTreeMap, hint::black_box, time::Instant};
 use normalizer_tr::{AmbiguityPolicy, Hint, HintKind, NormalizeOptions, Normalizer, SourceRange};
 use serde_json::{Value, json};
 
+#[path = "../tests/support/policy_contract.rs"]
+mod policy_fixtures;
+
 fn options(case: &Value, policy: AmbiguityPolicy) -> NormalizeOptions {
     let mut options = NormalizeOptions {
         ambiguity_policy: policy,
@@ -99,6 +102,180 @@ fn fallback_measurements(normalizer: &Normalizer, corpus: &[Value]) -> Value {
         .collect();
     json!({"cohorts":cohorts, "per_class_policy":per_class, "snapshots":snapshots,
         "method":"fallback only; same frozen cohorts; 2000 warmup and 10000 individually timed calls per cohort; no filtering or overhead subtraction"})
+}
+
+fn check_policy_contract(
+    case: &Value,
+    policy: AmbiguityPolicy,
+    prefix: &str,
+    result: &Result<normalizer_tr::NormalizeResult, normalizer_tr::NormalizeError>,
+) {
+    let unresolved = case.get("category").is_some();
+    match result {
+        Err(normalizer_tr::NormalizeError::Unresolved(issues))
+            if unresolved && policy == AmbiguityPolicy::Reject =>
+        {
+            assert_eq!(issues.len(), 1, "{}", case["id"]);
+            assert_eq!(
+                format!("{:?}", issues[0].category()),
+                case["category"].as_str().unwrap()
+            );
+        }
+        Ok(result) => {
+            let expected = if unresolved {
+                if policy == AmbiguityPolicy::Fallback {
+                    &case["fallback"]
+                } else {
+                    &case["text"]
+                }
+            } else {
+                &case["expected"]
+            };
+            assert_eq!(
+                result.normalized_text(),
+                format!("{prefix}{}", expected.as_str().unwrap()),
+                "{}",
+                case["id"]
+            );
+            assert_eq!(
+                result.complete(),
+                !unresolved || policy == AmbiguityPolicy::Fallback
+            );
+            assert_eq!(
+                result.fallback_used(),
+                unresolved && policy == AmbiguityPolicy::Fallback
+            );
+        }
+        other => panic!(
+            "policy-contract case {} has unexpected outcome: {other:?}",
+            case["id"]
+        ),
+    }
+}
+
+fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
+    let (cases, input_bytes) = policy_fixtures::load();
+    let mut cohorts = BTreeMap::new();
+    let mut classes = BTreeMap::<String, Vec<u64>>::new();
+    for cohort in ["short", "medium"] {
+        let prefix = if cohort == "medium" {
+            "Bu sentetik paragraf kaynak metnin ve miktarların birlikte okunmasını kontrol eder. "
+                .repeat(4)
+        } else {
+            String::new()
+        };
+        for (name, policy) in [
+            ("preserve", AmbiguityPolicy::Preserve),
+            ("reject", AmbiguityPolicy::Reject),
+            ("fallback", AmbiguityPolicy::Fallback),
+        ] {
+            let prepared: Vec<_> = cases
+                .iter()
+                .map(|case| {
+                    let text = format!("{prefix}{}", case["text"].as_str().unwrap());
+                    assert!(if cohort == "short" {
+                        text.len() <= 256
+                    } else {
+                        (257..=1024).contains(&text.len())
+                    });
+                    let mut options = options(case, policy);
+                    for hint in &mut options.hints {
+                        let range = hint.range();
+                        *hint = Hint::new(
+                            SourceRange::new(
+                                range.start() + prefix.len(),
+                                range.end() + prefix.len(),
+                            ),
+                            hint.kind(),
+                        );
+                    }
+                    check_policy_contract(
+                        case,
+                        policy,
+                        &prefix,
+                        &normalizer.normalize(&text, &options),
+                    );
+                    (case, text, options)
+                })
+                .collect();
+            for index in 0..2000 {
+                let (_, text, options) = &prepared[index % prepared.len()];
+                drop(black_box(
+                    normalizer.normalize(black_box(text), black_box(options)),
+                ));
+            }
+            let mut samples = Vec::with_capacity(10000);
+            for index in 0..10000 {
+                let (case, text, options) = &prepared[index % prepared.len()];
+                let start = Instant::now();
+                drop(black_box(
+                    normalizer.normalize(black_box(text), black_box(options)),
+                ));
+                let elapsed = start.elapsed().as_nanos() as u64;
+                samples.push(elapsed);
+                classes
+                    .entry(format!(
+                        "{cohort}:{}:{name}",
+                        case["class"].as_str().unwrap()
+                    ))
+                    .or_default()
+                    .push(elapsed);
+            }
+            for (case, text, options) in &prepared {
+                check_policy_contract(case, policy, &prefix, &normalizer.normalize(text, options));
+            }
+            cohorts.insert(format!("{cohort}:{name}"), quantiles(&mut samples));
+        }
+    }
+    let mut scaling = Vec::new();
+    for size in [4096, 16384, 32768] {
+        for (class, pattern) in [
+            ("ungrouped-run", "123 "),
+            ("grouped-money", "1 234,50TL; "),
+            ("quoted-list", "‘25TL’,5kg; "),
+            ("unmatched-quotes", "'25TL 123 "),
+            ("invalid-group", "12 34,50 TL; "),
+            ("decomposed", "o\u{308} 5kg; "),
+            ("pronunciation-name", "Claude; "),
+            ("pronunciation-phrase", "GitHub Copilot; "),
+            ("pronunciation-prefix-miss", "Visual Studio Nope; "),
+            ("pronunciation-list", "ChatGPT,Claude; "),
+            ("malformed-comma-token", "1,"),
+            ("malformed-dot-token", "1."),
+            ("mixed-quantity-list", "25kg;CHP,AKP; "),
+            ("rejected-phrase-list", "Claude,Hugging Face,UNKNOWN; "),
+        ] {
+            let mut text = pattern.repeat(size / pattern.len());
+            text.push_str(&" ".repeat(size - text.len()));
+            for (name, policy) in [
+                ("preserve", AmbiguityPolicy::Preserve),
+                ("reject", AmbiguityPolicy::Reject),
+                ("fallback", AmbiguityPolicy::Fallback),
+            ] {
+                let options = NormalizeOptions {
+                    ambiguity_policy: policy,
+                    ..Default::default()
+                };
+                let expected = outcome(normalizer.normalize(&text, &options));
+                let mut samples = Vec::with_capacity(100);
+                for _ in 0..100 {
+                    let start = Instant::now();
+                    drop(black_box(normalizer.normalize(black_box(&text), &options)));
+                    samples.push(start.elapsed().as_nanos() as u64);
+                }
+                assert_eq!(outcome(normalizer.normalize(&text, &options)), expected);
+                scaling.push(json!({"bytes":size,"class":class,"policy":name,"timing":quantiles(&mut samples),
+                    "complete":expected.get("result").map(|result| &result["complete"]),"error":expected.get("error")}));
+            }
+        }
+    }
+    let per_class: BTreeMap<_, _> = classes
+        .into_iter()
+        .map(|(key, mut values)| (key, quantiles(&mut values)))
+        .collect();
+    json!({"input_source":"tests/fixtures/policy-contract.json","input_bytes":input_bytes,"input_cases":cases,
+        "method":"separate policy cohorts; reviewed goldens before/after; 2000 warmups and 10000 calls including disposal; all outliers retained",
+        "cohorts":cohorts,"per_class_policy":per_class,"scaling":scaling})
 }
 
 fn main() {
@@ -282,6 +459,7 @@ fn main() {
         "distribution":distributions,"clock_overhead":quantiles(&mut clock),"large":large,"limit_diagnostics":controls,
         "snapshots":snapshots,
         "fallback_measurement":fallback_measurements(&normalizer, &corpus),
+        "expanded_coverage_measurement":policy_contract_measurements(&normalizer),
     });
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()

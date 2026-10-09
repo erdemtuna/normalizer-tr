@@ -1,14 +1,14 @@
-use crate::{domain::lexicon, numerals};
+use crate::domain::lexicon;
 
 /// Written components, deliberately not a validated Gregorian Date.
-pub(super) struct DateSurface {
+pub(crate) struct DateSurface {
     day: u64,
     month: &'static str,
     year: u64,
 }
 
 impl DateSurface {
-    pub(super) fn parse(text: &str) -> Option<Self> {
+    pub(crate) fn parse(text: &str) -> Option<Self> {
         let (day, month, year) = if text.contains('.') {
             let mut parts = text.split('.');
             let fields = (parts.next()?, parts.next()?, parts.next()?);
@@ -43,24 +43,25 @@ impl DateSurface {
         })
     }
 
-    pub(super) fn render(&self) -> String {
-        format!(
-            "{} {} {}",
-            numerals::cardinal(self.day).into_text(),
-            self.month,
-            numerals::cardinal(self.year).into_text()
-        )
+    pub(crate) fn day(&self) -> u64 {
+        self.day
+    }
+    pub(crate) fn month(&self) -> &'static str {
+        self.month
+    }
+    pub(crate) fn year(&self) -> u64 {
+        self.year
     }
 }
 
 /// Two source components, without asserting that they are a valid clock.
-pub(super) struct TimeSurface {
+pub(crate) struct TimeSurface {
     hour: u64,
     minute: u64,
 }
 
 impl TimeSurface {
-    pub(super) fn parse(text: &str) -> Option<Self> {
+    pub(crate) fn parse(text: &str) -> Option<Self> {
         let (hour, minute) = text.split_once([':', '.'])?;
         if !(1..=2).contains(&hour.len())
             || minute.len() != 2
@@ -76,11 +77,10 @@ impl TimeSurface {
             minute: minute.parse().ok()?,
         })
     }
-    pub(super) fn render(&self) -> String {
-        format!(
-            "{} {}",
-            numerals::cardinal(self.hour).into_text(),
-            numerals::cardinal(self.minute).into_text()
-        )
+    pub(crate) fn hour(&self) -> u64 {
+        self.hour
+    }
+    pub(crate) fn minute(&self) -> u64 {
+        self.minute
     }
 }

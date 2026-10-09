@@ -1,0 +1,80 @@
+[
+  {
+    "id": "invalid-compact-padding",
+    "class": "invalid",
+    "text": "01kg",
+    "category": "InvalidExpression",
+    "fallback": "sıfır bir kilogram",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-slash-date",
+    "class": "invalid",
+    "text": "31/02/2026",
+    "category": "InvalidExpression",
+    "fallback": "otuz bir eğik çizgi sıfır iki eğik çizgi iki bin yirmi altı",
+    "fallback_class": "Date",
+    "strategy": "Literal"
+  },
+  {
+    "id": "invalid-temperature-suffix",
+    "class": "invalid",
+    "text": "5°C'den",
+    "category": "InvalidExpression",
+    "fallback": "beş derece Santigrat kesme den",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "negative-list-boundary",
+    "class": "punctuation",
+    "text": "-5 kg ; -5 kg",
+    "expected": "eksi beş kilogram ; eksi beş kilogram"
+  },
+  {
+    "id": "independent-prefix-money",
+    "class": "mixed",
+    "text": "1 $25",
+    "expected": "bir yirmi beş dolar"
+  },
+  {
+    "id": "attached-prefix-group",
+    "class": "money",
+    "text": "$1 234,50",
+    "expected": "bin iki yüz otuz dört dolar elli sent",
+    "kind": "Money"
+  },
+  {
+    "id": "symbol-group-suffix",
+    "class": "money",
+    "text": "$1 234,50'dan",
+    "expected": "bin iki yüz otuz dört dolar elli sentten",
+    "kind": "Money"
+  },
+  {
+    "id": "spaced-symbol-suffix",
+    "class": "money",
+    "text": "$ 25'dan",
+    "expected": "yirmi beş dolardan",
+    "kind": "Money"
+  },
+  {
+    "id": "unsupported-group-currency",
+    "class": "invalid",
+    "text": "1 234,50 JPY",
+    "category": "Unsupported",
+    "fallback": "bir iki yüz otuz dört virgül beş sıfır JPY",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  },
+  {
+    "id": "zero-leading-group",
+    "class": "invalid",
+    "text": "0000 234,50 TL",
+    "category": "InvalidExpression",
+    "fallback": "sıfır sıfır sıfır sıfır iki yüz otuz dört virgül beş sıfır Türk lirası",
+    "fallback_class": "Quantity",
+    "strategy": "Literal"
+  }
+]

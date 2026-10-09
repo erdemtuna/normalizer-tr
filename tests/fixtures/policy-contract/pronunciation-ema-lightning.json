@@ -1,0 +1,11 @@
+[
+  {"id":"name-ema-lightning","class":"pronunciation","text":"EMA Lightning","expected":"ema laytning","kind":"Pronunciation"},
+  {"id":"name-ema-lightning-lowercase","class":"pronunciation","text":"ema lightning","expected":"ema laytning","kind":"Pronunciation"},
+  {"id":"name-ema-lightning-hyphenated","class":"pronunciation","text":"ema-lightning","expected":"ema laytning","kind":"Pronunciation"},
+  {"id":"name-ema-lightning-dative","class":"pronunciation","text":"EMA Lightning'e","expected":"ema laytninge","kind":"Pronunciation"},
+  {"id":"name-ema-lightning-ablative","class":"pronunciation","text":"ema-lightning\u2019den","expected":"ema laytningden","kind":"Pronunciation"},
+  {"id":"name-ema-lightning-genitive","class":"pronunciation","text":"ema lightning'in","expected":"ema laytningin","kind":"Pronunciation"},
+  {"id":"name-ema-lightning-approved-list","class":"pronunciation","text":"Claude,EMA Lightning,ema-lightning","expected":"klod,ema laytning,ema laytning"},
+  {"id":"name-ema-lightning-unknown-list","class":"pronunciation","text":"EMA Lightning,Claude,UNKNOWN","expected":"EMA Lightning,Claude,UNKNOWN"},
+  {"id":"name-ema-lightning-unapproved-case","class":"pronunciation","text":"EMA LIGHTNING","expected":"EMA LIGHTNING","kind":"Verbatim"}
+]

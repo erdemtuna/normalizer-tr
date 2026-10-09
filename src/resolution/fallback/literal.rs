@@ -1,20 +1,14 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-use super::{
-    output::Output,
-    spelling::{letter_name, symbol_name},
-};
+use super::output::Output;
+use crate::notation::{letter_name, symbol_name};
 use crate::{
     NormalizeError,
     domain::lexicon::{self, Currency, Lexeme},
     numerals,
 };
 
-#[derive(Clone, Copy)]
-pub(super) enum LetterReading {
-    Spell,
-    PreserveWords,
-}
+use crate::interpretation::LiteralReading;
 
 enum Part<'a> {
     Number(numerals::Number),
@@ -77,17 +71,14 @@ fn code_point(scalar: char, output: &mut Output<'_>) -> Result<(), NormalizeErro
     Ok(())
 }
 
-fn word_part(source: &str, reading: LetterReading) -> Part<'_> {
-    if matches!(reading, LetterReading::Spell) {
+fn word_part(source: &str, reading: LiteralReading) -> Part<'_> {
+    if matches!(reading, LiteralReading::Spell) {
         return Part::Letters(source);
     }
-    let label = lexicon::unit(source)
-        .or_else(|| lexicon::abbreviation(source))
+    let label = lexicon::abbreviation(source)
         .or_else(|| Currency::parse(source).map(|currency| currency.lexeme(source)));
     if let Some(label) = label {
         Part::Label(label)
-    } else if source.chars().all(char::is_uppercase) {
-        Part::Letters(source)
     } else {
         Part::Word(source)
     }
@@ -96,12 +87,16 @@ fn word_part(source: &str, reading: LetterReading) -> Part<'_> {
 /// Ordered borrowed runs. Numeric interpretation never crosses a delimiter.
 pub(super) fn render(
     source: &str,
-    letters: LetterReading,
+    letters: LiteralReading,
+    quantities: bool,
     output: &mut Output<'_>,
 ) -> Result<bool, NormalizeError> {
     let mut cursor = 0;
     let mut used_code_point = false;
+    let mut quantity_expected = false;
+    let mut notation_end = 0;
     while cursor < source.len() {
+        output.check()?;
         let remainder = &source[cursor..];
         let first = remainder.chars().next().ok_or(NormalizeError::Internal)?;
         if first.is_whitespace() {
@@ -112,24 +107,38 @@ pub(super) fn render(
             cursor += end;
             continue;
         }
+        if quantities
+            && quantity_expected
+            && let Some((symbol, label)) = lexicon::unit_prefix(remainder)
+        {
+            used_code_point |= emit(Part::Label(label), output)?;
+            cursor += symbol.len();
+            quantity_expected = false;
+            continue;
+        }
         let (part, length) = if first.is_ascii_digit() {
-            let notation_length = remainder
-                .find(|scalar: char| !scalar.is_ascii_digit() && !matches!(scalar, '.' | ','))
-                .unwrap_or(remainder.len());
-            if matches!(letters, LetterReading::PreserveWords)
-                && let Some(number) = numerals::Number::parse(&remainder[..notation_length])
-            {
-                used_code_point |= emit(Part::Number(number), output)?;
-                cursor += notation_length;
-                continue;
+            if matches!(letters, LiteralReading::PreserveWords) {
+                if cursor >= notation_end {
+                    notation_end = cursor
+                        + remainder
+                            .bytes()
+                            .position(|byte| !byte.is_ascii_digit() && !matches!(byte, b'.' | b','))
+                            .unwrap_or(remainder.len());
+                }
+                if let Some(number) = numerals::Number::parse(&source[cursor..notation_end]) {
+                    used_code_point |= emit(Part::Number(number), output)?;
+                    cursor = notation_end;
+                    quantity_expected = true;
+                    continue;
+                }
             }
             let length = remainder
                 .find(|scalar: char| !scalar.is_ascii_digit())
                 .unwrap_or(remainder.len());
             let digits = &remainder[..length];
             let part = match letters {
-                LetterReading::Spell => Part::Digits(digits),
-                LetterReading::PreserveWords => {
+                LiteralReading::Spell => Part::Digits(digits),
+                LiteralReading::PreserveWords => {
                     numerals::Number::parse(digits).map_or(Part::Digits(digits), Part::Number)
                 }
             };
@@ -148,6 +157,7 @@ pub(super) fn render(
                 .ok_or(NormalizeError::Internal)?;
             (Part::Symbol(grapheme), grapheme.len())
         };
+        quantity_expected = matches!(&part, Part::Number(_) | Part::Digits(_));
         used_code_point |= emit(part, output)?;
         cursor += length;
     }

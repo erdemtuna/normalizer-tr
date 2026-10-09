@@ -1,7 +1,8 @@
 use crate::{
     SegmentKind,
-    domain::lexicon::MONTHS,
-    model::{Clock, Date, Value},
+    domain::lexicon::{Lexeme, MONTHS},
+    domain::temporal::{Clock, Date},
+    interpretation::Value,
     morphology::{Inflection, Spoken},
     numerals,
 };
@@ -63,17 +64,16 @@ pub(crate) fn render(value: &Value) -> (SegmentKind, &'static str, String) {
             "quantity",
             quantity.render().into_text(),
         ),
-        Value::Lexical(entry, case) => {
-            let mut spoken = Spoken::lexical(entry.output, entry.target);
-            if let Some(case) = case {
-                spoken.inflect(*case);
-            }
-            (
-                SegmentKind::Abbreviation,
-                "abbreviation",
-                spoken.into_text(),
-            )
-        }
+        Value::Lexical(entry, case) => (
+            SegmentKind::Abbreviation,
+            "abbreviation",
+            lexical(*entry, *case),
+        ),
+        Value::Pronunciation(entry, case) => (
+            SegmentKind::Pronunciation,
+            "pronunciation.name",
+            lexical(*entry, *case),
+        ),
         Value::Range(range) => (SegmentKind::Range, "range.context", range.render()),
         Value::Telephone(phone) => (SegmentKind::Telephone, "telephone.tr", phone.render()),
         Value::Iban(iban) => (SegmentKind::Iban, "iban.tr.mod97", iban.render()),
@@ -89,4 +89,12 @@ pub(crate) fn render(value: &Value) -> (SegmentKind, &'static str, String) {
         ),
         Value::Symbol(text) => (SegmentKind::Symbol, "symbol.prose", text.clone()),
     }
+}
+
+fn lexical(entry: Lexeme, case: Option<Inflection>) -> String {
+    let mut spoken = Spoken::lexical(entry.output, entry.target);
+    if let Some(case) = case {
+        spoken.inflect(case);
+    }
+    spoken.into_text()
 }

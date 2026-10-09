@@ -1,37 +1,48 @@
-use crate::{
-    domain::{
-        electronic::Electronic,
-        identifiers::{Iban, Telephone},
-        numeric::{Numeric, NumericRange, Quantity},
-    },
-    morphology::Inflection,
-    numerals::Number,
-};
+//! Validated Gregorian dates and digital clocks.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum DateFormat {
+    Dotted,
+    Iso,
+    Slash,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Date {
     day: u8,
     month: u8,
     year: u16,
-    dotted: bool,
+    format: DateFormat,
 }
 
 impl Date {
     pub(crate) fn parse(text: &str) -> Option<Self> {
-        let dotted = text.contains('.');
-        let parts: Vec<_> = text.split(if dotted { '.' } else { '-' }).collect();
-        let [first, second, third] = parts.as_slice() else {
+        let format = if text.contains('.') {
+            DateFormat::Dotted
+        } else if text.contains('/') {
+            DateFormat::Slash
+        } else {
+            DateFormat::Iso
+        };
+        let separator = match format {
+            DateFormat::Dotted => '.',
+            DateFormat::Iso => '-',
+            DateFormat::Slash => '/',
+        };
+        let mut parts = text.split(separator);
+        let (Some(first), Some(second), Some(third), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
             return None;
         };
-        let (day, month, year) = if dotted {
-            (*first, *second, *third)
+        let (day, month, year) = if matches!(format, DateFormat::Iso) {
+            (third, second, first)
         } else {
-            (*third, *second, *first)
+            (first, second, third)
         };
         if year.len() != 4
             || !(1..=2).contains(&day.len())
             || !(1..=2).contains(&month.len())
-            || (!dotted && (day.len() != 2 || month.len() != 2))
+            || (!matches!(format, DateFormat::Dotted) && (day.len() != 2 || month.len() != 2))
             || ![day, month, year]
                 .iter()
                 .all(|s| s.bytes().all(|b| b.is_ascii_digit()))
@@ -57,7 +68,7 @@ impl Date {
             day,
             month,
             year,
-            dotted,
+            format,
         })
     }
     pub(crate) fn day(self) -> u8 {
@@ -70,7 +81,10 @@ impl Date {
         self.year
     }
     pub(crate) fn dotted(self) -> bool {
-        self.dotted
+        matches!(self.format, DateFormat::Dotted)
+    }
+    pub(crate) fn slash(self) -> bool {
+        matches!(self.format, DateFormat::Slash)
     }
 }
 
@@ -103,42 +117,6 @@ impl Clock {
     }
     pub(crate) fn minute(self) -> u8 {
         self.minute
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum Value {
-    Numeric(Numeric),
-    Digits(String),
-    Percent(Number, Option<Inflection>),
-    Date(Date, bool),
-    Time(Clock, bool),
-    Quantity(Quantity),
-    Lexical(crate::domain::lexicon::Lexeme, Option<Inflection>),
-    Range(NumericRange),
-    Telephone(Telephone),
-    Iban(Iban),
-    Roman(Numeric),
-    Electronic(Electronic),
-    Symbol(String),
-}
-
-pub(crate) enum TemporalPreference {
-    Date(Date, bool),
-    Time(Clock, bool),
-}
-
-pub(crate) struct TemporalFailure {
-    pub(crate) category: crate::IssueCategory,
-    pub(crate) preference: Option<TemporalPreference>,
-}
-
-impl From<crate::IssueCategory> for TemporalFailure {
-    fn from(category: crate::IssueCategory) -> Self {
-        Self {
-            category,
-            preference: None,
-        }
     }
 }
 

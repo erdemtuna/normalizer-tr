@@ -1,12 +1,11 @@
 # Python binding
 
-Distribution `normalizer-tr` 0.4.0; import `normalizer_tr`, native submodule
-`normalizer_tr._native`. This is the Python bridge to the same Rust engine, not a
-second implementation. Release target: ordinary CPython 3.11–3.14 on
-Windows/Linux x64 and macOS x64/arm64. Linux requires glibc 2.28+ and macOS
-targets 12.0+. Rust 1.99 builds the extension.
-No ABI3, PyPy or free-threaded Python claim. Import/use needs no Torch, hub, model folder, credentials,
-network or Python normalization subprocess.
+Distribution `normalizer-tr`; import `normalizer_tr`, native submodule
+`normalizer_tr._native`. This is the Python bridge to the Rust engine, not a
+second implementation. This guide follows the repository API; see the
+[changelog](../../CHANGELOG.md) for released and unreleased changes.
+The curated initialism/name additions and `"pronunciation"` labels below are
+**Unreleased**, not available in published 0.4.0.
 
 ## Install
 
@@ -14,12 +13,17 @@ network or Python normalization subprocess.
 python -m pip install normalizer-tr
 ```
 
-Compatible binary wheels need no Rust compiler.
+Wheels support ordinary CPython 3.11–3.14 on Windows/Linux x64 and macOS
+x64/arm64. Linux requires glibc 2.28+; macOS requires 12.0+. Release wheels are
+built with Rust 1.99.0, but compatible wheels need no Rust compiler to install.
+ABI3, PyPy, free-threaded Python and other architectures are not promised.
+Import/use needs no Torch, model folder, credentials, network or Python
+normalization subprocess.
 
 ## Build from source
 
-Install Rust and the MSVC C++ build tools before building. From a repository
-checkout, in PowerShell:
+Source builds require Rust. On Windows, also install the MSVC C++ build tools.
+From a repository checkout on Windows, in PowerShell:
 
 ```powershell
 py -3.13 -m venv .venv
@@ -57,7 +61,7 @@ start_byte/end_byte/kind/text/rule_id. Issue fields:
 start_byte/end_byte/category/explanation. All offsets are half-open
 **original UTF-8 bytes**, not Python character indices.
 
-Version 0.4 accepts `ambiguity_policy="fallback"` as well as
+The API accepts `ambiguity_policy="fallback"` as well as
 `"preserve"` (default) and `"reject"`. It keeps resolved readings unchanged,
 renders otherwise unresolved notation and symbols, and returns `complete=True`
 with separate handled-source diagnostics rather than unresolved issues:
@@ -68,14 +72,32 @@ assert r.normalized_text == "sıfır sıfır sıfır dört iki; hello gülümsey
 assert r.complete and r.fallback_used and not r.issues
 ```
 
+Approved initialisms and exact foreign names use primary readings in every
+policy, not fallback records:
+
+```python
+r = n.normalize("SGK'ya; GitHub Copilot'ın", ambiguity_policy="reject")
+assert r.normalized_text == "se ge kaya; git hab ko paylıtın"
+assert r.complete and not r.fallback_used
+assert r.segments[-1].kind == "pronunciation"
+assert r.segments[-1].rule_id == "pronunciation.name"
+```
+
+Aliases are Turkish-readable text, not phonemes. For exact casing, phrase and
+suffix boundaries, see [approved foreign names](../../docs/normalization.md#approved-foreign-names).
+Invalid suffixes are not repaired; handled name failures have fallback
+`attempted_class="pronunciation"`. Update strict kind/class allowlists when
+adopting the unreleased API.
+
 `FallbackDiagnostic` is frozen and has start_byte/end_byte/attempted_class/
 reason/original_category/strategy. Completion is not logical-value validation,
-redaction or a voice-quality promise. See the [full contract](../../docs/fallback.md), including Rust Serde
-versus Python record naming.
+redaction or a voice-quality promise. See the [fallback contract](../../docs/fallback.md)
+for readings and Rust Serde versus Python record naming, and the
+[normalization reference](../../docs/normalization.md) for supported formats.
 
 `normalize(text, *, ambiguity_policy="preserve", hints=(), cancellation=None,
 deadline_ms=None)` takes Python str, typed Hint objects, optional
-CancellationToken, and an integer deadline1..60000ms. Booleans do not count as
+CancellationToken, and an integer deadline of 1–60000 ms. Booleans do not count as
 integer coordinates/deadlines; surrogates are invalid input. Call-shape errors
 are TypeError/ValueError, never partial success. Hint kinds:
 cardinal/digits/date/time/ordinal/roman/range/telephone/electronic.
@@ -86,29 +108,22 @@ invalid_input, invalid_hint, invalid_configuration, limit_exceeded, cancelled,
 unresolved, internal. Strict errors contain issues, no normalized result.
 CancellationToken.cancel() signals associated ongoing/later calls. Native
 work executes pure Rust detached from the interpreter after copying/validating
-arguments; records marshal afterward. Actual concurrency/control tests cover it.
+arguments; records marshal afterward.
+
+Deadlines/cancellation are cooperative, not hard call-duration limits; see
+[reviewed boundary regressions](../../docs/normalization.md#reviewed-boundary-regressions-unreleased).
 
 ## Development and verification
 
-See the root [contribution guide](../../CONTRIBUTING.md) for pinned development
-requirements, source builds and installed-wheel tests. To explicitly build a
-release wheel after installing those tools:
+See [CONTRIBUTING](../../CONTRIBUTING.md#set-up) for pinned development tools
+and installed-wheel tests. To build a release wheel after installing those tools:
 
 ```powershell
 .\.venv\Scripts\python.exe -m maturin build --release --locked --manifest-path .\bindings\python\Cargo.toml --interpreter .\.venv\Scripts\python.exe --out .\target\wheels
 ```
 
-Final validation is one root command:
-
-```powershell
-.\scripts\verify.ps1 -PythonPath <isolated-build-python> -RustupHome <isolated-rustup> -OutputDirectory <new-absolute-directory>
-```
-
-The build interpreter needs pinned `requirements-dev.txt` / `constraints.lock` tools
-(maturin, pytest, Ruff, mypy, pip-audit); the existing local Cargo audit tool
-is provisioned locally as described in the contribution guide. The verifier builds/packages, inspects
-licenses/content, installs into a fresh environment and tests actual public IO
-without engine dependencies. It refuses overwrite/failure-shaped success.
+Follow the [full verification procedure](../../CONTRIBUTING.md#full-verification)
+for package inspection, clean-environment consumers, audits and measurements.
 
 The wheel contains facade/stubs/py.typed/native binary/SBOM and complete owned/
 upstream notices only. No speech integration, model weights, network code or credentials.

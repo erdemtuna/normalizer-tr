@@ -5,9 +5,10 @@ use crate::{
     domain::{
         identifiers::{Iban, Telephone},
         lexicon,
-        numeric::{self, NumericRange},
+        quantities::NumericRange,
     },
-    model::Value,
+    interpretation::Value,
+    notation,
 };
 pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     let text = ctx.text;
@@ -57,7 +58,7 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
         source.bytes().any(|b| b.is_ascii_digit()) && ctx.cue(index, &["telefon", "tel"]);
     let quantity_context = telephone_cue
         && tokens.get(index + 1).is_some_and(|next| {
-            numeric::label(next.text)
+            notation::label(next.text)
                 || ["kişi", "adet", "gün", "yaş"].contains(&lexicon::lookup_key(next.text).as_str())
         });
     if source.starts_with("+90")
@@ -91,8 +92,12 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
                 || national_shape
                 || phone_cue)
         {
+            let phone = Telephone::parse(whole, phone_cue);
+            if phone.is_none() && ctx.money_end(index).is_some() {
+                return None;
+            }
             return Some((
-                Telephone::parse(whole, phone_cue)
+                phone
                     .map(Value::Telephone)
                     .ok_or(IssueCategory::InvalidExpression),
                 end,
@@ -131,10 +136,10 @@ fn iban_end(text: &str, tokens: &[Token<'_>], index: usize) -> usize {
     let mut characters = tokens[index].text.len();
     while let Some(next) = tokens.get(end + 1) {
         if lexicon::abbreviation(next.text).is_some()
-            || numeric::label(next.text)
+            || notation::label(next.text)
             || (next.text.bytes().all(|b| b.is_ascii_digit())
                 && tokens.get(end + 2).is_some_and(|label| {
-                    numeric::label(label.text)
+                    notation::label(label.text)
                         && whitespace_between(text, next.range.end, label.range.start)
                 }))
         {

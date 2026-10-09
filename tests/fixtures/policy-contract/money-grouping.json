@@ -1,0 +1,44 @@
+[
+  {
+    "id": "group-money",
+    "class": "money",
+    "text": "1 234,50 TL",
+    "expected": "bin iki yüz otuz dört Türk lirası elli kuruş",
+    "kind": "Money"
+  },
+  {
+    "id": "group-nbsp",
+    "class": "money",
+    "text": "1 234,50 TL",
+    "expected": "bin iki yüz otuz dört Türk lirası elli kuruş",
+    "kind": "Money"
+  },
+  {
+    "id": "group-narrow",
+    "class": "money",
+    "text": "1 234,50 TL",
+    "expected": "bin iki yüz otuz dört Türk lirası elli kuruş",
+    "kind": "Money"
+  },
+  {
+    "id": "group-multiple",
+    "class": "money",
+    "text": "1 234 567,89 TL",
+    "expected": "bir milyon iki yüz otuz dört bin beş yüz altmış yedi Türk lirası seksen dokuz kuruş",
+    "kind": "Money"
+  },
+  {
+    "id": "group-prefix",
+    "class": "money",
+    "text": "$ 1 234,50",
+    "expected": "bin iki yüz otuz dört dolar elli sent",
+    "kind": "Money"
+  },
+  {
+    "id": "group-suffix",
+    "class": "money",
+    "text": "1 234,50 TL'den",
+    "expected": "bin iki yüz otuz dört Türk lirası elli kuruştan",
+    "kind": "Money"
+  }
+]

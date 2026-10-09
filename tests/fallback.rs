@@ -18,7 +18,6 @@ fn fallback_readings_are_source_faithful_and_diagnostic() {
         ("1.234", "bin iki yüz otuz dört"),
         ("00042", "sıfır sıfır sıfır dört iki"),
         ("AB12", "a be bir iki"),
-        ("ABC", "a be ce"),
         ("IV", "ı ve"),
         ("Toplam 25.", "Toplam yirmi beş."),
         ("10-15", "on tire on beş"),

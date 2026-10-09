@@ -2,6 +2,7 @@ mod electronic;
 mod identifiers;
 mod lexical;
 mod numeric;
+mod pronunciation;
 mod quantities;
 
 use super::{
@@ -13,13 +14,11 @@ use super::{
 use crate::{
     FallbackClass, HintKind, IssueCategory,
     domain::{
-        electronic::Electronic,
-        identifiers::Telephone,
-        lexicon,
-        numeric::{self as numbers, Numeric, NumericRange},
+        electronic::Electronic, identifiers::Telephone, numeric::Numeric, quantities::NumericRange,
     },
-    fallback,
-    model::Value,
+    interpretation::UnresolvedFinding,
+    interpretation::Value,
+    notation as numbers,
 };
 
 pub(super) type Attempt = (Result<Value, IssueCategory>, usize);
@@ -30,6 +29,22 @@ pub(super) struct Context<'a> {
 }
 
 impl Context<'_> {
+    pub(super) fn money_end(&self, index: usize) -> Option<usize> {
+        let token = self.tokens[index];
+        if !scan::number_fragment(token.text) {
+            return None;
+        }
+        let end = token.number_run_end;
+        let next = self.tokens.get(end + 1)?;
+        let spaced = end > index
+            && numbers::currency_marker(next.text)
+            && whitespace_between(self.text, self.tokens[end].range.end, next.range.start);
+        let attached =
+            scan::group_whitespace(self.text, self.tokens[end].range.end, next.range.start)
+                && numbers::attached_money_tail(next.text).is_some();
+        (spaced || attached).then_some(end + 1)
+    }
+
     pub(super) fn cue(&self, index: usize, allowed: &[&str]) -> bool {
         index.checked_sub(1).is_some_and(|i| {
             scan::cue_whitespace(
@@ -38,39 +53,6 @@ impl Context<'_> {
                 self.tokens[index].range.start,
             ) && allowed.contains(&context::cue_key(self.tokens[i].text).as_str())
         })
-    }
-    pub(super) fn contextual_cue_word(&self, index: usize) -> bool {
-        let key = context::cue_key(self.tokens[index].text);
-        context::is_cue_word(self.tokens[index].text)
-            || (["telefon", "tel", "web", "site"].contains(&key.as_str())
-                && self.tokens.get(index + 1).is_some_and(|next| {
-                    whitespace_between(self.text, self.tokens[index].range.end, next.range.start)
-                        && (next.text.contains('.')
-                            || next.text.chars().any(|c| c.is_ascii_digit()))
-                }))
-    }
-    /// Anchor roles are recorded once after a successfully read contextual Roman.
-    pub(super) fn roman_anchor_end(&self, index: usize) -> Option<usize> {
-        let token = self.tokens[index];
-        if !token.text.ends_with('.') {
-            return None;
-        }
-        let next = self.tokens.get(index + 1)?;
-        if !whitespace_between(self.text, token.range.end, next.range.start) {
-            return None;
-        }
-        match lexicon::lookup_key(next.text).as_str() {
-            "yüzyıl" => Some(index + 2),
-            "dünya" => self
-                .tokens
-                .get(index + 2)
-                .filter(|last| {
-                    lexicon::lookup_key(last.text) == "savaşı"
-                        && whitespace_between(self.text, next.range.end, last.range.start)
-                })
-                .map(|_| index + 3),
-            _ => None,
-        }
     }
 }
 
@@ -98,7 +80,6 @@ pub(super) fn read(
     ctx: &Context<'_>,
     index: usize,
     bounds: &Boundaries<'_>,
-    contextual_role: bool,
 ) -> Option<(super::Reading, usize)> {
     let annotate = |attempt: Attempt, class| {
         let (reading, end) = attempt;
@@ -106,15 +87,40 @@ pub(super) fn read(
         let reading = match reading {
             Ok(value) => super::Reading::Resolved(value),
             Err(category) => {
-                super::Reading::Unresolved(fallback::Request::unresolved(source, class, category))
+                super::Reading::Unresolved(UnresolvedFinding::unresolved(source, class, category))
             }
         };
         (reading, end)
     };
+    let admit_catalog = |attempt: Attempt| {
+        let (value, end) = &attempt;
+        if bounds.catalog_allowed(index, *end) {
+            return Some(attempt);
+        }
+        if value.is_err() {
+            let source = &ctx.text[ctx.tokens[index].range.start..ctx.tokens[*end].range.end];
+            let valid_prefix = source.split_once(',').is_some_and(|(prefix, _)| {
+                scan::trimmed_range(prefix, 0, &[]).is_some_and(|range| {
+                    crate::domain::lexicon::catalog_form_valid(&prefix[range.start..range.end])
+                })
+            });
+            if !valid_prefix {
+                return Some(attempt);
+            }
+        }
+        None
+    };
     electronic::whole(ctx, index)
         .map(|attempt| annotate(attempt, FallbackClass::Electronic))
         .or_else(|| {
-            lexical::read(ctx, index).map(|attempt| annotate(attempt, FallbackClass::Abbreviation))
+            pronunciation::read(ctx, index)
+                .and_then(admit_catalog)
+                .map(|attempt| annotate(attempt, FallbackClass::Pronunciation))
+        })
+        .or_else(|| {
+            lexical::read(ctx, index)
+                .and_then(admit_catalog)
+                .map(|attempt| annotate(attempt, FallbackClass::Abbreviation))
         })
         .or_else(|| {
             electronic::contextual(ctx, index)
@@ -151,7 +157,7 @@ pub(super) fn read(
             unsupported_quantity(ctx, index)
                 .map(|attempt| annotate(attempt, FallbackClass::Quantity))
         })
-        .or_else(|| token(ctx, index, contextual_role).map(|reading| (reading, index)))
+        .or_else(|| token(ctx, index).map(|reading| (reading, index)))
 }
 
 fn unsupported_quantity(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
@@ -188,10 +194,10 @@ fn unsupported_quantity(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
     None
 }
 
-fn token(ctx: &Context<'_>, index: usize, contextual_role: bool) -> Option<super::Reading> {
+fn token(ctx: &Context<'_>, index: usize) -> Option<super::Reading> {
     let token = ctx.tokens[index];
     let unresolved = |class, category| {
-        super::Reading::Unresolved(fallback::Request::unresolved(token.text, class, category))
+        super::Reading::Unresolved(UnresolvedFinding::unresolved(token.text, class, category))
     };
     if scan::identifier(token.text) {
         return Some(unresolved(
@@ -199,11 +205,11 @@ fn token(ctx: &Context<'_>, index: usize, contextual_role: bool) -> Option<super
             IssueCategory::ProtectedIdentifier,
         ));
     }
-    if token.text.contains([':', '.', '-']) && token.text.chars().any(char::is_numeric) {
+    if token.text.contains([':', '.', '-', '/']) && token.text.chars().any(char::is_numeric) {
         return temporal::recognize(ctx.text, ctx.tokens, index)
             .map(|(reading, class)| match reading {
                 Ok(value) => super::Reading::Resolved(value),
-                Err(failure) => super::Reading::Unresolved(fallback::Request::temporal(
+                Err(failure) => super::Reading::Unresolved(UnresolvedFinding::temporal(
                     token.text, class, failure,
                 )),
             })
@@ -212,18 +218,12 @@ fn token(ctx: &Context<'_>, index: usize, contextual_role: bool) -> Option<super
     if token.text.starts_with('%') || token.text.chars().any(char::is_numeric) {
         return Some(automatic_number(token.text));
     }
-    (scan::unknown_abbreviation(token.text) && !contextual_role && !ctx.contextual_cue_word(index))
-        .then(|| {
-            unresolved(
-                FallbackClass::Abbreviation,
-                IssueCategory::UnknownAbbreviation,
-            )
-        })
+    None
 }
 
 fn automatic_number(source: &str) -> super::Reading {
     match Numeric::automatic(source) {
         Ok(value) => super::Reading::Resolved(Value::Numeric(value)),
-        Err(failure) => super::Reading::Unresolved(fallback::Request::numeric(source, failure)),
+        Err(failure) => super::Reading::Unresolved(UnresolvedFinding::numeric(source, failure)),
     }
 }

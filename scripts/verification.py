@@ -137,6 +137,29 @@ def consume(output):
     normalizer = normalizer_tr.Normalizer()
     if normalizer.normalize("25 TL").normalized_text != "yirmi beş Türk lirası":
         raise RuntimeError("installed-wheel IO differs")
+    for policy in ("preserve", "reject", "fallback"):
+        for text, expected in (
+            ("1 234,50TL", "bin iki yüz otuz dört Türk lirası elli kuruş"),
+            ("5°C", "beş derece Santigrat"),
+            ("ABC", "ABC"),
+            ("tarih 03/04/2026", "tarih üç Nisan iki bin yirmi altı"),
+            ("CHP ve AKP", "ce he pe ve a ke pe"),
+            ("SGK'ya", "se ge kaya"),
+            ("PDF'ten", "pe de eften"),
+            ("CHP,AKP:", "ce he pe,a ke pe:"),
+            ("Claude'a", "kloda"),
+            ("ChatGPT", "çet ci pi ti"),
+            ("GitHub Copilot", "git hab ko paylıt"),
+            ("25kg;CHP,AKP", "yirmi beş kilogram;ce he pe,a ke pe"),
+            ("Claude,Hugging Face,UNKNOWN", "Claude,Hugging Face,UNKNOWN"),
+        ):
+            result = normalizer.normalize(text, ambiguity_policy=policy)
+            if (
+                result.normalized_text != expected
+                or not result.complete
+                or result.fallback_used
+            ):
+                raise RuntimeError("installed-wheel primary policy contract differs")
     fallback = normalizer.normalize("AB12; hello🙂", ambiguity_policy="fallback")
     if (
         fallback.normalized_text != "a be bir iki; hello gülümseyen yüz"
@@ -161,6 +184,60 @@ def consume(output):
     )
 
 
+def policy_contract_fixture():
+    catalog = ROOT / "tests" / "fixtures" / "policy-contract.json"
+    files = [catalog] + [
+        catalog.parent / name
+        for name in json.loads(catalog.read_text(encoding="utf-8"))
+    ]
+    cases = [
+        case
+        for file in files[1:]
+        for case in json.loads(file.read_text(encoding="utf-8"))
+    ]
+    if not cases or len({case["id"] for case in cases}) != len(cases):
+        raise RuntimeError("policy-contract fixture must have unique nonempty cases")
+    return cases, files
+
+
+def validate_policy_contract_measurement(value):
+    cases, _ = policy_contract_fixture()
+    keys = {
+        f"{cohort}:{policy}"
+        for cohort in ("short", "medium")
+        for policy in ("preserve", "reject", "fallback")
+    }
+    classes = {
+        f"{cohort}:{case['class']}:{policy}"
+        for cohort in ("short", "medium")
+        for policy in ("preserve", "reject", "fallback")
+        for case in cases
+    }
+    if value.get("input_cases") != cases:
+        raise RuntimeError(
+            "policy-contract measurement inputs differ from reviewed fixture"
+        )
+    if set(value.get("cohorts", {})) != keys or any(
+        cohort["count"] != 10000 for cohort in value["cohorts"].values()
+    ):
+        raise RuntimeError(
+            "policy-contract measurement cohorts are missing or undersampled"
+        )
+    if set(value.get("per_class_policy", {})) != classes:
+        raise RuntimeError("policy-contract measurement class/policy coverage differs")
+    for key in keys:
+        cohort, policy = key.split(":")
+        count = sum(
+            row["count"]
+            for name, row in value["per_class_policy"].items()
+            if name.startswith(cohort + ":") and name.endswith(":" + policy)
+        )
+        if count != 10000:
+            raise RuntimeError(
+                "policy-contract measurement class counts differ from cohort"
+            )
+
+
 def finalize(output):
     stages = json.loads((output / "stages.json").read_text(encoding="utf-8-sig"))
     if any(stage["status"] != "passed" for stage in stages):
@@ -176,6 +253,7 @@ def finalize(output):
             for cohort in value["cohorts"].values()
         ):
             raise RuntimeError("warm short/medium Rust p95 regression")
+        validate_policy_contract_measurement(value["expanded_coverage_measurement"])
         native.append(
             {
                 "file": record(path),
@@ -186,6 +264,7 @@ def finalize(output):
                 "large": value["large"],
                 "limit_diagnostics": value["limit_diagnostics"],
                 "fallback_measurement": value["fallback_measurement"],
+                "expanded_coverage_measurement": value["expanded_coverage_measurement"],
             }
         )
     if len(native) != 3:
@@ -210,6 +289,16 @@ def finalize(output):
                 "consumer native binary differs from authoritative wheel"
             )
     identity = installed["normalizer_id"]
+    python_report = json.loads(
+        (output / "reports" / "python.json").read_text(encoding="utf-8")
+    )
+    validate_policy_contract_measurement(python_report["expanded_coverage_measurement"])
+    _, contract_files = policy_contract_fixture()
+    contract_hash = hashlib.sha256(
+        b"".join(file.read_bytes() for file in contract_files)
+    ).hexdigest()
+    if python_report["expanded_coverage_measurement"]["input_sha256"] != contract_hash:
+        raise RuntimeError("Python policy-contract measurement fixture hash differs")
     if any(
         json.loads(Path(row["file"]["path"]).read_text(encoding="utf-8"))[
             "normalizer_id"
@@ -239,7 +328,8 @@ def finalize(output):
         "corpora": [
             record(ROOT / "benches" / name)
             for name in ("corpus.json", "intent-corpus.json")
-        ],
+        ]
+        + [record(file) for file in contract_files],
         "consumer": installed,
         "artifact_files": [
             record(path) for path in sorted((output / "reports").iterdir())

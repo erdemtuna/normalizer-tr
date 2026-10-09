@@ -1,4 +1,13 @@
+mod abbreviations;
+mod pronunciations;
+mod static_index;
+
 use crate::morphology::{Harmony, Word, WordEnd};
+use crate::{
+    IssueCategory,
+    morphology::{Inflection, case_inflection},
+    notation::split_suffix,
+};
 
 use Harmony::{BackFlat, BackRound, FrontFlat, FrontRound};
 use WordEnd::{Possessive, SoftensP, Voiced, Voiceless, Vowel};
@@ -73,6 +82,25 @@ const UNITS: &[(&str, Lexeme)] = &[
     ("cm²", Lexeme::same("santimetrekare", FrontFlat, Vowel)),
     ("km²", Lexeme::same("kilometrekare", FrontFlat, Vowel)),
     ("m³", Lexeme::same("metreküp", FrontRound, SoftensP)),
+    (
+        "°C",
+        Lexeme::distinct(
+            "derece Santigrat",
+            Word::new("Santigrat", BackFlat, Voiceless),
+            Word::new("Santigrat", BackFlat, Voiceless),
+        ),
+    ),
+    ("V", Lexeme::same("volt", BackRound, Voiceless)),
+    ("kW", Lexeme::same("kilovat", BackFlat, Voiceless)),
+    (
+        "kWh",
+        Lexeme::distinct(
+            "kilovat saat",
+            Word::new("saat", FrontFlat, Voiceless),
+            Word::new("saat", FrontFlat, Voiceless),
+        ),
+    ),
+    ("GB", Lexeme::same("gigabayt", BackFlat, Voiceless)),
 ];
 
 pub(crate) fn unit(symbol: &str) -> Option<Lexeme> {
@@ -89,6 +117,14 @@ pub(crate) fn unit_marker(symbol: &str) -> bool {
         .any(|(key, _)| key.eq_ignore_ascii_case(symbol))
 }
 
+pub(crate) fn unit_prefix(text: &str) -> Option<(&str, Lexeme)> {
+    UNITS.iter().find_map(|(symbol, entry)| {
+        text.strip_prefix(symbol)
+            .filter(|rest| !rest.starts_with(|ch: char| ch.is_alphanumeric() || ch == '_'))
+            .map(|_| (*symbol, *entry))
+    })
+}
+
 pub(crate) fn rate(symbol: &str) -> Option<(Lexeme, Lexeme)> {
     match symbol {
         "km/sa" | "km/h" => Some((unit("sa")?, unit("km")?)),
@@ -98,33 +134,44 @@ pub(crate) fn rate(symbol: &str) -> Option<(Lexeme, Lexeme)> {
 }
 
 pub(crate) fn abbreviation(symbol: &str) -> Option<Lexeme> {
-    Some(match symbol {
-        "Dr." => Lexeme::same("doktor", BackRound, Voiced),
-        "Prof." => Lexeme::same("profesör", FrontRound, Voiced),
-        "vb." => Lexeme::distinct(
-            "ve benzeri",
-            Word::new("be", FrontFlat, Vowel),
-            Word::new("benzeri", FrontFlat, Vowel),
-        ),
-        "TBMM" => Lexeme::distinct(
-            "te be me me",
-            Word::new("me", FrontFlat, Vowel),
-            Word::new("me", FrontFlat, Vowel),
-        ),
-        "PTT" => Lexeme::distinct(
-            "pe te te",
-            Word::new("te", FrontFlat, Vowel),
-            Word::new("te", FrontFlat, Vowel),
-        ),
-        "NATO" => Lexeme::same("nato", BackRound, Vowel),
-        "IBAN" => Lexeme::same("iban", BackFlat, Voiced),
-        "KDV" => Lexeme::distinct(
-            "katma değer vergisi",
-            Word::new("ve", FrontFlat, Vowel),
-            Word::new("vergisi", FrontFlat, Possessive),
-        ),
-        _ => return None,
-    })
+    abbreviations::lookup(symbol).map(abbreviations::Definition::default)
+}
+
+pub(crate) fn plain_abbreviation(text: &str) -> bool {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    abbreviation(base).is_some() && base.chars().all(char::is_uppercase)
+}
+
+pub(crate) fn pronunciation_candidates(first: &str) -> &'static [(&'static str, &'static Lexeme)] {
+    pronunciations::candidates(first)
+}
+
+pub(crate) fn pronunciation_word(text: &str) -> bool {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    pronunciations::lookup(base).is_some()
+}
+
+pub(crate) fn pronunciation_boundary(text: &str) -> bool {
+    pronunciations::boundary_word(text)
+}
+
+pub(crate) fn pronunciation_reading(
+    entry: Lexeme,
+    text: &str,
+) -> Result<(Lexeme, Option<Inflection>), IssueCategory> {
+    let (_, suffix) = split_suffix(text).ok_or(IssueCategory::Unsupported)?;
+    let case = suffix
+        .map(|suffix| case_inflection(entry.source, suffix).ok_or(IssueCategory::InvalidExpression))
+        .transpose()?;
+    Ok((entry, case))
+}
+
+pub(crate) fn catalog_form_valid(text: &str) -> bool {
+    if let Some(reading) = lexical_reading(text) {
+        return reading.is_ok();
+    }
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    pronunciations::lookup(base).is_some_and(|entry| pronunciation_reading(entry, text).is_ok())
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -194,4 +241,30 @@ impl Currency {
             Self::Gbp => Lexeme::same("peni", FrontFlat, Vowel),
         }
     }
+}
+
+pub(crate) fn lexical_reading(
+    text: &str,
+) -> Option<Result<(Lexeme, Option<Inflection>), IssueCategory>> {
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    let definition = abbreviations::lookup(base);
+    let entry = definition
+        .map(abbreviations::Definition::default)
+        .or_else(|| Currency::parse(base).map(|currency| currency.lexeme(base)))?;
+    let Some((_, suffix)) = split_suffix(text) else {
+        return Some(Err(IssueCategory::Unsupported));
+    };
+    let Some(suffix) = suffix else {
+        return Some(Ok((entry, None)));
+    };
+    let selected = if let Some(definition) = definition {
+        definition.inflected(suffix)
+    } else {
+        case_inflection(entry.source, suffix).map(|case| (entry, case))
+    };
+    Some(
+        selected
+            .map(|(entry, case)| (entry, Some(case)))
+            .ok_or(IssueCategory::InvalidExpression),
+    )
 }

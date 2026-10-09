@@ -1,6 +1,6 @@
 //! Small explicit name inventory, adapted from compatible PR #1 data.
 
-pub(super) fn letter_name(letter: char) -> Option<&'static str> {
+pub(crate) fn letter_name(letter: char) -> Option<&'static str> {
     Some(match letter {
         'a' | 'A' => "a",
         'b' | 'B' => "be",
@@ -38,7 +38,7 @@ pub(super) fn letter_name(letter: char) -> Option<&'static str> {
     })
 }
 
-pub(super) fn symbol_name(symbol: char) -> Option<&'static str> {
+pub(crate) fn symbol_name(symbol: char) -> Option<&'static str> {
     Some(match symbol {
         '.' => "nokta",
         ',' => "virgül",
@@ -106,7 +106,7 @@ pub(super) fn symbol_name(symbol: char) -> Option<&'static str> {
 }
 
 /// Ordinary prose punctuation is retained for sentence structure, not dropped.
-pub(super) fn prose_punctuation(symbol: char) -> bool {
+pub(crate) fn prose_punctuation(symbol: char) -> bool {
     matches!(
         symbol,
         '.' | ','
@@ -123,6 +123,7 @@ pub(super) fn prose_punctuation(symbol: char) -> bool {
             | '"'
             | '\''
             | '’'
+            | '‘'
             | '“'
             | '”'
             | '…'
@@ -130,4 +131,28 @@ pub(super) fn prose_punctuation(symbol: char) -> bool {
             | '–'
             | '—'
     )
+}
+
+pub(crate) fn needs_reading(grapheme: &str, within_word: bool) -> bool {
+    if grapheme.chars().any(|scalar| {
+        symbol_name(scalar).is_some()
+            && !prose_punctuation(scalar)
+            && !(within_word && scalar.is_alphabetic())
+    }) {
+        return true;
+    }
+    let has_letter = grapheme.chars().any(char::is_alphabetic);
+    grapheme.chars().any(|scalar| {
+        !scalar.is_alphabetic()
+            && !(has_letter && unicode_normalization::char::is_combining_mark(scalar))
+            && !scalar.is_whitespace()
+            && !prose_punctuation(scalar)
+    })
+}
+
+pub(crate) fn emoticon_length(source: &str) -> Option<usize> {
+    [":D", ":)", ":(", ";)", ":P", "<3"]
+        .iter()
+        .find(|emoticon| source.starts_with(**emoticon))
+        .map(|emoticon| emoticon.len())
 }
