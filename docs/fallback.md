@@ -108,7 +108,7 @@ The 512 KiB logical result budget counts fallback records and both owned text
 copies; amplified literals may fail with a real result-limit error.
 
 The base Fallback policy is available since 0.4.0; the expanded initialism/name
-coverage is in 0.5.0 release preparation, not yet tagged or published.
+coverage was added in 0.5.0.
 Fallback support incorporates parts of
 [Canberk's contribution](https://github.com/erdemtuna/normalizer-tr/pull/1).
 Internal responsibility boundaries are in [CONTRIBUTING](../CONTRIBUTING.md#code-layout).

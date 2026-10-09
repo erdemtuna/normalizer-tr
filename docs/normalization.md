@@ -6,8 +6,7 @@ profiles. `NORMALIZER_ID` / `normalizer_id` is diagnostic package metadata.
 claim about native-language or speech quality.
 
 This reference follows repository behavior. See the [changelog](../CHANGELOG.md)
-for differences between published packages and 0.5.0 release preparation,
-which is not yet tagged or published.
+for versioned changes and migration requirements.
 
 ## Exact numbers and morphology
 

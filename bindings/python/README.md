@@ -5,9 +5,7 @@ Distribution `normalizer-tr`; import `normalizer_tr`, native submodule
 second implementation. This guide follows the repository API; see the
 [changelog](../../CHANGELOG.md) for release status and migration notes.
 The curated initialism/name additions and `"pronunciation"` labels below are
-in **0.5.0 release preparation**, not yet tagged or published and not available
-in published 0.4.0. The registry install below still uses 0.4.0; use a source
-checkout or verified build artifact for 0.5.0.
+included in **0.5.0**; review the migration notes before upgrading.
 
 ## Install
 

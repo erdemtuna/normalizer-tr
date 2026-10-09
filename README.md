@@ -37,7 +37,7 @@ Requires Rust 1.94 or newer. Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-normalizer-tr = "0.4"
+normalizer-tr = "0.5"
 ```
 
 ```rust
@@ -97,9 +97,8 @@ engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/P
 
 The guides track repository behavior: expanded initialism coverage and
 [foreign-name speech aliases](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#approved-foreign-names)
-are in **0.5.0 release preparation**, not yet tagged or published. Registry
-installation above still uses published 0.4.0; 0.5.0 requires a source checkout
-or a verified build artifact.
+are included in **0.5.0**. Review the changelog's migration notes before upgrading,
+especially exhaustive Rust enum matches and strict serialized allowlists.
 
 ## License
 

@@ -1,14 +1,11 @@
 # Changelog
 
-Release-preparation entries describe agreed versions not yet available in
-published packages. For publishing instructions, see [CONTRIBUTING](CONTRIBUTING.md#releasing).
+Entries describe versioned changes and migration requirements.
+For publishing instructions, see [CONTRIBUTING](CONTRIBUTING.md#releasing).
 Platform requirements are in the [README](README.md) and
 [Python installation guide](bindings/python/README.md#install).
 
 ## 0.5.0 - 2026-10-09
-
-**Release preparation: not yet tagged or published.** The latest published
-version remains 0.4.0.
 
 - Remove repeated numeric-prefix scans from comma-boundary detection and literal
   fallback. Retain valid later numeric readings and cooperative control checks.
