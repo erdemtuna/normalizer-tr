@@ -47,6 +47,11 @@ const READINGS: &[(&str, &str, [&str; 5])] = &[
         ["u", "a", "da", "dan", "un"],
     ),
     ("VS Code", "vi es kod", ["u", "a", "da", "dan", "un"]),
+    (
+        "EMA Lightning",
+        "ema laytning",
+        ["i", "e", "de", "den", "in"],
+    ),
 ];
 
 const POLICIES: [AmbiguityPolicy; 3] = [
@@ -88,7 +93,7 @@ fn primary(n: &Normalizer, source: &str, expected: &str) {
 #[test]
 fn approved_defaults_and_five_case_families_have_independent_goldens() {
     let n = Normalizer::new().unwrap();
-    assert_eq!(READINGS.len(), 34);
+    assert_eq!(READINGS.len(), 35);
     for &(key, reading, suffixes) in READINGS {
         primary(&n, key, reading);
         for suffix in suffixes {
@@ -120,6 +125,8 @@ fn only_explicit_casing_aliases_are_accepted() {
         ("Youtube", "yu tub"),
         ("Whatsapp", "vats ep"),
         ("Linkedin", "linkt in"),
+        ("ema lightning", "ema laytning"),
+        ("ema-lightning", "ema laytning"),
     ] {
         primary(&n, key, expected);
     }
@@ -136,6 +143,11 @@ fn only_explicit_casing_aliases_are_accepted() {
         "MyChatGPTTool",
         "ClaudeMonet",
         "CodexTool",
+        "EMA LIGHTNING",
+        "Ema Lightning",
+        "ema-Lightning",
+        "EMA\tLightning",
+        "ema  lightning",
     ] {
         for policy in POLICIES {
             let result = n.normalize(source, &options(policy)).unwrap();
@@ -147,6 +159,22 @@ fn only_explicit_casing_aliases_are_accepted() {
                     .iter()
                     .all(|segment| segment.kind() == SegmentKind::Verbatim)
             );
+        }
+    }
+}
+
+#[test]
+fn ema_lightning_aliases_share_the_approved_case_families() {
+    let n = Normalizer::new().unwrap();
+    for key in ["ema lightning", "ema-lightning"] {
+        for suffix in ["i", "e", "de", "den", "in"] {
+            for apostrophe in ['\'', '’'] {
+                primary(
+                    &n,
+                    &format!("{key}{apostrophe}{suffix}"),
+                    &format!("ema laytning{suffix}"),
+                );
+            }
         }
     }
 }
@@ -211,6 +239,15 @@ fn punctuation_and_original_unicode_coordinates_stay_source_faithful() {
         ("o\u{308} Claude’un!", "o\u{308} klodun!"),
         ("Claude;Codex", "klod;kodeks"),
         ("Claude,UNKNOWN", "Claude,UNKNOWN"),
+        ("‘EMA Lightning’den’", "‘ema laytningden’"),
+        ("EMA Lightning,ema-lightning", "ema laytning,ema laytning"),
+        ("ema-lightning,EMA Lightning", "ema laytning,ema laytning"),
+        (
+            "EMA Lightning,Claude,UNKNOWN",
+            "EMA Lightning,Claude,UNKNOWN",
+        ),
+        ("ema-lightning,UNKNOWN", "ema-lightning,UNKNOWN"),
+        ("UNKNOWN,ema lightning", "UNKNOWN,ema lightning"),
     ] {
         for policy in POLICIES {
             let result = n.normalize(source, &options(policy)).unwrap();
@@ -246,6 +283,10 @@ fn failed_suffixes_keep_whole_name_findings_without_repair() {
         ("Claude'un'dan", IssueCategory::Unsupported),
         ("ChatGPT'", IssueCategory::Unsupported),
         ("Visual Studio Code'ye", IssueCategory::InvalidExpression),
+        ("EMA Lightning'a", IssueCategory::InvalidExpression),
+        ("ema lightning'da", IssueCategory::InvalidExpression),
+        ("ema-lightning'ten", IssueCategory::InvalidExpression),
+        ("ema-lightning'in'den", IssueCategory::Unsupported),
     ] {
         let preserve = n.normalize(source, &NormalizeOptions::default()).unwrap();
         assert_eq!(preserve.normalized_text(), source);
@@ -316,6 +357,12 @@ fn electronic_identifiers_versions_and_explicit_hints_keep_ownership() {
         "Visual Studio Code'foo@example.com",
         "Hugging Face@example.com",
         "Claude,Hugging Face'foo@example.com",
+        "ema-lightning@example.com",
+        "https://ornek.com/ema-lightning",
+        "ema-lightning-v2",
+        "EMA Lightning-2",
+        "AB12(ema-lightning)",
+        "EMA Lightning'foo@example.com",
     ] {
         for policy in POLICIES {
             match n.normalize(source, &options(policy)) {
@@ -330,7 +377,7 @@ fn electronic_identifiers_versions_and_explicit_hints_keep_ownership() {
             }
         }
     }
-    for source in ["Claude", "GitHub Copilot"] {
+    for source in ["Claude", "GitHub Copilot", "EMA Lightning", "ema-lightning"] {
         for policy in POLICIES {
             let mut options = options(policy);
             options

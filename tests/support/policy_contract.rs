@@ -76,6 +76,10 @@ const GROUPS: &[(&str, &str)] = &[
         "policy-contract/review-tight-admission.json",
         include_str!("../fixtures/policy-contract/review-tight-admission.json"),
     ),
+    (
+        "policy-contract/pronunciation-ema-lightning.json",
+        include_str!("../fixtures/policy-contract/pronunciation-ema-lightning.json"),
+    ),
 ];
 
 pub fn load() -> (Vec<Value>, usize) {

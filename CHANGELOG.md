@@ -34,16 +34,17 @@ Platform requirements are in the [README](README.md) and
   quantity-list punctuation without confusing decimals or suffix apostrophes.
   Unknown uppercase prose such as `ABC` stays verbatim in every policy;
   protected identifiers and recognized Roman-looking notation keep their rules.
-- Add 34 reviewed foreign-name speech aliases with 44 exact keys, including
+- Add 35 reviewed foreign-name speech aliases with 47 exact keys, including
   `Claude`, `ChatGPT`, `GitHub Copilot` and `Visual Studio Code`. They are primary
   readings under every policy, with explicit case aliases, bounded phrases and
   validated Turkish case suffixes; unknown spellings are not guessed.
+  `EMA Lightning`, `ema lightning` and `ema-lightning` read as `ema laytning`.
 - Add `SegmentKind::Pronunciation`, `FallbackClass::Pronunciation`, Python
   `"pronunciation"` labels and primary rule ID `pronunciation.name`.
 - Reorganize internal modules by responsibility without changing public import
   paths or existing enum/Serde tags. Keep thematic lexical definitions in logical
   order with shared compile-time static indexes for borrowed lookup.
-- Expand the ordered policy-contract catalog to 170 cases; the earlier 153 remain
+- Expand the ordered policy-contract catalog to 179 cases; the earlier 170 remain
   an exact prefix. Rust tests/benchmarks share its loader, and Python
   tests/measurements/verification cover every catalog input. Keep these
   measurements separate from the original frozen benchmark corpora and aggregates.

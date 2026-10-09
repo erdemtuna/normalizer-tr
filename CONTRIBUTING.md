@@ -96,7 +96,7 @@ under `tests/fixtures/policy-contract/`. Rust tests and benchmarks share a
 compiled fixture loader; installed-Python tests and verification consume the
 same catalog. Add cross-feature cases and exercise Preserve, Reject and Fallback
 independently. Do not alter the frozen benchmark inputs/order to improve an aggregate.
-The catalog currently has 170 cases; the earlier 153 remain an exact prefix.
+The catalog currently has 179 cases; the earlier 170 remain an exact prefix.
 `tests/support/policy_contract.rs` supplies the Rust loader; Python consumers
 flatten the files in catalog order and fingerprint every input. The report key
 `expanded_coverage_measurement` is retained for compatibility, not a second

@@ -67,9 +67,10 @@ It is an ordered catalog of money, quantity, lexical, punctuation, date,
 unresolved, context and compound-boundary fixture files. Case order and expected
 outcomes of existing cases are preserved; initialism, pronunciation-variant and
 abbreviation-boundary groups, then AI/developer/consumer name and pronunciation-
-boundary groups, then review regression groups are appended. The catalog now has
-170 cases with the earlier 153 as an exact prefix. Python fingerprints and manifests
-cover the catalog and every referenced file rather than just the catalog itself.
+boundary groups, then review regression and EMA Lightning groups are appended.
+The catalog now has 179 cases with the earlier 170 as an exact prefix. Python
+fingerprints and manifests cover the catalog and every referenced file rather
+than just the catalog itself.
 Each short/medium policy cohort is separate, with 2,000 warmups and 10,000 calls.
 Golden outcomes are checked before/after timing; class counts and exact inputs
 are validated by the verifier. Native reports also retain 4/16/32 KiB grouping,

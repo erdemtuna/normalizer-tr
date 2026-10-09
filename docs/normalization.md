@@ -131,8 +131,8 @@ proper-name detector.
 
 ## Approved foreign names
 
-The [name catalog](../src/domain/lexicon/pronunciations.rs) contains 34 reviewed
-readings with 44 exact keys in thematic [AI](../src/domain/lexicon/pronunciations/ai.rs),
+The [name catalog](../src/domain/lexicon/pronunciations.rs) contains 35 reviewed
+readings with 47 exact keys in thematic [AI](../src/domain/lexicon/pronunciations/ai.rs),
 [developer](../src/domain/lexicon/pronunciations/developer.rs) and
 [consumer](../src/domain/lexicon/pronunciations/consumer.rs) groups.
 These are user-approved Turkish-readable **text aliases**, not IPA, phonemes or
@@ -146,6 +146,7 @@ official/universal pronunciations. No TTS/audio model or voice quality was teste
 | `GitHub Copilot` | `git hab ko paylıt` |
 | `Hugging Face` | `haging feys` |
 | `Visual Studio Code` | `vijuıl stüdyo kod` |
+| `EMA Lightning`, `ema lightning`, `ema-lightning` | `ema laytning` |
 
 Recognition is automatic under Preserve, Reject and Fallback, without a name
 hint or selector. Exact keys such as `Apple`, `Rust`, `Python` and `React`

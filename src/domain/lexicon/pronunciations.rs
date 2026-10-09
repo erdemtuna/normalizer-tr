@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn catalog_and_phrase_indexes_cover_every_exact_key() {
-        assert_eq!(ENTRIES.len(), 44);
+        assert_eq!(ENTRIES.len(), 47);
         for (key, entry) in &ENTRIES {
             assert_eq!(lookup(key).unwrap().output, entry.output);
             assert!(

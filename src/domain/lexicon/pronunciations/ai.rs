@@ -9,6 +9,7 @@ const CLAUDE: Lexeme = pronounced("klod", "klod", BackRound, Voiced);
 const CODEX: Lexeme = pronounced("kodeks", "kodeks", FrontFlat, Voiceless);
 const CHATGPT: Lexeme = pronounced("çet ci pi ti", "ti", FrontFlat, Vowel);
 const OPENAI: Lexeme = pronounced("opın ey ay", "ay", BackFlat, Voiced);
+const EMA_LIGHTNING: Lexeme = pronounced("ema laytning", "laytning", FrontFlat, Voiced);
 
 pub(super) const ENTRIES: &[(&str, Lexeme)] = &[
     ("Claude", CLAUDE),
@@ -29,4 +30,7 @@ pub(super) const ENTRIES: &[(&str, Lexeme)] = &[
         "Hugging Face",
         pronounced("haging feys", "feys", FrontFlat, Voiceless),
     ),
+    ("EMA Lightning", EMA_LIGHTNING),
+    ("ema lightning", EMA_LIGHTNING),
+    ("ema-lightning", EMA_LIGHTNING),
 ];
