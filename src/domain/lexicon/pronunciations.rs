@@ -19,26 +19,6 @@ const fn pronounced(
 const GROUPS: &[&[(&str, Lexeme)]] = &[ai::ENTRIES, developer::ENTRIES, consumer::ENTRIES];
 const ENTRIES: [(&str, &Lexeme); static_index::count(GROUPS)] = static_index::build(GROUPS);
 const MAX_KEY_BYTES: usize = static_index::maximum_key_bytes(&ENTRIES);
-pub(super) const MAX_WORDS: usize = {
-    let mut maximum = 1;
-    let mut entry = 0;
-    while entry < ENTRIES.len() {
-        let bytes = ENTRIES[entry].0.as_bytes();
-        let mut words = 1;
-        let mut offset = 0;
-        while offset < bytes.len() {
-            if bytes[offset] == b' ' {
-                words += 1;
-            }
-            offset += 1;
-        }
-        if words > maximum {
-            maximum = words;
-        }
-        entry += 1;
-    }
-    maximum
-};
 const FIRST_BYTES: [bool; u8::MAX as usize + 1] = {
     let mut bytes = [false; u8::MAX as usize + 1];
     let mut entry = 0;

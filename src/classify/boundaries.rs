@@ -1,10 +1,11 @@
-use super::scan::{Token, overlaps};
+use super::scan::{CatalogGroup, Token, overlaps};
 use crate::{Hint, HintKind, NormalizeError, SourceRange, notation};
 
 /// The one source of cursor advancement, source claims and whole-hint ownership.
 pub(super) struct Boundaries<'a> {
     pub(super) tokens: &'a [Token<'a>],
     phone_like: &'a [SourceRange],
+    catalog_groups: &'a [CatalogGroup],
 }
 
 pub(super) struct Claim {
@@ -13,8 +14,27 @@ pub(super) struct Claim {
 }
 
 impl<'a> Boundaries<'a> {
-    pub(super) fn new(tokens: &'a [Token<'a>], phone_like: &'a [SourceRange]) -> Self {
-        Self { tokens, phone_like }
+    pub(super) fn new(
+        tokens: &'a [Token<'a>],
+        phone_like: &'a [SourceRange],
+        catalog_groups: &'a [CatalogGroup],
+    ) -> Self {
+        Self {
+            tokens,
+            phone_like,
+            catalog_groups,
+        }
+    }
+
+    pub(super) fn catalog_allowed(&self, start: usize, end: usize) -> bool {
+        let range = SourceRange::new(self.tokens[start].range.start, self.tokens[end].range.end);
+        let index = self
+            .catalog_groups
+            .partition_point(|group| group.range.end <= range.start);
+        !self.catalog_groups[index..]
+            .iter()
+            .take_while(|group| group.range.start < range.end)
+            .any(|group| group.catalog && !group.approved)
     }
     pub(super) fn claim(&self, start: usize, end: usize) -> Result<Claim, NormalizeError> {
         let first = self.tokens.get(start).ok_or(NormalizeError::Internal)?;

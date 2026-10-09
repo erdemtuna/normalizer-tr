@@ -13,5 +13,8 @@
   "policy-contract/pronunciation-ai.json",
   "policy-contract/pronunciation-developer.json",
   "policy-contract/pronunciation-consumer.json",
-  "policy-contract/pronunciation-boundaries.json"
+  "policy-contract/pronunciation-boundaries.json",
+  "policy-contract/review-money-ownership.json",
+  "policy-contract/review-mixed-members.json",
+  "policy-contract/review-tight-admission.json"
 ]

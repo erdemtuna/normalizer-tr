@@ -1,4 +1,6 @@
 //! Tokenization and indexed source traversal.
+mod lists;
+mod piece;
 mod punctuation;
 mod signals;
 
@@ -6,9 +8,12 @@ use super::context;
 use crate::{
     NormalizeError, SourceRange, WorkControl, resources::Resources, source_map::SourceMap,
 };
+pub(super) use lists::CatalogGroup;
+use piece::Piece;
+pub(in crate::classify) use punctuation::trimmed_range;
 use punctuation::{
-    boundary, expression_range, lexical_list, lexical_period, numeric_parenthesis_compound,
-    quantity_separators, quotation_boundaries, trimmed_range,
+    boundary, expression_range, lexical_period, numeric_parenthesis_compound, quantity_separators,
+    quotation_boundaries,
 };
 pub(super) use signals::{
     group_whitespace, identifier, math_operator, number_fragment, phones, spaced_compound,
@@ -19,6 +24,11 @@ pub(super) struct Token<'a> {
     pub(super) range: SourceRange,
     pub(super) text: &'a str,
     pub(super) number_run_end: usize,
+}
+
+pub(super) struct Scanned<'a> {
+    pub(super) tokens: Vec<Token<'a>>,
+    pub(super) catalog_groups: Vec<CatalogGroup>,
 }
 
 pub(super) fn overlaps(a: SourceRange, b: SourceRange) -> bool {
@@ -36,9 +46,10 @@ pub(super) fn tokens<'a>(
     source: &'a SourceMap,
     rules: &Resources,
     control: &WorkControl,
-) -> Result<Vec<Token<'a>>, NormalizeError> {
+) -> Result<Scanned<'a>, NormalizeError> {
     let text = source.text();
     let quotes = quotation_boundaries(text);
+    let catalog_groups = lists::groups(text, rules, &quotes, control)?;
     let mut tokens = Vec::new();
     let mut skip_until = 0;
     for matched in rules.tokens.find_iter(text) {
@@ -109,14 +120,7 @@ pub(super) fn tokens<'a>(
         }
         // Identifier punctuation (including URL queries) must not split the token.
         let protected = identifier(&text[range.start..range.end]);
-        let mut approved_list = !protected
-            && lexical_list(
-                body.split(';').next().unwrap_or(body),
-                range.start,
-                &quotes,
-                text,
-                &tokens,
-            );
+        let mut approved_list = approved(&catalog_groups, range.start);
         let list =
             protected && quantity_separators(&text[range.start..range.end], range.start, &quotes);
         if protected && !list {
@@ -124,21 +128,23 @@ pub(super) fn tokens<'a>(
             continue;
         }
         let mut start = 0;
+        let mut piece = Piece::default();
         for (offset, ch) in raw.char_indices() {
+            control.check()?;
+            let preceding = &raw[start..offset];
+            let delimiter = boundary(ch, matched.start() + offset, &quotes);
+            let quantity = (delimiter || ch == ',') && piece.quantity(preceding);
             let comma = ch == ','
                 && (approved_list
                     || (raw[offset + 1..]
                         .starts_with(|c: char| c.is_ascii_digit() || "+-₺$€£".contains(c))
-                        && crate::notation::quantity_piece(&raw[start..offset])));
-            if !boundary(ch, matched.start() + offset, &quotes) && !comma {
+                        && quantity));
+            if !delimiter && !comma {
+                piece.advance(preceding, ch);
                 continue;
             }
-            if list
-                && ch != ';'
-                && !comma
-                && identifier(&raw[start..offset])
-                && !crate::notation::quantity_piece(&raw[start..offset])
-            {
+            if list && ch != ';' && !comma && piece.identifier(preceding) && !quantity {
+                piece.advance(preceding, ch);
                 continue;
             }
             if let Some(range) =
@@ -147,15 +153,9 @@ pub(super) fn tokens<'a>(
                 append_token(&mut tokens, source, range);
             }
             start = offset + ch.len_utf8();
-            if ch == ';' && !protected {
-                let remaining = &raw[start..];
-                approved_list = lexical_list(
-                    remaining.split(';').next().unwrap_or(remaining),
-                    matched.start() + start,
-                    &quotes,
-                    text,
-                    &tokens,
-                );
+            piece = Piece::default();
+            if ch == ';' {
+                approved_list = approved(&catalog_groups, matched.start() + start);
             }
         }
         if let Some(range) = trimmed_range(&raw[start..], matched.start() + start, &quotes) {
@@ -173,7 +173,17 @@ pub(super) fn tokens<'a>(
             tokens[index].number_run_end = next.number_run_end;
         }
     }
-    Ok(tokens)
+    Ok(Scanned {
+        tokens,
+        catalog_groups,
+    })
+}
+
+fn approved(groups: &[CatalogGroup], offset: usize) -> bool {
+    let index = groups.partition_point(|group| group.range.end <= offset);
+    groups
+        .get(index)
+        .is_some_and(|group| group.range.start <= offset && group.approved)
 }
 
 fn append_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: SourceRange) {

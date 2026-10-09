@@ -11,9 +11,9 @@ improvement. Current semantic outcomes are checked independently by the
 characterization and class tests.
 
 Passing those frozen cohorts does not cover every scaling path. The
-[known implementation gaps](docs/normalization.md#known-implementation-gaps-unreleased)
-include quadratic work for long malformed numeric-comma tokens and delayed
-deadline checks. Cooperative deadlines are not hard latency guarantees.
+[reviewed boundary regressions](docs/normalization.md#reviewed-boundary-regressions-unreleased)
+also exercise single malformed numeric tokens and cooperative control checks.
+Cooperative deadlines are not hard latency guarantees.
 
 ## Reproduce
 
@@ -67,13 +67,14 @@ It is an ordered catalog of money, quantity, lexical, punctuation, date,
 unresolved, context and compound-boundary fixture files. Case order and expected
 outcomes of existing cases are preserved; initialism, pronunciation-variant and
 abbreviation-boundary groups, then AI/developer/consumer name and pronunciation-
-boundary groups are appended. The catalog now has 153 cases with the earlier
-97 as an exact prefix. Python fingerprints and manifests
+boundary groups, then review regression groups are appended. The catalog now has
+170 cases with the earlier 153 as an exact prefix. Python fingerprints and manifests
 cover the catalog and every referenced file rather than just the catalog itself.
 Each short/medium policy cohort is separate, with 2,000 warmups and 10,000 calls.
 Golden outcomes are checked before/after timing; class counts and exact inputs
 are validated by the verifier. Native reports also retain 4/16/32 KiB grouping,
-quotation/list, malformed-input, name/phrase/prefix-miss and decomposed-Unicode
+quotation/list, single malformed comma/dot tokens, mixed quantity lists,
+name/phrase/prefix-miss/rejected-list and decomposed-Unicode
 scaling diagnostics. These workloads are not exhaustive complexity checks.
 
 The first process initialization is recorded separately from 100 later cached

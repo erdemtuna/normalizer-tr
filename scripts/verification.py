@@ -150,6 +150,8 @@ def consume(output):
             ("Claude'a", "kloda"),
             ("ChatGPT", "çet ci pi ti"),
             ("GitHub Copilot", "git hab ko paylıt"),
+            ("25kg;CHP,AKP", "yirmi beş kilogram;ce he pe,a ke pe"),
+            ("Claude,Hugging Face,UNKNOWN", "Claude,Hugging Face,UNKNOWN"),
         ):
             result = normalizer.normalize(text, ambiguity_policy=policy)
             if (

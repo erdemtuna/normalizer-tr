@@ -94,7 +94,9 @@ pub(super) fn render(
     let mut cursor = 0;
     let mut used_code_point = false;
     let mut quantity_expected = false;
+    let mut notation_end = 0;
     while cursor < source.len() {
+        output.check()?;
         let remainder = &source[cursor..];
         let first = remainder.chars().next().ok_or(NormalizeError::Internal)?;
         if first.is_whitespace() {
@@ -115,16 +117,20 @@ pub(super) fn render(
             continue;
         }
         let (part, length) = if first.is_ascii_digit() {
-            let notation_length = remainder
-                .find(|scalar: char| !scalar.is_ascii_digit() && !matches!(scalar, '.' | ','))
-                .unwrap_or(remainder.len());
-            if matches!(letters, LiteralReading::PreserveWords)
-                && let Some(number) = numerals::Number::parse(&remainder[..notation_length])
-            {
-                used_code_point |= emit(Part::Number(number), output)?;
-                cursor += notation_length;
-                quantity_expected = true;
-                continue;
+            if matches!(letters, LiteralReading::PreserveWords) {
+                if cursor >= notation_end {
+                    notation_end = cursor
+                        + remainder
+                            .bytes()
+                            .position(|byte| !byte.is_ascii_digit() && !matches!(byte, b'.' | b','))
+                            .unwrap_or(remainder.len());
+                }
+                if let Some(number) = numerals::Number::parse(&source[cursor..notation_end]) {
+                    used_code_point |= emit(Part::Number(number), output)?;
+                    cursor = notation_end;
+                    quantity_expected = true;
+                    continue;
+                }
             }
             let length = remainder
                 .find(|scalar: char| !scalar.is_ascii_digit())

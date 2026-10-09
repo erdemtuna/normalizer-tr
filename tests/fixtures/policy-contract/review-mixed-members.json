@@ -1,0 +1,6 @@
+[
+  {"id":"review-quantity-before-initialisms","class":"abbreviation","text":"25kg;CHP,AKP","expected":"yirmi beş kilogram;ce he pe,a ke pe"},
+  {"id":"review-quantity-after-initialisms","class":"abbreviation","text":"CHP,AKP;25TL","expected":"ce he pe,a ke pe;yirmi beş Türk lirası"},
+  {"id":"review-quantity-before-suffix-variants","class":"abbreviation","text":"25TL;SGK'ya,PDF'ten:","expected":"yirmi beş Türk lirası;se ge kaya,pe de eften:"},
+  {"id":"review-quantity-before-names","class":"pronunciation","text":"25kg;Claude,Hugging Face","expected":"yirmi beş kilogram;klod,haging feys"}
+]

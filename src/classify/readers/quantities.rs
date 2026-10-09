@@ -82,7 +82,8 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
             && number_fragment(number)
             && next.is_some_and(|next| {
                 group_whitespace(text, token.range.end, next.range.start)
-                    && split_suffix(next.text).is_some_and(|(body, _)| number_fragment(body))
+                    && (split_suffix(next.text).is_some_and(|(body, _)| number_fragment(body))
+                        || notation::attached_money_tail(next.text).is_some())
             })
         {
             let end = amount_end(ctx, index + 1);
@@ -141,8 +142,9 @@ fn amount_end(ctx: &Context<'_>, index: usize) -> usize {
         .get(end + 1)
         .filter(|next| {
             group_whitespace(ctx.text, ctx.tokens[end].range.end, next.range.start)
-                && split_suffix(next.text)
-                    .is_some_and(|(body, suffix)| suffix.is_some() && number_fragment(body))
+                && (notation::attached_money_tail(next.text).is_some()
+                    || split_suffix(next.text)
+                        .is_some_and(|(body, suffix)| suffix.is_some() && number_fragment(body)))
         })
         .map_or(end, |_| end + 1)
 }

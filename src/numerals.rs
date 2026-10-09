@@ -1,6 +1,12 @@
 use crate::morphology::{Spoken, Word};
 
 pub(crate) const MAGNITUDE_LIMIT: u64 = 1_000_000_000_000_000_000;
+const GROUP_WIDTH: usize = 3;
+const MAX_FRACTION_DIGITS: usize = 9;
+const MAX_INTEGER_DIGITS: usize = MAGNITUDE_LIMIT.ilog10() as usize;
+const MAX_GROUP_SEPARATORS: usize = (MAX_INTEGER_DIGITS - 1) / GROUP_WIDTH;
+const MAX_STANDARD_NUMBER_BYTES: usize =
+    1 + MAX_INTEGER_DIGITS + MAX_GROUP_SEPARATORS + 1 + MAX_FRACTION_DIGITS;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Sign {
@@ -64,6 +70,9 @@ pub(crate) struct Number {
 
 impl Number {
     pub(crate) fn parse(text: &str) -> Option<Self> {
+        if text.len() > MAX_STANDARD_NUMBER_BYTES {
+            return None;
+        }
         Self::parse_with_padding(text, false, false)
     }
     pub(crate) fn parse_cardinal_hint(text: &str) -> Option<Self> {
@@ -80,7 +89,8 @@ impl Number {
         let fraction = parts.next();
         if parts.next().is_some()
             || fraction.is_some_and(|f| {
-                !(1..=9).contains(&f.len()) || !f.bytes().all(|b| b.is_ascii_digit())
+                !(1..=MAX_FRACTION_DIGITS).contains(&f.len())
+                    || !f.bytes().all(|b| b.is_ascii_digit())
             })
         {
             return None;
@@ -100,8 +110,8 @@ impl Number {
                 || !group.bytes().all(|b| b.is_ascii_digit())
                 || (!allow_padding && index == 0 && group.len() > 1 && group.starts_with('0'))
                 || (separator != '.' && index == 0 && group.starts_with('0'))
-                || (grouped && index == 0 && group.len() > 3)
-                || (index > 0 && group.len() != 3)
+                || (grouped && index == 0 && group.len() > GROUP_WIDTH)
+                || (index > 0 && group.len() != GROUP_WIDTH)
             {
                 return None;
             }
@@ -309,5 +319,24 @@ mod tests {
         ] {
             assert!(Number::parse(input).is_none(), "{input}");
         }
+    }
+
+    #[test]
+    fn normal_number_bound_preserves_maximum_values_and_other_parse_modes() {
+        let maximal = "-999.999.999.999.999.999,123456789";
+        assert_eq!(maximal.len(), MAX_STANDARD_NUMBER_BYTES);
+        assert_eq!(
+            Number::parse(maximal).unwrap().integer(),
+            MAGNITUDE_LIMIT - 1
+        );
+        assert_eq!(
+            Number::parse_cardinal_hint(&"0".repeat(512))
+                .unwrap()
+                .integer(),
+            0
+        );
+        let money = "-999\u{202f}999\u{202f}999\u{202f}999\u{202f}999\u{202f}999,99";
+        assert!(money.len() > MAX_STANDARD_NUMBER_BYTES);
+        assert_eq!(Amount::parse(money).unwrap().major(), MAGNITUDE_LIMIT - 1);
     }
 }

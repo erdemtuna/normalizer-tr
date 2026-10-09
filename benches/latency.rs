@@ -240,6 +240,10 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
             ("pronunciation-phrase", "GitHub Copilot; "),
             ("pronunciation-prefix-miss", "Visual Studio Nope; "),
             ("pronunciation-list", "ChatGPT,Claude; "),
+            ("malformed-comma-token", "1,"),
+            ("malformed-dot-token", "1."),
+            ("mixed-quantity-list", "25kg;CHP,AKP; "),
+            ("rejected-phrase-list", "Claude,Hugging Face,UNKNOWN; "),
         ] {
             let mut text = pattern.repeat(size / pattern.len());
             text.push_str(&" ".repeat(size - text.len()));

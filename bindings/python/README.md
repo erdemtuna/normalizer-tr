@@ -111,7 +111,7 @@ work executes pure Rust detached from the interpreter after copying/validating
 arguments; records marshal afterward.
 
 Deadlines/cancellation are cooperative, not hard call-duration limits; see
-[known implementation gaps](../../docs/normalization.md#known-implementation-gaps-unreleased).
+[reviewed boundary regressions](../../docs/normalization.md#reviewed-boundary-regressions-unreleased).
 
 ## Development and verification
 

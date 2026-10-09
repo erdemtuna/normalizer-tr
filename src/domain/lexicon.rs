@@ -2,8 +2,6 @@ mod abbreviations;
 mod pronunciations;
 mod static_index;
 
-pub(crate) const MAX_PRONUNCIATION_WORDS: usize = pronunciations::MAX_WORDS;
-
 use crate::morphology::{Harmony, Word, WordEnd};
 use crate::{
     IssueCategory,
@@ -166,6 +164,14 @@ pub(crate) fn pronunciation_reading(
         .map(|suffix| case_inflection(entry.source, suffix).ok_or(IssueCategory::InvalidExpression))
         .transpose()?;
     Ok((entry, case))
+}
+
+pub(crate) fn catalog_form_valid(text: &str) -> bool {
+    if let Some(reading) = lexical_reading(text) {
+        return reading.is_ok();
+    }
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    pronunciations::lookup(base).is_some_and(|entry| pronunciation_reading(entry, text).is_ok())
 }
 
 #[derive(Clone, Copy, Debug)]

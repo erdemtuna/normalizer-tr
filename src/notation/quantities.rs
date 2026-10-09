@@ -34,6 +34,12 @@ pub(crate) fn quantity_piece(text: &str) -> bool {
             .is_some_and(|(number, label)| !number.is_empty() && base.ends_with(label))
 }
 
+pub(crate) fn attached_money_tail(text: &str) -> Option<(&str, &str)> {
+    let (number, label) = attached_quantity(text)?;
+    (!number.is_empty() && text.starts_with(number) && currency_marker(label))
+        .then_some((number, label))
+}
+
 pub(crate) fn currency_marker(text: &str) -> bool {
     let base = text.split(['\'', '’']).next().unwrap_or(text);
     Currency::parse(base).is_some()

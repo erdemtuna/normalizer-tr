@@ -7,6 +7,13 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Remove repeated numeric-prefix scans from comma-boundary detection and literal
+  fallback. Retain valid later numeric readings and cooperative control checks.
+- Keep attached duplicate currency markers in one invalid prefixed amount rather
+  than accepting separate money fragments.
+- Evaluate safely separated semicolon members independently and validate complete
+  tight comma groups before primary abbreviation/name admission. Keep ordinary
+  spaced prose and genuine protected-source diagnostics unchanged.
 - Add 65 reviewed uppercase initialisms (80 approved abbreviation spellings in
   total, including existing aliases) with typed pronunciation tails. `SGK`
   defaults to `se ge ka`; approved suffixes select `ke`/`ka` alternatives and
@@ -36,16 +43,14 @@ Platform requirements are in the [README](README.md) and
 - Reorganize internal modules by responsibility without changing public import
   paths or existing enum/Serde tags. Keep thematic lexical definitions in logical
   order with shared compile-time static indexes for borrowed lookup.
-- Expand the ordered policy-contract catalog to 153 cases; the earlier 97 remain
+- Expand the ordered policy-contract catalog to 170 cases; the earlier 153 remain
   an exact prefix. Rust tests/benchmarks share its loader, and Python
   tests/measurements/verification cover every catalog input. Keep these
   measurements separate from the original frozen benchmark corpora and aggregates.
 
-Known implementation gaps in malformed-amount ownership, mixed quantity/
-abbreviation lists, multiword-name lists and numeric-comma scanning remain
-documented in the
-[normalization reference](docs/normalization.md#known-implementation-gaps-unreleased).
-They are not intended changes to the contract.
+The previously reviewed ownership, list-admission and numeric-scanning gaps are
+covered by [review regression tests](docs/normalization.md#reviewed-boundary-regressions-unreleased),
+not treated as supported syntax or relaxed contracts.
 
 ### Migration
 

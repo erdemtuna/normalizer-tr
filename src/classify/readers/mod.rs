@@ -41,11 +41,7 @@ impl Context<'_> {
             && whitespace_between(self.text, self.tokens[end].range.end, next.range.start);
         let attached =
             scan::group_whitespace(self.text, self.tokens[end].range.end, next.range.start)
-                && numbers::attached_quantity(next.text).is_some_and(|(number, label)| {
-                    !number.is_empty()
-                        && next.text.starts_with(number)
-                        && numbers::currency_marker(label)
-                });
+                && numbers::attached_money_tail(next.text).is_some();
         (spaced || attached).then_some(end + 1)
     }
 
@@ -96,14 +92,35 @@ pub(super) fn read(
         };
         (reading, end)
     };
+    let admit_catalog = |attempt: Attempt| {
+        let (value, end) = &attempt;
+        if bounds.catalog_allowed(index, *end) {
+            return Some(attempt);
+        }
+        if value.is_err() {
+            let source = &ctx.text[ctx.tokens[index].range.start..ctx.tokens[*end].range.end];
+            let valid_prefix = source.split_once(',').is_some_and(|(prefix, _)| {
+                scan::trimmed_range(prefix, 0, &[]).is_some_and(|range| {
+                    crate::domain::lexicon::catalog_form_valid(&prefix[range.start..range.end])
+                })
+            });
+            if !valid_prefix {
+                return Some(attempt);
+            }
+        }
+        None
+    };
     electronic::whole(ctx, index)
         .map(|attempt| annotate(attempt, FallbackClass::Electronic))
         .or_else(|| {
             pronunciation::read(ctx, index)
+                .and_then(admit_catalog)
                 .map(|attempt| annotate(attempt, FallbackClass::Pronunciation))
         })
         .or_else(|| {
-            lexical::read(ctx, index).map(|attempt| annotate(attempt, FallbackClass::Abbreviation))
+            lexical::read(ctx, index)
+                .and_then(admit_catalog)
+                .map(|attempt| annotate(attempt, FallbackClass::Abbreviation))
         })
         .or_else(|| {
             electronic::contextual(ctx, index)

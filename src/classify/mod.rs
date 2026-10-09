@@ -42,9 +42,10 @@ pub(crate) fn collect(
     control: &WorkControl,
 ) -> Result<Vec<Candidate>, NormalizeError> {
     let text = source.text();
-    let tokens = scan::tokens(source, resources, control)?;
+    let scanned = scan::tokens(source, resources, control)?;
+    let tokens = scanned.tokens;
     let phone_like = scan::phones(text, &tokens, resources, control)?;
-    let bounds = Boundaries::new(&tokens, &phone_like);
+    let bounds = Boundaries::new(&tokens, &phone_like, &scanned.catalog_groups);
     let ctx = Context {
         text,
         tokens: &tokens,

@@ -41,8 +41,8 @@ conversion, exchange-rate lookup or currency catalog inference:
 | GBP | `GBP`, `£` | `sterlin` / `peni` |
 
 Zero minor units are omitted. Unknown or malformed currency expressions remain
-whole unresolved spans by contract; see
-[known implementation gaps](#known-implementation-gaps-unreleased) for current exceptions.
+whole unresolved spans; see the
+[reviewed boundary regressions](#reviewed-boundary-regressions-unreleased).
 
 Supported currency labels may be compact or spaced: `25TL`, `25 TL`, `$25`,
 `$ 25` and `25$`. Currency context also permits space-grouped money such as
@@ -205,9 +205,11 @@ The same narrow comma-list rule accepts exact approved name members:
 Complete phrases participate (`Hugging Face,Claude`), but their last words do
 not independently qualify (`Face,Claude`). Approved names also retain paired
 quotes and ordinary trailing colon/period punctuation.
-The contract requires unknown, protected or malformed list members to block
-partial name-list rewriting; multiword lookahead currently has a
-[known ownership gap](#known-implementation-gaps-unreleased).
+Unknown, protected or empty members block successful catalog rewrites throughout
+a tight group. Genuine unresolved findings and literal fallback remain available.
+Comma-separated spaced prose is normalized independently; a tight group ends
+at a space after the comma or an established semicolon boundary. See
+[reviewed boundary regressions](#reviewed-boundary-regressions-unreleased).
 
 ## Phones, IBANs and Romans
 
@@ -274,29 +276,32 @@ controls are invalid. Cancellation/deadlines are cooperative between bounded
 steps, not hard wall-clock guarantees. Outputs contain input text, but the core
 does not log it; issue explanations contain no copied input values.
 
-## Known implementation gaps (Unreleased)
+## Reviewed boundary regressions (Unreleased)
 
 The [full-PR review](https://github.com/erdemtuna/normalizer-tr/pull/2#pullrequestreview-5466509996)
 and [pronunciation review](https://github.com/erdemtuna/normalizer-tr/pull/2#pullrequestreview-5467492566)
-identified four implementation bugs that remain in the
+identified four implementation bugs in the
 [`76eb8b4` source head](https://github.com/erdemtuna/normalizer-tr/commit/76eb8b454cb3b8079df8df94270f76497963fd71).
-They are implementation gaps, not supported syntax or relaxed contracts:
+The fixes restore the intended contract and are covered by independent
+cross-policy regression tests:
 
 - [Numeric-comma scanning](https://github.com/erdemtuna/normalizer-tr/pull/2#discussion_r4227273249):
-  a long malformed token such as repeated `1,` can require quadratic work and
-  delay cancellation/deadline checks despite fitting the input limit.
+  quantity-boundary signals advance incrementally, and fallback numeric-run
+  boundaries are discovered once. Repeated `1,` or `1.` does not cause
+  growing-prefix/remainder rescans. Controls remain cooperative, not a hard SLA.
 - [Duplicate attached currencies](https://github.com/erdemtuna/normalizer-tr/pull/2#discussion_r4227273255):
-  `$1 234,50TL` incorrectly resolves as separate money fragments, even under
-  Reject. It should instead be one unresolved malformed amount.
+  `$1 234,50TL`, same-currency duplicates and compact symbol variants have one
+  invalid whole owner. Reject does not accept successful money fragments.
 - [Mixed quantity/abbreviation lists](https://github.com/erdemtuna/normalizer-tr/pull/2#discussion_r4227273258):
-  `25kg;CHP,AKP` suppresses approved abbreviation readings; some suffixed
-  variants also produce a spurious issue. A space after the semicolon avoids
-  the reproduced boundary failure, but does not change the intended list grammar.
+  `25kg;CHP,AKP` and the reverse order recognize each safely separated member.
+  A quantity's digits do not suppress a later approved initialism/suffix list.
 - [Multiword-name comma lists](https://github.com/erdemtuna/normalizer-tr/pull/2#discussion_r4228033170):
-  `Claude,Hugging Face,UNKNOWN` incorrectly becomes `klod,Hugging Face,UNKNOWN`
-  with completion and no diagnostics in every policy. Phrase lookahead fails to
-  validate the full logical list before rewriting its prefix; protected or
-  malformed later members can also escape the intended whole-list guard.
+  `Claude,Hugging Face,UNKNOWN` stays unchanged: complete tight-group admission
+  precedes any successful catalog rewrite. Unknown, protected or empty members
+  prevent primary name/abbreviation changes, while genuine identifier/errors and
+  literal fallback remain available. Spaced prose such as
+  `Claude, Hugging Face, UNKNOWN` still normalizes approved names independently.
 
-Neither `complete=true` nor a passing frozen performance cohort proves these
-paths correct.
+Neither `complete=true` nor a passing frozen performance cohort proves universal
+coverage or pronunciation quality. Malformed-token/list scaling checks remain
+separate from the short/medium latency target.

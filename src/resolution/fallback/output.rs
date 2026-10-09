@@ -16,7 +16,7 @@ impl<'a> Output<'a> {
     }
 
     pub(super) fn append(&mut self, text: &str) -> Result<(), NormalizeError> {
-        self.control.check()?;
+        self.check()?;
         self.text
             .len()
             .checked_add(text.len())
@@ -31,6 +31,10 @@ impl<'a> Output<'a> {
             self.append(" ")?;
         }
         self.append(word)
+    }
+
+    pub(super) fn check(&self) -> Result<(), NormalizeError> {
+        self.control.check()
     }
 
     pub(super) fn finish(self) -> String {

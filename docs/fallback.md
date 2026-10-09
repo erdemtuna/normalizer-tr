@@ -48,8 +48,8 @@ space-grouped money and supported units receive primary readings under Fallback
 without fallback records. See the [normalization reference](normalization.md).
 The contract requires malformed compounds to own their full source span and
 carry the original failure category; their literal output is not a valid-money/
-unit certificate. Current exceptions are listed under
-[known implementation gaps](normalization.md#known-implementation-gaps-unreleased).
+unit certificate. The fixed ownership cases are covered under
+[reviewed boundary regressions](normalization.md#reviewed-boundary-regressions-unreleased).
 
 Approved initialisms and suffix-selected pronunciations are primary readings in
 every policy, without fallback records: `SGK’ya` -> `se ge kaya` and

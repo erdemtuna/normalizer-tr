@@ -1,0 +1,7 @@
+[
+  {"id":"review-duplicate-currency-compact","class":"money","text":"$1 234,50TL","category":"InvalidExpression","fallback":"dolar işareti bir iki yüz otuz dört virgül beş sıfır Türk lirası","fallback_class":"Quantity","strategy":"Literal"},
+  {"id":"review-duplicate-currency-same","class":"money","text":"$1 234,50USD","category":"InvalidExpression","fallback":"dolar işareti bir iki yüz otuz dört virgül beş sıfır dolar","fallback_class":"Quantity","strategy":"Literal"},
+  {"id":"review-duplicate-currency-prefix-space","class":"money","text":"$ 1 234,50USD","category":"InvalidExpression","fallback":"dolar işareti bir iki yüz otuz dört virgül beş sıfır dolar","fallback_class":"Quantity","strategy":"Literal"},
+  {"id":"review-duplicate-currency-symbol","class":"money","text":"$1 234,50$","category":"InvalidExpression","fallback":"dolar işareti bir iki yüz otuz dört virgül beş sıfır dolar işareti","fallback_class":"Quantity","strategy":"Literal"},
+  {"id":"review-independent-prefix-money","class":"money","text":"1 $25","expected":"bir yirmi beş dolar"}
+]

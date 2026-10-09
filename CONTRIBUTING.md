@@ -73,6 +73,9 @@ Unicode coordinates. Text goldens are not speech-model/audio validation.
 The scanner indexes numeric-run ends once for bounded money lookahead and
 distinguishes paired quotation boundaries from suffix apostrophes. Keep
 recognition separate from strict value validation and share typed label metadata.
+Its incremental piece signals and complete tight-list admission stay separate
+from domain parsing and rendering. Rejecting a group must not invent candidates
+or hide genuine unresolved findings; source admission belongs with boundary claims.
 
 ## Change rules and tests
 
@@ -93,7 +96,7 @@ under `tests/fixtures/policy-contract/`. Rust tests and benchmarks share a
 compiled fixture loader; installed-Python tests and verification consume the
 same catalog. Add cross-feature cases and exercise Preserve, Reject and Fallback
 independently. Do not alter the frozen benchmark inputs/order to improve an aggregate.
-The catalog currently has 153 cases; the earlier 97 are an exact prefix.
+The catalog currently has 170 cases; the earlier 153 remain an exact prefix.
 `tests/support/policy_contract.rs` supplies the Rust loader; Python consumers
 flatten the files in catalog order and fingerprint every input. The report key
 `expanded_coverage_measurement` is retained for compatibility, not a second
