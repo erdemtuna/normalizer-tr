@@ -17,7 +17,15 @@ that contribution, with a bounded set of exact keys and explicitly approved
 pronunciation variants. Suffixes select typed readings; the catalog is not an
 acronym detector or a copy of the contribution's contextual abbreviation engine.
 
-Owned Rust code, unit/currency/abbreviation/character readings and finite
+The [foreign-name catalog](../domain/lexicon/pronunciations.rs) contains finite,
+user-reviewed text mappings authored in thematic AI/developer/consumer groups.
+Explicit spelling aliases and Turkish suffix tails accompany each reading.
+These Turkish-readable aliases are not IPA, an official pronunciation dictionary
+or a claim of universal/native TTS pronunciation. No speech/audio model was
+tested, and no bulk dictionary or external model dataset is bundled.
+See [the exact coverage](../../docs/normalization.md#approved-foreign-names).
+
+Owned Rust code, unit/currency/abbreviation/name/character readings and finite
 source/target/derived-tail metadata are Apache-2.0. No bulk dictionary or
 third-party normalizer source was copied. Exact numeral behavior was
 cross-checked against Unicode CLDR release 48 Turkish RBNF:
@@ -35,6 +43,13 @@ NFC/grapheme behavior comes from the locked unicode-normalization and
 unicode-segmentation dependencies under their own terms. No NFKC, global
 casing rewrite, learned model, private dictionary, account lookup or network
 address fetch is introduced.
+
+The [policy-contract catalog](../../tests/fixtures/policy-contract.json) orders
+authored text expectations from logical group files, shared across Rust and
+installed-Python consumers. Fingerprints cover the catalog and all referenced
+inputs. The original [corpus](../../benches/corpus.json) and
+[intent corpus](../../benches/intent-corpus.json) remain frozen; expanded policy
+coverage is separate measurement data, not a replacement baseline.
 
 Semantic fixtures protect the normalization contract, not a promise of older
 behavior forever. Deliberate reading changes are recorded in the

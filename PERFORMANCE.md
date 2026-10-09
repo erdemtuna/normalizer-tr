@@ -10,6 +10,11 @@ Do not shrink the corpus, weaken validation or remove slow cases to claim
 improvement. Current semantic outcomes are checked independently by the
 characterization and class tests.
 
+Passing those frozen cohorts does not cover every scaling path. The
+[known implementation gaps](docs/normalization.md#known-implementation-gaps-unreleased)
+include quadratic work for long malformed numeric-comma tokens and delayed
+deadline checks. Cooperative deadlines are not hard latency guarantees.
+
 ## Reproduce
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to provision the isolated Python tools
@@ -61,12 +66,15 @@ aggregate/order or existing report fields. Reviewed cases come from
 It is an ordered catalog of money, quantity, lexical, punctuation, date,
 unresolved, context and compound-boundary fixture files. Case order and expected
 outcomes of existing cases are preserved; initialism, pronunciation-variant and
-abbreviation-boundary groups are appended. Python fingerprints and manifests
+abbreviation-boundary groups, then AI/developer/consumer name and pronunciation-
+boundary groups are appended. The catalog now has 153 cases with the earlier
+97 as an exact prefix. Python fingerprints and manifests
 cover the catalog and every referenced file rather than just the catalog itself.
 Each short/medium policy cohort is separate, with 2,000 warmups and 10,000 calls.
 Golden outcomes are checked before/after timing; class counts and exact inputs
 are validated by the verifier. Native reports also retain 4/16/32 KiB grouping,
-quotation/list, malformed-input and decomposed-Unicode scaling diagnostics.
+quotation/list, malformed-input, name/phrase/prefix-miss and decomposed-Unicode
+scaling diagnostics. These workloads are not exhaustive complexity checks.
 
 The first process initialization is recorded separately from 100 later cached
 same-process constructor calls. Those later calls are **not cold starts**.
@@ -94,6 +102,9 @@ refactor subsequently committed as
 Measurements were collected before the refactor commit, not from a clean release
 revision. Both builds reported `normalizer-tr/0.4.0`; that identity alone does
 not distinguish these source snapshots.
+
+This historical snapshot predates the initialism and foreign-name additions;
+it is not a measurement of the current Unreleased head.
 
 Host: AMD Ryzen AI 7 PRO 350, 8 cores / 16 logical processors, Windows 11
 Enterprise 26200. Native builds used Rust 1.99.0 x64 MSVC, optimized bench

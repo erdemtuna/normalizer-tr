@@ -4,6 +4,8 @@ Distribution `normalizer-tr`; import `normalizer_tr`, native submodule
 `normalizer_tr._native`. This is the Python bridge to the Rust engine, not a
 second implementation. This guide follows the repository API; see the
 [changelog](../../CHANGELOG.md) for released and unreleased changes.
+The curated initialism/name additions and `"pronunciation"` labels below are
+**Unreleased**, not available in published 0.4.0.
 
 ## Install
 
@@ -70,6 +72,23 @@ assert r.normalized_text == "sıfır sıfır sıfır dört iki; hello gülümsey
 assert r.complete and r.fallback_used and not r.issues
 ```
 
+Approved initialisms and exact foreign names use primary readings in every
+policy, not fallback records:
+
+```python
+r = n.normalize("SGK'ya; GitHub Copilot'ın", ambiguity_policy="reject")
+assert r.normalized_text == "se ge kaya; git hab ko paylıtın"
+assert r.complete and not r.fallback_used
+assert r.segments[-1].kind == "pronunciation"
+assert r.segments[-1].rule_id == "pronunciation.name"
+```
+
+Aliases are Turkish-readable text, not phonemes. For exact casing, phrase and
+suffix boundaries, see [approved foreign names](../../docs/normalization.md#approved-foreign-names).
+Invalid suffixes are not repaired; handled name failures have fallback
+`attempted_class="pronunciation"`. Update strict kind/class allowlists when
+adopting the unreleased API.
+
 `FallbackDiagnostic` is frozen and has start_byte/end_byte/attempted_class/
 reason/original_category/strategy. Completion is not logical-value validation,
 redaction or a voice-quality promise. See the [fallback contract](../../docs/fallback.md)
@@ -90,6 +109,9 @@ unresolved, internal. Strict errors contain issues, no normalized result.
 CancellationToken.cancel() signals associated ongoing/later calls. Native
 work executes pure Rust detached from the interpreter after copying/validating
 arguments; records marshal afterward.
+
+Deadlines/cancellation are cooperative, not hard call-duration limits; see
+[known implementation gaps](../../docs/normalization.md#known-implementation-gaps-unreleased).
 
 ## Development and verification
 

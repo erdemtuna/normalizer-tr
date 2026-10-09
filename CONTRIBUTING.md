@@ -35,6 +35,7 @@ Core/binding development needs no Torch, model files or credentials.
 | `src/api` | Public contract behind crate-root re-exports |
 | `src/classify` | Fixed reader priority, validation and whole-span claims; `scan` separates tokenization/indexing, punctuation and signals |
 | `src/domain` | Validated numeric, quantity, temporal, electronic and identifier values |
+| `src/domain/lexicon` | Approved abbreviation/name catalogs and shared compile-time lookup indexes; typed spoken tails remain in the domain |
 | `src/notation` | Shared written-form helpers, explicit character names and noncertifying source surfaces |
 | `src/interpretation.rs` | Neutral findings retaining their family, original issue and prevalidated alternatives |
 | `src/resolution` | Static policy selection; `fallback` renders alternatives, ordered literals and code-point strategies with bounded emission |
@@ -50,14 +51,24 @@ controls and capacity during traversal. `src/classify/symbols.rs` supplements
 only unclaimed graphemes in Fallback. Python calls this engine without duplicating
 language rules.
 
-`src/domain/lexicon/abbreviations.rs` is the single static abbreviation catalog.
+`src/domain/lexicon/abbreviations.rs` is the abbreviation catalog entry point.
 It owns default and alternate Lexemes with typed source/target tails. The parent
 lexicon validates suffixes and selects a reading; scanners use approved bases
 only for source boundaries. Keep new names out of scanner, rendering and Python
 special cases. Definitions live in thematic `titles`, `civic`, `education`,
 `finance` and `technology` modules; maintain them in logical order, not alphabetical
-order. A compile-time index combines the groups for allocation-free binary lookup.
+order. `src/domain/lexicon/static_index.rs` combines the groups at compile time
+for allocation-free binary lookup.
 Test global key uniqueness, index coverage and unambiguous variant suffixes.
+
+`src/domain/lexicon/pronunciations.rs` owns the exact foreign-name catalog,
+grouped into `ai`, `developer` and `consumer`. It shares the static-index helper;
+bounded phrase candidates are borrowed from that index. Keep approved spellings,
+text aliases and typed suffix tails together. `src/classify/readers/pronunciation.rs`
+claims the longest exact phrase after whole electronic recognition, without
+guessing casing or meanings. Test all approved case families, invalid suffix
+ownership, mixed prose, protected identifiers, phrase boundaries and original
+Unicode coordinates. Text goldens are not speech-model/audio validation.
 
 The scanner indexes numeric-run ends once for bounded money lookahead and
 distinguishes paired quotation boundaries from suffix apostrophes. Keep
@@ -82,6 +93,12 @@ under `tests/fixtures/policy-contract/`. Rust tests and benchmarks share a
 compiled fixture loader; installed-Python tests and verification consume the
 same catalog. Add cross-feature cases and exercise Preserve, Reject and Fallback
 independently. Do not alter the frozen benchmark inputs/order to improve an aggregate.
+The catalog currently has 153 cases; the earlier 97 are an exact prefix.
+`tests/support/policy_contract.rs` supplies the Rust loader; Python consumers
+flatten the files in catalog order and fingerprint every input. The report key
+`expanded_coverage_measurement` is retained for compatibility, not a second
+fixture suite. Fixture origins and rights are recorded in
+[data provenance](src/data/provenance.md).
 
 ## Checks
 

@@ -7,7 +7,8 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
-- Add 65 reviewed uppercase initialisms with typed pronunciation tails. `SGK`
+- Add 65 reviewed uppercase initialisms (80 approved abbreviation spellings in
+  total, including existing aliases) with typed pronunciation tails. `SGK`
   defaults to `se ge ka`; approved suffixes select `ke`/`ka` alternatives and
   PDF's `fe`/`ef` alternative without silently canonicalizing the reading.
   API/IP/HDMI use an explicit international `i` reading.
@@ -16,7 +17,7 @@ Platform requirements are in the [README](README.md) and
   canonical Roman intent.
 - Recognize compact quantities, supported spaced currency symbols, validated
   space-grouped money, additional percent positions and spaced contextual ranges.
-  Validation remains exact; malformed compounds stay whole.
+  Validation remains exact; whole-span ownership is the intended contract.
 - Add numeric-context `°C` (`derece Santigrat`), `V`, `kW`, `kWh` and `GB` with
   validated case suffixes, plus explicit capitalization aliases for doctor,
   professor and doçent titles.
@@ -26,14 +27,38 @@ Platform requirements are in the [README](README.md) and
   quantity-list punctuation without confusing decimals or suffix apostrophes.
   Unknown uppercase prose such as `ABC` stays verbatim in every policy;
   protected identifiers and recognized Roman-looking notation keep their rules.
-- Reorganize internal modules without changing public imports, serialization or
-  reading behavior. Keep policy-contract/scaling measurements separate from the
-  original frozen benchmark corpora and aggregates.
+- Add 34 reviewed foreign-name speech aliases with 44 exact keys, including
+  `Claude`, `ChatGPT`, `GitHub Copilot` and `Visual Studio Code`. They are primary
+  readings under every policy, with explicit case aliases, bounded phrases and
+  validated Turkish case suffixes; unknown spellings are not guessed.
+- Add `SegmentKind::Pronunciation`, `FallbackClass::Pronunciation`, Python
+  `"pronunciation"` labels and primary rule ID `pronunciation.name`.
+- Reorganize internal modules by responsibility without changing public import
+  paths or existing enum/Serde tags. Keep thematic lexical definitions in logical
+  order with shared compile-time static indexes for borrowed lookup.
+- Expand the ordered policy-contract catalog to 153 cases; the earlier 97 remain
+  an exact prefix. Rust tests/benchmarks share its loader, and Python
+  tests/measurements/verification cover every catalog input. Keep these
+  measurements separate from the original frozen benchmark corpora and aggregates.
+
+Known implementation gaps in malformed-amount ownership, mixed quantity/
+abbreviation lists, multiword-name lists and numeric-comma scanning remain
+documented in the
+[normalization reference](docs/normalization.md#known-implementation-gaps-unreleased).
+They are not intended changes to the contract.
 
 ### Migration
 
-Public signatures, result/diagnostic shapes, policy defaults, limits and
-dependencies are unchanged. The expanded recognition is a deliberate behavior
+Public signatures, result/diagnostic fields, options, policy defaults, limits,
+dependencies and package versions are unchanged. The new enum variants were
+appended without reordering existing values. Adding variants to these exhaustive
+public enums is a **source-breaking change for existing exhaustive Rust matches**,
+which must handle `SegmentKind::Pronunciation` and `FallbackClass::Pronunciation`.
+Closed serialized schemas/allowlists must also accept `"Pronunciation"`.
+Python segment kinds and fallback attempted classes use `"pronunciation"`. See
+[diagnostics and serialization](docs/fallback.md#diagnostics-and-serialization).
+
+The expanded recognition is a deliberate behavior
 change: previously unresolved forms may resolve, Reject may succeed, and
 fallback counts/readings may change. Fragment hints inside recognized compounds
 are invalid. Compact strings matching an approved quantity are treated as
@@ -41,9 +66,15 @@ quantities, not opaque codes. Review output snapshots, diagnostic-dependent logi
 and hint ranges. Approved initialisms previously left verbatim now receive
 primary Abbreviation segments. Their unmatched suffixes produce structured
 issues (or Reject errors) instead of being accepted as ordinary prose.
+Exact approved foreign names now receive primary Pronunciation segments even
+without context: `Apple` and `Rust` are aliases, while lowercase `apple` and
+`rust` remain prose. Recognized names with wrong suffixes retain a whole-span
+issue under Preserve, fail under Reject, or receive literal Fallback rather than
+a repaired alias. Review casing-sensitive snapshots and segment-kind consumers.
 No spelling override, global casing/whitespace rewrite, rounding or currency
 conversion is added. See the [normalization reference](docs/normalization.md)
-for exact boundaries.
+for exact boundaries. Speech aliases are Turkish-readable text, not phonemes or
+evidence of speech-model quality.
 
 ## 0.4.0 - 2026-10-03
 
