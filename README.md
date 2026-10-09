@@ -93,11 +93,13 @@ UTF-8 byte offsets, not character positions.
 
 This is a pre 1.0 library with bounded coverage, not a universal pronunciation
 engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) for measurements and
-[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for released and unreleased changes.
+[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for release status and migration notes.
 
 The guides track repository behavior: expanded initialism coverage and
 [foreign-name speech aliases](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#approved-foreign-names)
-are **Unreleased**, not part of published 0.4.0.
+are in **0.5.0 release preparation**, not yet tagged or published. Registry
+installation above still uses published 0.4.0; 0.5.0 requires a source checkout
+or a verified build artifact.
 
 ## License
 

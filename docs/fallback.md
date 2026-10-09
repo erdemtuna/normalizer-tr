@@ -6,7 +6,7 @@ Preserve remains the default. Fallback does not relax Reject's strictness or
 mask engineering errors.
 
 This guide follows repository behavior; see the [changelog](../CHANGELOG.md)
-for released and unreleased changes.
+for release status and migration notes.
 
 The policy prefers clear source formats, then literal letters/digits/symbols,
 then conventional Unicode `U+...` identifiers spoken character by character.
@@ -49,7 +49,7 @@ without fallback records. See the [normalization reference](normalization.md).
 The contract requires malformed compounds to own their full source span and
 carry the original failure category; their literal output is not a valid-money/
 unit certificate. The fixed ownership cases are covered under
-[reviewed boundary regressions](normalization.md#reviewed-boundary-regressions-unreleased).
+[reviewed boundary regressions](normalization.md#reviewed-boundary-regressions-050).
 
 Approved initialisms and suffix-selected pronunciations are primary readings in
 every policy, without fallback records: `SGK’ya` -> `se ge kaya` and
@@ -90,7 +90,7 @@ variants in Rust casing, for example `"SurfaceDate"`. It includes a computed
 `dataclasses.asdict()` includes stored fields; `fallback_used` is a property,
 so explicitly add it if needed when exporting Python records.
 
-Unreleased name recognition adds `SegmentKind::Pronunciation` for successful
+Name recognition in 0.5.0 adds `SegmentKind::Pronunciation` for successful
 primary aliases and `FallbackClass::Pronunciation` for failed name forms.
 Serde uses `"Pronunciation"` for either enum value; Python uses
 `"pronunciation"` for segment `kind` and fallback `attempted_class`.
@@ -108,6 +108,7 @@ The 512 KiB logical result budget counts fallback records and both owned text
 copies; amplified literals may fail with a real result-limit error.
 
 The base Fallback policy is available since 0.4.0; the expanded initialism/name
-coverage remains Unreleased. Fallback support incorporates parts of
+coverage is in 0.5.0 release preparation, not yet tagged or published.
+Fallback support incorporates parts of
 [Canberk's contribution](https://github.com/erdemtuna/normalizer-tr/pull/1).
 Internal responsibility boundaries are in [CONTRIBUTING](../CONTRIBUTING.md#code-layout).

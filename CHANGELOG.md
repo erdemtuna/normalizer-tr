@@ -1,11 +1,14 @@
 # Changelog
 
-Unreleased entries describe repository changes not yet available in published
-packages. For publishing instructions, see [CONTRIBUTING](CONTRIBUTING.md#releasing).
+Release-preparation entries describe agreed versions not yet available in
+published packages. For publishing instructions, see [CONTRIBUTING](CONTRIBUTING.md#releasing).
 Platform requirements are in the [README](README.md) and
 [Python installation guide](bindings/python/README.md#install).
 
-## Unreleased
+## 0.5.0 - 2026-10-09
+
+**Release preparation: not yet tagged or published.** The latest published
+version remains 0.4.0.
 
 - Remove repeated numeric-prefix scans from comma-boundary detection and literal
   fallback. Retain valid later numeric readings and cooperative control checks.
@@ -50,13 +53,14 @@ Platform requirements are in the [README](README.md) and
   measurements separate from the original frozen benchmark corpora and aggregates.
 
 The previously reviewed ownership, list-admission and numeric-scanning gaps are
-covered by [review regression tests](docs/normalization.md#reviewed-boundary-regressions-unreleased),
+covered by [review regression tests](docs/normalization.md#reviewed-boundary-regressions-050),
 not treated as supported syntax or relaxed contracts.
 
 ### Migration
 
-Public signatures, result/diagnostic fields, options, policy defaults, limits,
-dependencies and package versions are unchanged. The new enum variants were
+Core, private Rust/Python companion and Python distribution versions are 0.5.0.
+Public signatures, result/diagnostic fields, options, policy defaults, limits
+and dependency pins are unchanged. The new enum variants were
 appended without reordering existing values. Adding variants to these exhaustive
 public enums is a **source-breaking change for existing exhaustive Rust matches**,
 which must handle `SegmentKind::Pronunciation` and `FallbackClass::Pronunciation`.

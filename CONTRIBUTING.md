@@ -146,6 +146,8 @@ See [PERFORMANCE.md](PERFORMANCE.md) for host-specific timing limits.
 Maintain [CHANGELOG.md](CHANGELOG.md): leave changes under Unreleased until the
 next version and release date are agreed. Before publishing, update core/binding
 versions consistently and finalize that entry without rewriting past releases.
+Mark a finalized entry as release preparation until tagging and publication;
+versioned source and build artifacts do not imply registry availability.
 Platform requirements are in the [Python guide](bindings/python/README.md#install).
 
 [release.yml](.github/workflows/release.yml) is manually dispatched. Its default
