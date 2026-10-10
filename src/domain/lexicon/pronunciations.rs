@@ -4,7 +4,10 @@ mod consumer;
 mod developer;
 
 use super::{Lexeme, static_index};
-use crate::morphology::{Harmony, Word, WordEnd};
+use crate::{
+    NormalizeError,
+    morphology::{Harmony, NominalInflection, Word, WordEnd},
+};
 
 const fn pronounced(
     output: &'static str,
@@ -71,6 +74,36 @@ fn first_word(key: &str) -> &str {
     key.split(' ').next().unwrap_or(key)
 }
 
+pub(super) fn validate() -> Result<(), NormalizeError> {
+    validate_entries(&ENTRIES)
+}
+
+fn validate_entries(entries: &[(&str, &Lexeme)]) -> Result<(), NormalizeError> {
+    for (_, entry) in entries {
+        if entry.source != entry.target
+            || entry.target.text.is_empty()
+            || entry.output.trim().is_empty()
+            || !entry.output.ends_with(entry.target.text)
+        {
+            return Err(NormalizeError::InvalidConfiguration);
+        }
+        for form in NominalInflection::forms() {
+            let suffix = form.source_suffix(entry.source);
+            let expected = form.render(entry.output, entry.target);
+            let mut matched = false;
+            let mut consistent = true;
+            NominalInflection::analyses(entry.source, &suffix, |analysis| {
+                matched = true;
+                consistent &= analysis.render(entry.output, entry.target) == expected;
+            });
+            if !matched || !consistent {
+                return Err(NormalizeError::InvalidConfiguration);
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,6 +130,33 @@ mod tests {
             "apple", "codex", "react", "rust", "python", "Face", "Studio", "Code",
         ] {
             assert!(lookup(unknown).is_none(), "{unknown}");
+        }
+    }
+
+    #[test]
+    fn initialization_validation_accepts_the_catalog_and_syncretic_forms() {
+        assert_eq!(validate(), Ok(()));
+        let entry = pronounced("ayfon", "ayfon", Harmony::BackRound, WordEnd::Voiced);
+        assert_eq!(validate_entries(&[("Example", &entry)]), Ok(()));
+    }
+
+    #[test]
+    fn initialization_validation_rejects_inconsistent_definitions() {
+        let canonical = Word::new("ti", Harmony::FrontFlat, WordEnd::Vowel);
+        for entry in [
+            Lexeme::distinct(
+                "ti",
+                Word::new("ayfon", Harmony::BackRound, WordEnd::Voiced),
+                canonical,
+            ),
+            pronounced("", "ti", Harmony::FrontFlat, WordEnd::Vowel),
+            pronounced("ti", "", Harmony::FrontFlat, WordEnd::Vowel),
+            pronounced("different", "ti", Harmony::FrontFlat, WordEnd::Vowel),
+        ] {
+            assert_eq!(
+                validate_entries(&[("Example", &entry)]),
+                Err(NormalizeError::InvalidConfiguration)
+            );
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::morphology::{
 };
 
 const YOUTUBE: Lexeme = pronounced("yu tub", "tub", BackRound, Voiced);
-const WHATSAPP: Lexeme = pronounced("vats ep", "ep", FrontFlat, Voiceless);
+const WHATSAPP: Lexeme = pronounced("vatsap", "vatsap", BackFlat, Voiceless);
 const LINKEDIN: Lexeme = pronounced("linkt in", "in", FrontFlat, Voiced);
 
 pub(super) const ENTRIES: &[(&str, Lexeme)] = &[
@@ -31,7 +31,7 @@ pub(super) const ENTRIES: &[(&str, Lexeme)] = &[
     ("Whatsapp", WHATSAPP),
     (
         "Instagram",
-        pronounced("instıgrem", "instıgrem", FrontFlat, Voiced),
+        pronounced("instagram", "instagram", BackFlat, Voiced),
     ),
     ("LinkedIn", LINKEDIN),
     ("Linkedin", LINKEDIN),

@@ -89,6 +89,13 @@ Invalid suffixes are not repaired; handled name failures have fallback
 `attempted_class="pronunciation"`. Update strict kind/class allowlists when
 adopting the 0.5.0 API.
 
+Unreleased name handling includes `iPhone'umdan` -> `ayfonumdan` under all
+policies, without fallback diagnostics. The Python call and result shapes are
+unchanged. See [supported suffixes](../../docs/normalization.md#nominal-suffixes-unreleased)
+for the shared Rust grammar and the
+[Unreleased migration notes](../../CHANGELOG.md#unreleased) for changed
+Instagram/WhatsApp readings and previously accepted spellings that now fail.
+
 `FallbackDiagnostic` is frozen and has start_byte/end_byte/attempted_class/
 reason/original_category/strategy. Completion is not logical-value validation,
 redaction or a voice-quality promise. See the [fallback contract](../../docs/fallback.md)

@@ -27,8 +27,8 @@ const READINGS: &[(&str, &str, [&str; 5])] = &[
     ("Apple", "epıl", ["ı", "a", "da", "dan", "ın"]),
     ("iPhone", "ayfon", ["u", "a", "da", "dan", "un"]),
     ("Samsung", "semsang", ["ı", "a", "da", "dan", "ın"]),
-    ("WhatsApp", "vats ep", ["i", "e", "te", "ten", "in"]),
-    ("Instagram", "instıgrem", ["i", "e", "de", "den", "in"]),
+    ("WhatsApp", "vatsap", ["ı", "a", "ta", "tan", "ın"]),
+    ("Instagram", "instagram", ["ı", "a", "da", "dan", "ın"]),
     ("LinkedIn", "linkt in", ["i", "e", "de", "den", "in"]),
     ("Spotify", "spotıfay", ["ı", "a", "da", "dan", "ın"]),
     ("Amazon", "emızon", ["u", "a", "da", "dan", "un"]),
@@ -123,7 +123,7 @@ fn only_explicit_casing_aliases_are_accepted() {
         ("Github", "git hab"),
         ("GITHUB", "git hab"),
         ("Youtube", "yu tub"),
-        ("Whatsapp", "vats ep"),
+        ("Whatsapp", "vatsap"),
         ("Linkedin", "linkt in"),
         ("ema lightning", "ema laytning"),
         ("ema-lightning", "ema laytning"),
@@ -164,6 +164,138 @@ fn only_explicit_casing_aliases_are_accepted() {
 }
 
 #[test]
+fn possessive_forms_have_independent_goldens_in_every_policy() {
+    let n = Normalizer::new().unwrap();
+    for (key, suffixes, outputs) in [
+        (
+            "iPhone",
+            ["um", "un", "u", "umuz", "unuz", "ları"],
+            [
+                "ayfonum",
+                "ayfonun",
+                "ayfonu",
+                "ayfonumuz",
+                "ayfonunuz",
+                "ayfonları",
+            ],
+        ),
+        (
+            "Google",
+            ["ım", "ın", "ı", "ımız", "ınız", "ları"],
+            [
+                "gugılım",
+                "gugılın",
+                "gugılı",
+                "gugılımız",
+                "gugılınız",
+                "gugılları",
+            ],
+        ),
+        (
+            "Codex",
+            ["im", "in", "i", "imiz", "iniz", "leri"],
+            [
+                "kodeksim",
+                "kodeksin",
+                "kodeksi",
+                "kodeksimiz",
+                "kodeksiniz",
+                "kodeksleri",
+            ],
+        ),
+        (
+            "ChatGPT",
+            ["m", "n", "si", "miz", "niz", "leri"],
+            [
+                "çet ci pi tim",
+                "çet ci pi tin",
+                "çet ci pi tisi",
+                "çet ci pi timiz",
+                "çet ci pi tiniz",
+                "çet ci pi tileri",
+            ],
+        ),
+    ] {
+        for (suffix, output) in suffixes.into_iter().zip(outputs) {
+            for apostrophe in ['\'', '’'] {
+                primary(&n, &format!("{key}{apostrophe}{suffix}"), output);
+            }
+        }
+    }
+}
+
+#[test]
+fn plural_possessive_and_case_chains_are_primary_whole_spans() {
+    let n = Normalizer::new().unwrap();
+    for (source, output) in [
+        ("iPhone'umdan", "ayfonumdan"),
+        ("iPhone'una", "ayfonuna"),
+        ("iPhone'unu", "ayfonunu"),
+        ("iPhone'undan", "ayfonundan"),
+        ("iPhone'unun", "ayfonunun"),
+        ("iPhone'lar", "ayfonlar"),
+        ("iPhone'lardan", "ayfonlardan"),
+        ("iPhone'ları", "ayfonları"),
+        ("iPhone'larına", "ayfonlarına"),
+        ("iPhone'larının", "ayfonlarının"),
+        ("iPhone'larımıza", "ayfonlarımıza"),
+        ("YouTube'um", "yu tubum"),
+        ("YouTube'larımı", "yu tublarımı"),
+        ("Google'ım", "gugılım"),
+        ("ChatGPT'mden", "çet ci pi timden"),
+        ("ChatGPT'sinden", "çet ci pi tisinden"),
+        ("ChatGPT'lerimizden", "çet ci pi tilerimizden"),
+        ("Instagram'ımızda", "instagramımızda"),
+        ("WhatsApp'larından", "vatsaplarından"),
+        ("GitHub Copilot'ımızda", "git hab ko paylıtımızda"),
+        ("ema-lightning'lerimizden", "ema laytninglerimizden"),
+    ] {
+        primary(&n, source, output);
+    }
+}
+
+#[test]
+fn nominal_claims_share_phrase_list_and_original_coordinate_boundaries() {
+    let n = Normalizer::new().unwrap();
+    for (source, output) in [
+        ("iPhone'umdan,ChatGPT'm", "ayfonumdan,çet ci pi tim"),
+        (
+            "GitHub Copilot'ımızda,Claude'um",
+            "git hab ko paylıtımızda,klodum",
+        ),
+        ("‘iPhone’umdan’", "‘ayfonumdan’"),
+        ("iPhone'larımıza.", "ayfonlarımıza."),
+        ("iPhone'umdan,UNKNOWN", "iPhone'umdan,UNKNOWN"),
+        ("iphone'umdan", "iphone'umdan"),
+        ("IPHONE'umdan", "IPHONE'umdan"),
+        ("iPhoneX'umdan", "iPhoneX'umdan"),
+    ] {
+        for policy in POLICIES {
+            let result = n.normalize(source, &options(policy)).unwrap();
+            assert_eq!(result.normalized_text(), output, "{source}");
+            assert!(result.complete() && !result.fallback_used());
+        }
+    }
+    let source = "o\u{308} iPhone’umdan!";
+    for policy in POLICIES {
+        let result = n.normalize(source, &options(policy)).unwrap();
+        assert_eq!(result.normalized_text(), "o\u{308} ayfonumdan!");
+        let name = result
+            .segments()
+            .iter()
+            .find(|segment| segment.kind() == SegmentKind::Pronunciation)
+            .unwrap();
+        assert_eq!(name.range(), SourceRange::new(4, 18));
+        let mut cursor = 0;
+        for segment in result.segments() {
+            assert_eq!(segment.range().start(), cursor);
+            cursor = segment.range().end();
+        }
+        assert_eq!(cursor, source.len());
+    }
+}
+
+#[test]
 fn ema_lightning_aliases_share_the_approved_case_families() {
     let n = Normalizer::new().unwrap();
     for key in ["ema lightning", "ema-lightning"] {
@@ -176,6 +308,33 @@ fn ema_lightning_aliases_share_the_approved_case_families() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn every_approved_reading_shares_the_nominal_grammar() {
+    let n = Normalizer::new().unwrap();
+    for &(key, reading, [accusative, dative, _, _, _]) in READINGS {
+        let vowel = accusative.starts_with('y');
+        let high = accusative.strip_prefix('y').unwrap_or(accusative);
+        let low = dative.strip_prefix('y').unwrap_or(dative);
+        let possessive = if vowel {
+            "m".to_owned()
+        } else {
+            format!("{high}m")
+        };
+        primary(
+            &n,
+            &format!("{key}'{possessive}"),
+            &format!("{reading}{possessive}"),
+        );
+        let flat_high = if low == "a" { "ı" } else { "i" };
+        let suffix = format!("l{low}r{flat_high}m{flat_high}zd{low}n");
+        primary(
+            &n,
+            &format!("{key}'{suffix}"),
+            &format!("{reading}{suffix}"),
+        );
     }
 }
 
@@ -280,6 +439,16 @@ fn failed_suffixes_keep_whole_name_findings_without_repair() {
     let n = Normalizer::new().unwrap();
     for (source, category) in [
         ("Claude'ye", IssueCategory::InvalidExpression),
+        ("Instagram'e", IssueCategory::InvalidExpression),
+        ("Instagram'de", IssueCategory::InvalidExpression),
+        ("WhatsApp'ten", IssueCategory::InvalidExpression),
+        ("iPhone'laru", IssueCategory::InvalidExpression),
+        ("iPhone'larlar", IssueCategory::InvalidExpression),
+        ("iPhone'larları", IssueCategory::InvalidExpression),
+        ("iPhone'umlar", IssueCategory::InvalidExpression),
+        ("iPhone'danım", IssueCategory::InvalidExpression),
+        ("iPhone'umdanx", IssueCategory::InvalidExpression),
+        ("ChatGPT'im", IssueCategory::InvalidExpression),
         ("Claude'un'dan", IssueCategory::Unsupported),
         ("ChatGPT'", IssueCategory::Unsupported),
         ("Visual Studio Code'ye", IssueCategory::InvalidExpression),
@@ -310,6 +479,29 @@ fn failed_suffixes_keep_whole_name_findings_without_repair() {
         assert_eq!(record.strategy(), FallbackStrategy::Literal);
         assert_eq!(record.original_category(), Some(category));
         assert_eq!(record.range(), SourceRange::new(0, source.len()));
+    }
+    let source = format!("iPhone'{}", "lar".repeat(4_000));
+    for policy in POLICIES {
+        let result = n.normalize(&source, &options(policy));
+        if policy == AmbiguityPolicy::Reject {
+            assert!(matches!(result, Err(NormalizeError::Unresolved(_))));
+        } else {
+            let result = result.unwrap();
+            let ranges: Vec<_> = if policy == AmbiguityPolicy::Fallback {
+                result
+                    .fallbacks()
+                    .iter()
+                    .map(|record| record.range())
+                    .collect()
+            } else {
+                result
+                    .issues()
+                    .iter()
+                    .map(|record| record.range())
+                    .collect()
+            };
+            assert_eq!(ranges, [SourceRange::new(0, source.len())]);
+        }
     }
 }
 

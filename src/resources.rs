@@ -18,6 +18,7 @@ impl Resources {
         INSTANCE.get_or_init(|| Self::load().map(Arc::new)).clone()
     }
     pub(crate) fn load() -> Result<Self, NormalizeError> {
+        crate::domain::lexicon::validate_pronunciations()?;
         let compile =
             |pattern| Regex::new(pattern).map_err(|_| NormalizeError::InvalidConfiguration);
         Ok(Self {

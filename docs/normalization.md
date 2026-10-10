@@ -147,6 +147,12 @@ official/universal pronunciations. No TTS/audio model or voice quality was teste
 | `Hugging Face` | `haging feys` |
 | `Visual Studio Code` | `vijuıl stüdyo kod` |
 | `EMA Lightning`, `ema lightning`, `ema-lightning` | `ema laytning` |
+| `Instagram` | `instagram` |
+| `WhatsApp`, `Whatsapp` | `vatsap` |
+
+The Instagram and WhatsApp readings above are **Unreleased**. Each name has
+one chosen reading. See the [migration notes](../CHANGELOG.md#unreleased)
+for changes from 0.5.0 and spellings that no longer validate.
 
 Recognition is automatic under Preserve, Reject and Fallback, without a name
 hint or selector. Exact keys such as `Apple`, `Rust`, `Python` and `React`
@@ -161,14 +167,60 @@ name segments. Tabs, newlines and doubled spaces do not match a phrase;
 independently approved words may still resolve on either side. Partial phrase
 words such as `Face`, `Studio` and `Code` gain no standalone alias.
 
-Straight or smart apostrophes introduce one validated accusative, dative,
-locative, ablative or genitive suffix based on the approved spoken tail:
+Straight or smart apostrophes introduce a validated tail based on the approved
+spoken stem, not the last written English letter:
 `Claude'un` -> `klodun`, `ChatGPT'ye` -> `çet ci pi tiye`,
 `GitHub Copilot'ın` -> `git hab ko paylıtın`.
-A wrong allomorph (`Claude'ye`), empty suffix or suffix chain owns the whole
+
+### Nominal suffixes (Unreleased)
+
+Every exact approved name accepts suffixes in the order **plural, possessive,
+case**. Each stage is optional and can appear at most once. A tail after an
+apostrophe must be nonempty and match completely. Cases are accusative, dative,
+locative, ablative and genitive. Possession covers all six person and number
+combinations:
+
+| Possessor | Example | Primary output |
+|---|---|---|
+| First person singular | `iPhone'um` | `ayfonum` |
+| Second person singular | `iPhone'un` | `ayfonun` |
+| Third person singular | `iPhone'u` | `ayfonu` |
+| First person plural | `iPhone'umuz` | `ayfonumuz` |
+| Second person plural | `iPhone'unuz` | `ayfonunuz` |
+| Third person plural | `iPhone'ları` | `ayfonları` |
+
+Each suffix follows the stem produced by the previous stage. Suffixes that can
+use `ı`, `i`, `u` or `ü` use `ı` after `lar` and `i` after `ler`.
+For example, `YouTube'larımı` reads `yu tublarımı`, not
+`yu tublarumu`. A longer combination, `iPhone'larımıza`, reads `ayfonlarımıza`.
+
+Third person possessive forms take a linking `n` before a following case
+suffix: `iPhone'una` -> `ayfonuna`. First and second person possessive forms
+end in a consonant and attach the case directly: `iPhone'umdan` -> `ayfonumdan`.
+Noun plural and third person plural possession share one `lar` or `ler`,
+so the grammar accepts `iPhone'ları`, not `iPhone'larları`.
+
+Different grammatical meanings can produce the same speech. The accusative
+and possessive forms of `iPhone'u` both read `ayfonu`; the normalizer returns
+that shared reading without selecting a grammatical meaning.
+
+Pronunciations ending in a vowel use their own forms: `ChatGPT'm` ->
+`çet ci pi tim`, `ChatGPT'sinden` -> `çet ci pi tisinden`.
+`ChatGPT'im` is invalid because the spoken stem `ti` already ends in a vowel.
+The written acronym letters do not override that stem.
+Phrase ownership and exact casing are unchanged.
+
+Suffixes follow the chosen spoken reading: `Instagram'a` -> `instagrama`,
+`Instagram'da` -> `instagramda` and `WhatsApp'tan` -> `vatsaptan`.
+Spellings based on the old readings, such as `Instagram'e` and `WhatsApp'ten`,
+are invalid; they do not select another pronunciation.
+
+A wrong allomorph (`Claude'ye`), empty tail, repeated stage, multiple
+apostrophes, derivation or trailing unconsumed text owns the whole
 recognized name span: Preserve retains it with an issue, Reject fails, and
 Fallback renders the source literally rather than repairing the alias.
-Other suffix families are not inferred.
+Other suffix families are not inferred. This grammar does not expand suffix
+coverage for numbers, quantities, units or initialisms.
 
 Successful segments have Rust kind `SegmentKind::Pronunciation`, Python kind
 `"pronunciation"` and rule ID `pronunciation.name`, without fallback records.

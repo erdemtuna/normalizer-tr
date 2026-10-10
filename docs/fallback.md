@@ -59,11 +59,19 @@ an inferred pronunciation to repair it.
 
 Exact approved foreign names likewise use primary Pronunciation segments,
 without fallback records: `Claude` -> `klod`, `ChatGPT'ye` -> `çet ci pi tiye`.
+Unreleased suffix coverage also makes `iPhone'umdan` -> `ayfonumdan` a primary
+reading in every policy, not a special Fallback repair.
 These are text aliases, not phonemes or model-quality guarantees. A recognized
 name with an invalid suffix (`Claude'ye`) receives literal Fallback with
 attempted class `Pronunciation`, its original issue category and the whole
 source range, not a repaired name reading. See
 [approved foreign names](normalization.md#approved-foreign-names) for exact coverage.
+
+Changed name readings can also make previously accepted suffixes invalid.
+Those forms receive the same literal fallback as other rejected name tails;
+no suffix repair or older reading is selected. See the
+[Unreleased migration notes](../CHANGELOG.md#unreleased) for affected spellings.
+Diagnostic fields and policy defaults are unchanged.
 
 Unknown uppercase prose such as `ABC` is preserved rather than spelled.
 Identifier `AB12` and uncued Roman `IV` use their protected/literal

@@ -40,6 +40,8 @@ Core/binding development needs no Torch, model files or credentials.
 | `src/interpretation.rs` | Neutral findings retaining their family, original issue and prevalidated alternatives |
 | `src/resolution` | Static policy selection; `fallback` renders alternatives, ordered literals and code-point strategies with bounded emission |
 | `src/numerals.rs`, `src/morphology.rs`, `src/verbalize.rs` | Exact rendering and spoken-tail metadata |
+| `src/morphology/nominal.rs` | Private bounded name inflection, current-stem transitions and borrowed suffix matching |
+| `src/morphology/nominal/tests.rs` | Nominal unit goldens, state transitions, invalid tails and finite-form consistency |
 | `src/source_map.rs` | NFC recognition mapped to original UTF-8/grapheme coordinates |
 | `src/resources.rs` | Immutable patterns validated and cached once, not input/result memoization |
 | `src/pipeline.rs` | Source composition, diagnostics, adjacency padding and allocation budgets; aggregate Reject after engineering checks |
@@ -96,12 +98,20 @@ under `tests/fixtures/policy-contract/`. Rust tests and benchmarks share a
 compiled fixture loader; installed-Python tests and verification consume the
 same catalog. Add cross-feature cases and exercise Preserve, Reject and Fallback
 independently. Do not alter the frozen benchmark inputs/order to improve an aggregate.
-The catalog currently has 179 cases; the earlier 170 remain an exact prefix.
+Append new groups and retain existing case IDs and order. Change expected
+outputs only for intentional behavior changes documented in the changelog.
 `tests/support/policy_contract.rs` supplies the Rust loader; Python consumers
 flatten the files in catalog order and fingerprint every input. The report key
 `expanded_coverage_measurement` is retained for compatibility, not a second
 fixture suite. Fixture origins and rights are recorded in
 [data provenance](src/data/provenance.md).
+
+Name matching and rendering share typed suffix transitions. Reuse them rather
+than deriving harmony from English spelling or duplicating rules in readers
+or Python. Initialization checks the catalog once and returns
+`InvalidConfiguration` for inconsistent definitions. Different grammatical
+analyses can have the same spoken result; tests should accept that agreement
+and reject conflicting outputs.
 
 ## Checks
 

@@ -69,10 +69,13 @@ pub(crate) fn render(value: &Value) -> (SegmentKind, &'static str, String) {
             "abbreviation",
             lexical(*entry, *case),
         ),
-        Value::Pronunciation(entry, case) => (
+        Value::Pronunciation(entry, inflection) => (
             SegmentKind::Pronunciation,
             "pronunciation.name",
-            lexical(*entry, *case),
+            inflection.map_or_else(
+                || entry.output.to_owned(),
+                |inflection| inflection.render(entry.output, entry.target),
+            ),
         ),
         Value::Range(range) => (SegmentKind::Range, "range.context", range.render()),
         Value::Telephone(phone) => (SegmentKind::Telephone, "telephone.tr", phone.render()),

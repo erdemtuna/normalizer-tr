@@ -1,3 +1,7 @@
+mod nominal;
+
+pub(crate) use nominal::NominalInflection;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Inflection {
     Ordinal,
@@ -9,7 +13,7 @@ pub(crate) enum Inflection {
     Derivation,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Harmony {
     BackFlat,
     FrontFlat,
@@ -32,6 +36,12 @@ impl Harmony {
             Self::FrontFlat | Self::FrontRound => "e",
         }
     }
+    fn flat(self) -> Self {
+        match self {
+            Self::BackFlat | Self::BackRound => Self::BackFlat,
+            Self::FrontFlat | Self::FrontRound => Self::FrontFlat,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,7 +54,7 @@ pub(crate) enum WordEnd {
     Possessive,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Word {
     pub(crate) text: &'static str,
     harmony: Harmony,
@@ -56,6 +66,9 @@ impl Word {
         Self { text, harmony, end }
     }
     pub(crate) fn source_suffix(self, inflection: Inflection) -> String {
+        self.suffix_parts(inflection).concat()
+    }
+    fn suffix_parts(self, inflection: Inflection) -> [&'static str; 4] {
         let high = self.harmony.high();
         let low = self.harmony.low();
         let vowel = matches!(self.end, WordEnd::Vowel | WordEnd::Possessive);
@@ -64,21 +77,21 @@ impl Word {
             _ => "d",
         };
         match inflection {
-            Inflection::Accusative if self.end == WordEnd::Possessive => format!("n{high}"),
-            Inflection::Dative if self.end == WordEnd::Possessive => format!("n{low}"),
-            Inflection::Locative if self.end == WordEnd::Possessive => format!("nd{low}"),
-            Inflection::Ablative if self.end == WordEnd::Possessive => format!("nd{low}n"),
-            Inflection::Ordinal if vowel => format!("nc{high}"),
-            Inflection::Ordinal => format!("{high}nc{high}"),
-            Inflection::Accusative if vowel => format!("y{high}"),
-            Inflection::Accusative => high.to_owned(),
-            Inflection::Dative if vowel => format!("y{low}"),
-            Inflection::Dative => low.to_owned(),
-            Inflection::Locative => format!("{stop}{low}"),
-            Inflection::Ablative => format!("{stop}{low}n"),
-            Inflection::Genitive if vowel => format!("n{high}n"),
-            Inflection::Genitive => format!("{high}n"),
-            Inflection::Derivation => format!("l{high}k"),
+            Inflection::Accusative if self.end == WordEnd::Possessive => ["n", high, "", ""],
+            Inflection::Dative if self.end == WordEnd::Possessive => ["n", low, "", ""],
+            Inflection::Locative if self.end == WordEnd::Possessive => ["n", "d", low, ""],
+            Inflection::Ablative if self.end == WordEnd::Possessive => ["n", "d", low, "n"],
+            Inflection::Ordinal if vowel => ["n", "c", high, ""],
+            Inflection::Ordinal => [high, "n", "c", high],
+            Inflection::Accusative if vowel => ["y", high, "", ""],
+            Inflection::Accusative => [high, "", "", ""],
+            Inflection::Dative if vowel => ["y", low, "", ""],
+            Inflection::Dative => [low, "", "", ""],
+            Inflection::Locative => [stop, low, "", ""],
+            Inflection::Ablative => [stop, low, "n", ""],
+            Inflection::Genitive if vowel => ["n", high, "n", ""],
+            Inflection::Genitive => [high, "n", "", ""],
+            Inflection::Derivation => ["l", high, "k", ""],
         }
     }
 }
@@ -125,7 +138,6 @@ impl Spoken {
         self.tail.source_suffix(inflection)
     }
     pub(crate) fn inflect(&mut self, inflection: Inflection) {
-        let suffix = self.source_suffix(inflection);
         let vowel_suffix = matches!(
             inflection,
             Inflection::Ordinal
@@ -133,19 +145,27 @@ impl Spoken {
                 | Inflection::Dative
                 | Inflection::Genitive
         );
-        if self.tail.end == WordEnd::Softens && vowel_suffix {
-            self.text.pop();
-            self.text.push('d');
-        }
-        if self.tail.end == WordEnd::SoftensP && vowel_suffix {
-            self.text.pop();
-            self.text.push('b');
-        }
-        self.text.push_str(&suffix);
+        self.append_suffix(self.tail.suffix_parts(inflection), vowel_suffix);
         match inflection {
             Inflection::Ordinal => self.tail.end = WordEnd::Vowel,
             Inflection::Derivation => self.tail.end = WordEnd::Voiceless,
             _ => {}
+        }
+    }
+    fn append_suffix(&mut self, parts: [&str; 4], vowel_start: bool) {
+        if vowel_start {
+            let replacement = match self.tail.end {
+                WordEnd::Softens => Some('d'),
+                WordEnd::SoftensP => Some('b'),
+                _ => None,
+            };
+            if let Some(replacement) = replacement {
+                self.text.pop();
+                self.text.push(replacement);
+            }
+        }
+        for part in parts {
+            self.text.push_str(part);
         }
     }
     pub(crate) fn into_text(self) -> String {

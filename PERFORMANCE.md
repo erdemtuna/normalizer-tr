@@ -63,20 +63,26 @@ Policy-contract measurements retain the existing `expanded_coverage_measurement`
 JSON key for report compatibility without changing the frozen inputs, original
 aggregate/order or existing report fields. Reviewed cases come from
 `tests/fixtures/policy-contract.json`, shared with Rust/Python tests.
-It is an ordered catalog of money, quantity, lexical, punctuation, date,
-unresolved, context and compound-boundary fixture files. Case order and expected
-outcomes of existing cases are preserved; initialism, pronunciation-variant and
-abbreviation-boundary groups, then AI/developer/consumer name and pronunciation-
-boundary groups, then review regression and EMA Lightning groups are appended.
-The catalog now has 179 cases with the earlier 170 as an exact prefix. Python
-fingerprints and manifests cover the catalog and every referenced file rather
-than just the catalog itself.
+It contains 198 cases in ordered fixture groups. Existing IDs, order and
+unrelated expected outcomes are preserved; new nominal cases are appended.
+The two Instagram/WhatsApp output expectations deliberately change as described
+in the [Unreleased migration notes](CHANGELOG.md#unreleased). Python fingerprints
+and manifests cover the catalog and every referenced file, not just the catalog
+itself.
 Each short/medium policy cohort is separate, with 2,000 warmups and 10,000 calls.
 Golden outcomes are checked before/after timing; class counts and exact inputs
 are validated by the verifier. Native reports also retain 4/16/32 KiB grouping,
 quotation/list, single malformed comma/dot tokens, mixed quantity lists,
 name/phrase/prefix-miss/rejected-list and decomposed-Unicode
 scaling diagnostics. These workloads are not exhaustive complexity checks.
+
+Unreleased scaling diagnostics add possessive chains, plural combinations,
+suffixes with multiple grammatical meanings, phrases, wrong vowel harmony and
+single long name tails. Name suffix matching is bounded and does not render
+rejected candidate outputs. Catalog consistency is checked once during
+initialization; include that cost in the first constructor measurement, not
+cached constructor or warm call timings. Differences between workloads that
+produce different normalized text do not establish a speedup.
 
 The first process initialization is recorded separately from 100 later cached
 same-process constructor calls. Those later calls are **not cold starts**.

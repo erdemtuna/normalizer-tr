@@ -25,6 +25,9 @@ or a claim of universal/native TTS pronunciation. No speech/audio model was
 tested, and no bulk dictionary or external model dataset is bundled.
 See [the exact coverage](../../docs/normalization.md#approved-foreign-names).
 
+The nominal suffix rules and regression examples are authored in this project.
+No external morphology library, dictionary or model data is added.
+
 Owned Rust code, unit/currency/abbreviation/name/character readings and finite
 source/target/derived-tail metadata are Apache-2.0. No bulk dictionary or
 third-party normalizer source was copied. Exact numeral behavior was
