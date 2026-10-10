@@ -5,12 +5,12 @@ For publishing instructions, see [CONTRIBUTING](CONTRIBUTING.md#releasing).
 Platform requirements are in the [README](README.md) and
 [Python installation guide](bindings/python/README.md#install).
 
-## Unreleased
+## 0.6.0 - 2026-10-11
 
 - Support plural, all six possessive forms and a final case suffix for every
   exact approved foreign name. `iPhone'umdan` reads `ayfonumdan`, and
   `iPhone'larımıza` reads `ayfonlarımıza`. See the
-  [grammar and examples](docs/normalization.md#nominal-suffixes-unreleased).
+  [grammar and examples](docs/normalization.md#nominal-suffixes).
 - Replace Instagram's `instıgrem` reading with `instagram` and the
   WhatsApp/Whatsapp reading `vats ep` with `vatsap`. `Instagram'a`,
   `Instagram'da` and `WhatsApp'tan` receive primary readings under every policy.
@@ -36,9 +36,9 @@ Spellings based on the old readings, such as `Instagram'e`, `Instagram'de` and
 issue, Reject errors, and Fallback spells it literally. Update text snapshots
 and code that depends on diagnostics. Malformed suffixes are not repaired.
 
-These source changes are not a published release. Independent EMA Lightning
-listening validation remains a release prerequisite. Passing text tests and
-benchmarks does not establish audio quality.
+Independent EMA Lightning listening validation was not performed; the release
+owner waived that gate. Passing text tests and benchmarks does not establish
+audio quality.
 
 ## 0.5.0 - 2026-10-09
 

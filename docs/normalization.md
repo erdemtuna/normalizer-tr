@@ -150,8 +150,8 @@ official/universal pronunciations. No TTS/audio model or voice quality was teste
 | `Instagram` | `instagram` |
 | `WhatsApp`, `Whatsapp` | `vatsap` |
 
-The Instagram and WhatsApp readings above are **Unreleased**. Each name has
-one chosen reading. See the [migration notes](../CHANGELOG.md#unreleased)
+The Instagram and WhatsApp readings above apply from **0.6.0**. Each name has
+one chosen reading. See the [migration notes](../CHANGELOG.md#060---2026-10-11)
 for changes from 0.5.0 and spellings that no longer validate.
 
 Recognition is automatic under Preserve, Reject and Fallback, without a name
@@ -172,7 +172,9 @@ spoken stem, not the last written English letter:
 `Claude'un` -> `klodun`, `ChatGPT'ye` -> `çet ci pi tiye`,
 `GitHub Copilot'ın` -> `git hab ko paylıtın`.
 
-### Nominal suffixes (Unreleased)
+### Nominal suffixes
+
+Available from 0.6.0.
 
 Every exact approved name accepts suffixes in the order **plural, possessive,
 case**. Each stage is optional and can appear at most once. A tail after an

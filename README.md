@@ -37,7 +37,7 @@ Requires Rust 1.94 or newer. Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-normalizer-tr = "0.5"
+normalizer-tr = "0.6"
 ```
 
 ```rust
@@ -100,10 +100,10 @@ The guides track repository behavior: expanded initialism coverage and
 are included in **0.5.0**. Review the changelog's migration notes before upgrading,
 especially exhaustive Rust enum matches and strict serialized allowlists.
 
-**Unreleased:** approved names support plural and possessive suffixes followed
+**0.6.0:** approved names support plural and possessive suffixes followed
 by a case suffix, such as `iPhone'umdan` -> `ayfonumdan`.
-Review [coverage](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#nominal-suffixes-unreleased)
-and [migration notes](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md#unreleased),
+Review [coverage](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#nominal-suffixes)
+and [migration notes](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md#060---2026-10-11),
 including changed Instagram and WhatsApp readings, before upgrading.
 
 ## License

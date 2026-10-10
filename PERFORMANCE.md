@@ -66,7 +66,7 @@ aggregate/order or existing report fields. Reviewed cases come from
 It contains 198 cases in ordered fixture groups. Existing IDs, order and
 unrelated expected outcomes are preserved; new nominal cases are appended.
 The two Instagram/WhatsApp output expectations deliberately change as described
-in the [Unreleased migration notes](CHANGELOG.md#unreleased). Python fingerprints
+in the [0.6.0 migration notes](CHANGELOG.md#060---2026-10-11). Python fingerprints
 and manifests cover the catalog and every referenced file, not just the catalog
 itself.
 Each short/medium policy cohort is separate, with 2,000 warmups and 10,000 calls.
@@ -76,7 +76,7 @@ quotation/list, single malformed comma/dot tokens, mixed quantity lists,
 name/phrase/prefix-miss/rejected-list and decomposed-Unicode
 scaling diagnostics. These workloads are not exhaustive complexity checks.
 
-Unreleased scaling diagnostics add possessive chains, plural combinations,
+The 0.6.0 scaling diagnostics add possessive chains, plural combinations,
 suffixes with multiple grammatical meanings, phrases, wrong vowel harmony and
 single long name tails. Name suffix matching is bounded and does not render
 rejected candidate outputs. Catalog consistency is checked once during
