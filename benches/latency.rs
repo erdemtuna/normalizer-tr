@@ -240,12 +240,26 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
             ("pronunciation-phrase", "GitHub Copilot; "),
             ("pronunciation-prefix-miss", "Visual Studio Nope; "),
             ("pronunciation-list", "ChatGPT,Claude; "),
+            ("pronunciation-possessive", "iPhone'umdan; "),
+            ("pronunciation-plural-possessive", "iPhone'larımıza; "),
+            ("pronunciation-syncretic", "iPhone'una; "),
+            ("pronunciation-nominal-phrase", "GitHub Copilot'ımızda; "),
+            ("pronunciation-invalid-harmony", "Instagram'de; "),
+            ("pronunciation-long-tail", "lar"),
             ("malformed-comma-token", "1,"),
             ("malformed-dot-token", "1."),
             ("mixed-quantity-list", "25kg;CHP,AKP; "),
             ("rejected-phrase-list", "Claude,Hugging Face,UNKNOWN; "),
         ] {
-            let mut text = pattern.repeat(size / pattern.len());
+            let prefix = if class == "pronunciation-long-tail" {
+                "iPhone'"
+            } else {
+                ""
+            };
+            let remaining = size - prefix.len();
+            let mut text = String::with_capacity(size);
+            text.push_str(prefix);
+            text.push_str(&pattern.repeat(remaining / pattern.len()));
             text.push_str(&" ".repeat(size - text.len()));
             for (name, policy) in [
                 ("preserve", AmbiguityPolicy::Preserve),

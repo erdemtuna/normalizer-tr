@@ -100,6 +100,12 @@ The guides track repository behavior: expanded initialism coverage and
 are included in **0.5.0**. Review the changelog's migration notes before upgrading,
 especially exhaustive Rust enum matches and strict serialized allowlists.
 
+**Unreleased:** approved names support plural and possessive suffixes followed
+by a case suffix, such as `iPhone'umdan` -> `ayfonumdan`.
+Review [coverage](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#nominal-suffixes-unreleased)
+and [migration notes](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md#unreleased),
+including changed Instagram and WhatsApp readings, before upgrading.
+
 ## License
 
 [Apache-2.0](https://github.com/erdemtuna/normalizer-tr/blob/main/LICENSE),

@@ -8,7 +8,7 @@ use crate::{
         quantities::{NumericRange, Quantity},
         temporal::{Clock, Date},
     },
-    morphology::Inflection,
+    morphology::{Inflection, NominalInflection},
     notation::{DateSurface, TimeSurface},
     numerals::Number,
 };
@@ -22,7 +22,7 @@ pub(crate) enum Value {
     Time(Clock, bool),
     Quantity(Quantity),
     Lexical(crate::domain::lexicon::Lexeme, Option<Inflection>),
-    Pronunciation(crate::domain::lexicon::Lexeme, Option<Inflection>),
+    Pronunciation(crate::domain::lexicon::Lexeme, Option<NominalInflection>),
     Range(NumericRange),
     Telephone(Telephone),
     Iban(Iban),

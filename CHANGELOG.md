@@ -5,6 +5,41 @@ For publishing instructions, see [CONTRIBUTING](CONTRIBUTING.md#releasing).
 Platform requirements are in the [README](README.md) and
 [Python installation guide](bindings/python/README.md#install).
 
+## Unreleased
+
+- Support plural, all six possessive forms and a final case suffix for every
+  exact approved foreign name. `iPhone'umdan` reads `ayfonumdan`, and
+  `iPhone'larımıza` reads `ayfonlarımıza`. See the
+  [grammar and examples](docs/normalization.md#nominal-suffixes-unreleased).
+- Replace Instagram's `instıgrem` reading with `instagram` and the
+  WhatsApp/Whatsapp reading `vats ep` with `vatsap`. `Instagram'a`,
+  `Instagram'da` and `WhatsApp'tan` receive primary readings under every policy.
+  There is no older pronunciation option or legacy suffix alias.
+- Validate the pronunciation catalog once during initialization. Reject
+  inconsistent definitions before normalization. Suffix matching uses borrowed
+  fragments without allocating candidate outputs.
+- Add name suffix regression cases and scaling workloads to the shared
+  measurements. The original benchmark corpora and report keys are unchanged.
+
+### Migration
+
+Public signatures, enum values, serialized labels, record fields, hint kinds,
+policy defaults, limits and dependencies are unchanged. The new grammar applies
+only to exact approved names, not numbers, quantities, units or initialisms.
+Existing casing, phrase ownership, source ranges and protected contexts remain
+unchanged.
+
+Bare Instagram and WhatsApp outputs change. Newly accepted suffixes no longer
+produce unresolved issues or fallback diagnostics, and Reject can succeed.
+Spellings based on the old readings, such as `Instagram'e`, `Instagram'de` and
+`WhatsApp'ten`, no longer validate: Preserve retains the whole source with an
+issue, Reject errors, and Fallback spells it literally. Update text snapshots
+and code that depends on diagnostics. Malformed suffixes are not repaired.
+
+These source changes are not a published release. Independent EMA Lightning
+listening validation remains a release prerequisite. Passing text tests and
+benchmarks does not establish audio quality.
+
 ## 0.5.0 - 2026-10-09
 
 - Remove repeated numeric-prefix scans from comma-boundary detection and literal

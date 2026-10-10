@@ -17,5 +17,6 @@
   "policy-contract/review-money-ownership.json",
   "policy-contract/review-mixed-members.json",
   "policy-contract/review-tight-admission.json",
-  "policy-contract/pronunciation-ema-lightning.json"
+  "policy-contract/pronunciation-ema-lightning.json",
+  "policy-contract/pronunciation-nominal.json"
 ]

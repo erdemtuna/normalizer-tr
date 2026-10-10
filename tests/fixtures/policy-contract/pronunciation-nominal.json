@@ -1,0 +1,21 @@
+[
+  {"id":"name-iphone-possessive","class":"pronunciation","text":"iPhone'um","expected":"ayfonum","kind":"Pronunciation"},
+  {"id":"name-iphone-possessive-ablative","class":"pronunciation","text":"iPhone'umdan","expected":"ayfonumdan","kind":"Pronunciation"},
+  {"id":"name-iphone-possessive-dative","class":"pronunciation","text":"iPhone'una","expected":"ayfonuna","kind":"Pronunciation"},
+  {"id":"name-iphone-plural","class":"pronunciation","text":"iPhone'lar","expected":"ayfonlar","kind":"Pronunciation"},
+  {"id":"name-iphone-plural-possessive-dative","class":"pronunciation","text":"iPhone'larımıza","expected":"ayfonlarımıza","kind":"Pronunciation"},
+  {"id":"name-iphone-third-plural-case","class":"pronunciation","text":"iPhone'larından","expected":"ayfonlarından","kind":"Pronunciation"},
+  {"id":"name-youtube-possessive","class":"pronunciation","text":"YouTube'um","expected":"yu tubum","kind":"Pronunciation"},
+  {"id":"name-google-possessive","class":"pronunciation","text":"Google'ım","expected":"gugılım","kind":"Pronunciation"},
+  {"id":"name-instagram-dative","class":"pronunciation","text":"Instagram'a","expected":"instagrama","kind":"Pronunciation"},
+  {"id":"name-instagram-locative","class":"pronunciation","text":"Instagram'da","expected":"instagramda","kind":"Pronunciation"},
+  {"id":"name-whatsapp-ablative","class":"pronunciation","text":"WhatsApp'tan","expected":"vatsaptan","kind":"Pronunciation"},
+  {"id":"name-whatsapp-possessive","class":"pronunciation","text":"Whatsapp'ım","expected":"vatsapım","kind":"Pronunciation"},
+  {"id":"name-chatgpt-vowel-possessive","class":"pronunciation","text":"ChatGPT'm","expected":"çet ci pi tim","kind":"Pronunciation"},
+  {"id":"name-chatgpt-third-possessive-case","class":"pronunciation","text":"ChatGPT'sinden","expected":"çet ci pi tisinden","kind":"Pronunciation"},
+  {"id":"name-copilot-phrase-possessive","class":"pronunciation","text":"GitHub Copilot'ımızda","expected":"git hab ko paylıtımızda","kind":"Pronunciation"},
+  {"id":"name-instagram-wrong-harmony","class":"pronunciation","text":"Instagram'e","category":"InvalidExpression","fallback_class":"Pronunciation","strategy":"Literal","fallback":"ı ne se te a ge re a me kesme e"},
+  {"id":"name-whatsapp-wrong-harmony","class":"pronunciation","text":"WhatsApp'ten","category":"InvalidExpression","fallback_class":"Pronunciation","strategy":"Literal","fallback":"çift ve he a te se a pe pe kesme te e ne"},
+  {"id":"name-iphone-plural-wrong-rounding","class":"pronunciation","text":"iPhone'laru","category":"InvalidExpression","fallback_class":"Pronunciation","strategy":"Literal","fallback":"i pe he o ne e kesme le a re u"},
+  {"id":"name-iphone-repeated-plural","class":"pronunciation","text":"iPhone'larlar","category":"InvalidExpression","fallback_class":"Pronunciation","strategy":"Literal","fallback":"i pe he o ne e kesme le a re le a re"}
+]

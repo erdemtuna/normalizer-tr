@@ -22,7 +22,7 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
         }
         return Some((
             lexicon::pronunciation_reading(*entry, source)
-                .map(|(entry, case)| Value::Pronunciation(entry, case)),
+                .map(|(entry, inflection)| Value::Pronunciation(entry, inflection)),
             end,
         ));
     }

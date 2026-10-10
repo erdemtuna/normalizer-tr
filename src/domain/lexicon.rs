@@ -5,7 +5,7 @@ mod static_index;
 use crate::morphology::{Harmony, Word, WordEnd};
 use crate::{
     IssueCategory,
-    morphology::{Inflection, case_inflection},
+    morphology::{Inflection, NominalInflection, case_inflection},
     notation::split_suffix,
 };
 
@@ -158,12 +158,18 @@ pub(crate) fn pronunciation_boundary(text: &str) -> bool {
 pub(crate) fn pronunciation_reading(
     entry: Lexeme,
     text: &str,
-) -> Result<(Lexeme, Option<Inflection>), IssueCategory> {
+) -> Result<(Lexeme, Option<NominalInflection>), IssueCategory> {
     let (_, suffix) = split_suffix(text).ok_or(IssueCategory::Unsupported)?;
-    let case = suffix
-        .map(|suffix| case_inflection(entry.source, suffix).ok_or(IssueCategory::InvalidExpression))
+    let inflection = suffix
+        .map(|suffix| {
+            NominalInflection::parse(entry.source, suffix).ok_or(IssueCategory::InvalidExpression)
+        })
         .transpose()?;
-    Ok((entry, case))
+    Ok((entry, inflection))
+}
+
+pub(crate) fn validate_pronunciations() -> Result<(), crate::NormalizeError> {
+    pronunciations::validate()
 }
 
 pub(crate) fn catalog_form_valid(text: &str) -> bool {
