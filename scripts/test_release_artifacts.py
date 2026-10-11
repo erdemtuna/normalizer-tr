@@ -68,10 +68,56 @@ class ReleaseTests(unittest.TestCase):
                 preflight("v99.0.0", "owner/repo")
             with patch(
                 "release_artifacts.subprocess.run",
-                side_effect=subprocess.CalledProcessError(1, ["git"]),
+                side_effect=[
+                    None,
+                    subprocess.CalledProcessError(1, ["git", "merge-base"]),
+                ],
             ):
                 with self.assertRaises(subprocess.CalledProcessError):
                     preflight("v" + VERSION, "owner/repo")
+
+    def test_preflight_checks_tag_source_and_latest_ci(self):
+        head = "abc"
+        success = {
+            "head_sha": head,
+            "head_branch": "main",
+            "event": "push",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://ci/run",
+        }
+        with patch.dict(
+            "release_artifacts.os.environ", {"GITHUB_REF": "refs/tags/v" + VERSION}
+        ):
+            for runs, error in (
+                ([], "no main CI"),
+                ([{**success, "conclusion": "failure"}], "not successful"),
+            ):
+                with (
+                    patch(
+                        "release_artifacts.subprocess.check_output",
+                        side_effect=[head, head, json.dumps({"workflow_runs": runs})],
+                    ),
+                    patch("release_artifacts.subprocess.run"),
+                    self.assertRaisesRegex(RuntimeError, error),
+                ):
+                    preflight("v" + VERSION, "owner/repo")
+            with (
+                patch(
+                    "release_artifacts.subprocess.check_output",
+                    side_effect=[head, "different"],
+                ),
+                self.assertRaisesRegex(RuntimeError, "checked-out source"),
+            ):
+                preflight("v" + VERSION, "owner/repo")
+            with (
+                patch(
+                    "release_artifacts.subprocess.check_output",
+                    side_effect=[head, head, json.dumps({"workflow_runs": [success]})],
+                ),
+                patch("release_artifacts.subprocess.run"),
+            ):
+                preflight("v" + VERSION, "owner/repo")
 
     def test_registry_requires_exact_names_and_checksums(self):
         expected = [{"name": "wheel.whl", "sha256": "abc"}]
