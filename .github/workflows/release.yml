@@ -16,7 +16,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    name: Publication revision checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+      - name: Verify publishing source against exact main CI
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: python scripts/release_artifacts.py preflight --tag "$RELEASE_TAG" --repository "$REPOSITORY"
+      - name: Verify consistent versions for build-only dispatch
+        if: '!inputs.publish'
+        run: python -c "import sys; sys.path.insert(0, 'scripts'); from release_artifacts import check_versions; check_versions()"
+
+  advisories:
+    needs: preflight
+    uses: ./.github/workflows/advisories.yml
+    with:
+      scan: true
+
   wheels:
+    needs: [preflight, advisories]
     name: ${{ matrix.platform }} / CPython ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -90,6 +120,7 @@ jobs:
           if-no-files-found: error
 
   source:
+    needs: [preflight, advisories]
     name: Source distribution and core archive
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -196,3 +227,11 @@ jobs:
         with:
           packages-dir: verified/dist
           print-hash: true
+      - name: Verify published bytes and a fresh Python consumer
+        run: python scripts/release_artifacts.py registry verified --registry pypi --output "$RUNNER_TEMP/registry-verification"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: pypi-registry-verification
+          path: ${{ runner.temp }}/registry-verification/registry-verification.json
+          if-no-files-found: warn

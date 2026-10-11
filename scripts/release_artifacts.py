@@ -5,17 +5,272 @@ import email.parser
 import itertools
 import json
 import os
+import platform
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
+import sys
 import tarfile
 import tomllib
+import urllib.error
+import urllib.request
 import zipfile
 
-from verification import inspect_wheel, sha, version, write
+from verification import ROOT, inspect_wheel, sha, version, write
 
 PYTHONS = ("3.11", "3.12", "3.13", "3.14")
 PLATFORMS = ("windows", "linux", "macos-x64", "macos-arm64")
+NETWORK_TIMEOUT = 30
+
+
+def check_versions():
+    release = version()
+    binding = tomllib.loads(
+        (ROOT / "bindings/python/Cargo.toml").read_text(encoding="utf-8")
+    )
+    python = tomllib.loads(
+        (ROOT / "bindings/python/pyproject.toml").read_text(encoding="utf-8")
+    )
+    if (
+        binding["package"]["version"] != release
+        or binding["dependencies"]["normalizer-tr"]["version"] != "=" + release
+        or python["project"]["version"] != release
+    ):
+        raise RuntimeError("core, companion, and Python versions must agree")
+
+
+def check_ci_run(run, head):
+    if (
+        run.get("head_sha") != head
+        or run.get("head_branch") != "main"
+        or run.get("event") != "push"
+        or run.get("status") != "completed"
+        or run.get("conclusion") != "success"
+    ):
+        raise RuntimeError("latest main CI run for the tagged SHA is not successful")
+
+
+def preflight(tag, repository):
+    check_versions()
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    if tag != "v" + version():
+        raise RuntimeError("publishing requires the matching version tag")
+    if os.environ.get("GITHUB_REF", f"refs/tags/{tag}") != f"refs/tags/{tag}":
+        raise RuntimeError("publish dispatch must select a tag, not a branch")
+    tagged = subprocess.check_output(
+        ["git", "rev-parse", f"refs/tags/{tag}^{{commit}}"], text=True
+    ).strip()
+    if tagged != head:
+        raise RuntimeError("tag does not identify the checked-out source")
+    subprocess.run(["git", "fetch", "--no-tags", "origin", "main"], check=True)
+    subprocess.run(
+        ["git", "merge-base", "--is-ancestor", head, "origin/main"], check=True
+    )
+    payload = json.loads(
+        subprocess.check_output(
+            [
+                "gh",
+                "api",
+                f"repos/{repository}/actions/workflows/ci.yml/runs?head_sha={head}&event=push&per_page=1",
+            ],
+            text=True,
+        )
+    )
+    if not payload["workflow_runs"]:
+        raise RuntimeError("no main CI run exists for the tagged SHA")
+    run = payload["workflow_runs"][0]
+    check_ci_run(run, head)
+    print(f"Publication preflight passed: {head}, CI {run['html_url']}")
+
+
+def check_registry_files(expected, published):
+    actual = {row["name"]: row for row in published}
+    if len(actual) != len(published) or actual.keys() != {
+        row["name"] for row in expected
+    }:
+        raise RuntimeError("registry file set differs from the release manifest")
+    for row in expected:
+        if actual[row["name"]]["sha256"] != row["sha256"]:
+            raise RuntimeError(f"registry checksum differs: {row['name']}")
+    return actual
+
+
+def fetch_json(url):
+    with urllib.request.urlopen(url, timeout=NETWORK_TIMEOUT) as response:
+        return json.load(response)
+
+
+def download(url, path, expected_sha):
+    with (
+        urllib.request.urlopen(url, timeout=NETWORK_TIMEOUT) as response,
+        path.open("xb") as stream,
+    ):
+        shutil.copyfileobj(response, stream)
+    if sha(path) != expected_sha:
+        raise RuntimeError(f"downloaded bytes differ from manifest: {path.name}")
+
+
+def registry_consumer(registry, directory, record):
+    if registry == "pypi":
+        system = {"Windows": "windows", "Linux": "linux", "Darwin": "macos"}
+        host = system[platform.system()]
+        if host == "macos":
+            host += (
+                "-arm64"
+                if platform.machine().lower() in {"arm64", "aarch64"}
+                else "-x64"
+            )
+        interpreter = f"{sys.version_info.major}.{sys.version_info.minor}"
+        wheels = [
+            row
+            for row in record["python_artifacts"]
+            if row["kind"] == "wheel"
+            and row["platform"] == host
+            and row["python"] == interpreter
+        ]
+        if len(wheels) != 1:
+            raise RuntimeError("no unique tested wheel matches the consumer host")
+        env = directory / "consumer"
+        subprocess.run([sys.executable, "-m", "venv", str(env)], check=True)
+        python = env / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        subprocess.run(
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--no-deps",
+                str(directory / wheels[0]["name"]),
+            ],
+            check=True,
+        )
+        (directory / "reports").mkdir()
+        subprocess.run(
+            [
+                str(python),
+                str(ROOT / "scripts/verification.py"),
+                "consume",
+                str(directory),
+            ],
+            check=True,
+        )
+        consumer = json.loads(
+            (directory / "reports/python-consumer.json").read_text(encoding="utf-8")
+        )
+        if consumer["normalizer_id"] != "normalizer-tr/" + record["version"]:
+            raise RuntimeError(
+                "installed registry consumer identity differs from release"
+            )
+    else:
+        manifest = directory / "Cargo.toml"
+        manifest.write_text(
+            "[workspace]\n[package]\nname='registry-consumer'\nversion='0.0.0'\nedition='2024'\npublish=false\n"
+            "[lib]\n"
+            f"path={json.dumps((ROOT / 'scripts/core_consumer.rs').as_posix())}\n"
+            "[features]\ndefault=[]\nserde=['normalizer-tr/serde']\n"
+            f"[dependencies]\nnormalizer-tr='={record['version']}'\n",
+            encoding="utf-8",
+        )
+        env = {**os.environ, "CARGO_TARGET_DIR": str(directory / "target")}
+        subprocess.run(
+            ["cargo", "generate-lockfile", "--manifest-path", str(manifest)],
+            env=env,
+            check=True,
+        )
+        lock = tomllib.loads((directory / "Cargo.lock").read_text(encoding="utf-8"))
+        packages = [row for row in lock["package"] if row["name"] == "normalizer-tr"]
+        if len(packages) != 1 or packages[0]["checksum"] != record["core"]["sha256"]:
+            raise RuntimeError(
+                "registry consumer did not resolve the reviewed core archive"
+            )
+        for features in ([], ["--all-features"]):
+            subprocess.run(
+                [
+                    "cargo",
+                    "test",
+                    "--locked",
+                    "--manifest-path",
+                    str(manifest),
+                    *features,
+                ],
+                env=env,
+                check=True,
+            )
+
+
+def verify_registry(directory, registries, output):
+    record = json.loads(
+        (directory / "release-manifest.json").read_text(encoding="utf-8")
+    )
+    if record["version"] != version():
+        raise RuntimeError(
+            "check out the release version before verifying its consumers"
+        )
+    output.mkdir()
+    results = {}
+    for registry in registries:
+        destination = output / registry
+        destination.mkdir()
+        found = False
+        try:
+            if registry == "pypi":
+                metadata = fetch_json(
+                    f"https://pypi.org/pypi/normalizer-tr/{record['version']}/json"
+                )
+                expected = record["python_artifacts"]
+                published = [
+                    {
+                        "name": row["filename"],
+                        "sha256": row["digests"]["sha256"],
+                        "url": row["url"],
+                    }
+                    for row in metadata["urls"]
+                ]
+            else:
+                metadata = fetch_json(
+                    f"https://crates.io/api/v1/crates/normalizer-tr/{record['version']}"
+                )
+                expected = [record["core"]]
+                published = [
+                    {
+                        "name": record["core"]["name"],
+                        "sha256": metadata["version"]["checksum"],
+                        "url": f"https://static.crates.io/crates/normalizer-tr/{record['core']['name']}",
+                    }
+                ]
+            found = True
+            actual = check_registry_files(expected, published)
+            for row in expected:
+                download(
+                    actual[row["name"]]["url"], destination / row["name"], row["sha256"]
+                )
+            registry_consumer(registry, destination, record)
+            results[registry] = {"status": "verified", "files": len(expected)}
+        except urllib.error.HTTPError as error:
+            results[registry] = {
+                "status": "not-published"
+                if error.code == 404 and not found
+                else "failed",
+                "error": str(error),
+            }
+        except (
+            urllib.error.URLError,
+            RuntimeError,
+            subprocess.CalledProcessError,
+            json.JSONDecodeError,
+        ) as error:
+            results[registry] = {"status": "failed", "error": str(error)}
+    write(
+        output / "registry-verification.json",
+        {"version": record["version"], "registries": results},
+    )
+    print(json.dumps(results, indent=2))
+    if any(row["status"] != "verified" for row in results.values()):
+        raise RuntimeError(
+            "requested registries are not all verified; see registry-verification.json"
+        )
 
 
 def check_members(names):
@@ -225,13 +480,26 @@ def main():
     publish = commands.add_parser("verify")
     publish.add_argument("directory", type=Path)
     publish.add_argument("--tag", required=True)
+    before = commands.add_parser("preflight")
+    before.add_argument("--tag", required=True)
+    before.add_argument("--repository", required=True)
+    registry = commands.add_parser("registry")
+    registry.add_argument("directory", type=Path)
+    registry.add_argument(
+        "--registry", action="append", choices=("pypi", "crates"), required=True
+    )
+    registry.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.action == "inspect":
         inspect(args.directory, args.python, args.platform, args.sdist)
     elif args.action == "manifest":
         manifest(args.directory, args.core, args.output)
-    else:
+    elif args.action == "verify":
         verify(args.directory, args.tag)
+    elif args.action == "preflight":
+        preflight(args.tag, args.repository)
+    else:
+        verify_registry(args.directory.resolve(), args.registry, args.output.resolve())
 
 
 if __name__ == "__main__":

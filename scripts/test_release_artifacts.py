@@ -1,8 +1,26 @@
 """Release gate regressions; no registry, native execution or credentials."""
 
 import unittest
+import hashlib
+import io
+import json
+import tempfile
+import subprocess
+import urllib.error
+from pathlib import Path
+from unittest.mock import patch
 
-from release_artifacts import check_members, check_metadata, wheel_platform
+from release_artifacts import (
+    check_ci_run,
+    check_members,
+    check_metadata,
+    check_registry_files,
+    check_versions,
+    download,
+    preflight,
+    verify_registry,
+    wheel_platform,
+)
 from verification import version
 
 VERSION = version()
@@ -16,6 +34,151 @@ METADATA = (
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_versions_are_consistent(self):
+        check_versions()
+
+    def test_exact_main_ci_revision_is_required(self):
+        run = {
+            "head_sha": "abc",
+            "head_branch": "main",
+            "event": "push",
+            "status": "completed",
+            "conclusion": "success",
+        }
+        check_ci_run(run, "abc")
+        for change in (
+            {"head_sha": "other"},
+            {"head_branch": "feature"},
+            {"event": "pull_request"},
+            {"status": "in_progress"},
+            {"conclusion": "failure"},
+            {"conclusion": "cancelled"},
+        ):
+            with self.subTest(change=change), self.assertRaises(RuntimeError):
+                check_ci_run({**run, **change}, "abc")
+
+    def test_preflight_rejects_wrong_tag_and_unreviewed_history(self):
+        with (
+            patch("release_artifacts.subprocess.check_output", return_value="abc\n"),
+            patch.dict(
+                "release_artifacts.os.environ", {"GITHUB_REF": "refs/tags/v" + VERSION}
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "version tag"):
+                preflight("v99.0.0", "owner/repo")
+            with patch(
+                "release_artifacts.subprocess.run",
+                side_effect=subprocess.CalledProcessError(1, ["git"]),
+            ):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    preflight("v" + VERSION, "owner/repo")
+
+    def test_registry_requires_exact_names_and_checksums(self):
+        expected = [{"name": "wheel.whl", "sha256": "abc"}]
+        check_registry_files(expected, expected)
+        for actual in (
+            [],
+            expected * 2,
+            [{"name": "wheel.whl", "sha256": "different"}],
+        ):
+            with self.subTest(actual=actual), self.assertRaises(RuntimeError):
+                check_registry_files(expected, actual)
+
+    def test_download_checks_actual_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = b"reviewed bytes"
+            with patch(
+                "release_artifacts.urllib.request.urlopen",
+                return_value=io.BytesIO(data),
+            ):
+                download(
+                    "https://registry/file",
+                    Path(directory) / "good",
+                    hashlib.sha256(data).hexdigest(),
+                )
+            with patch(
+                "release_artifacts.urllib.request.urlopen",
+                return_value=io.BytesIO(data),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "bytes differ"):
+                    download("https://registry/file", Path(directory) / "bad", "wrong")
+
+    def test_registry_status_is_not_a_success_shaped_missing_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "release-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": VERSION,
+                        "python_artifacts": [{"name": "wheel.whl", "sha256": "abc"}],
+                    }
+                )
+            )
+            error = urllib.error.HTTPError(
+                "https://registry", 404, "missing", None, None
+            )
+            with patch("release_artifacts.fetch_json", side_effect=error):
+                with self.assertRaisesRegex(RuntimeError, "not all verified"):
+                    verify_registry(root, ["pypi"], root / "missing")
+            result = json.loads(
+                (root / "missing/registry-verification.json").read_text()
+            )
+            self.assertEqual(result["registries"]["pypi"]["status"], "not-published")
+            metadata = {
+                "urls": [
+                    {
+                        "filename": "wheel.whl",
+                        "digests": {"sha256": "abc"},
+                        "url": "https://registry",
+                    }
+                ]
+            }
+            with (
+                patch("release_artifacts.fetch_json", return_value=metadata),
+                patch("release_artifacts.download", side_effect=error),
+            ):
+                with self.assertRaises(RuntimeError):
+                    verify_registry(root, ["pypi"], root / "bad-file")
+            result = json.loads(
+                (root / "bad-file/registry-verification.json").read_text()
+            )
+            self.assertEqual(result["registries"]["pypi"]["status"], "failed")
+
+    def test_consumer_failure_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "release-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": VERSION,
+                        "python_artifacts": [{"name": "wheel.whl", "sha256": "abc"}],
+                    }
+                )
+            )
+            metadata = {
+                "urls": [
+                    {
+                        "filename": "wheel.whl",
+                        "digests": {"sha256": "abc"},
+                        "url": "https://registry",
+                    }
+                ]
+            }
+            with (
+                patch("release_artifacts.fetch_json", return_value=metadata),
+                patch("release_artifacts.download"),
+                patch(
+                    "release_artifacts.registry_consumer",
+                    side_effect=RuntimeError("bad consumer"),
+                ),
+            ):
+                with self.assertRaises(RuntimeError):
+                    verify_registry(root, ["pypi"], root / "failed")
+            result = json.loads(
+                (root / "failed/registry-verification.json").read_text()
+            )
+            self.assertEqual(result["registries"]["pypi"]["status"], "failed")
+
     def test_metadata_accepts_normalized_requirement_order_and_spacing(self):
         check_metadata(METADATA.encode())
 
