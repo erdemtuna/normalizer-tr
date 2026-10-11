@@ -29,7 +29,11 @@ def report():
         },
         "expanded_coverage_measurement": {
             "input_cases": [{"text": "5 kg", "expected": "spoken"}],
-            "cohorts": {"short:preserve": timing()},
+            "cohorts": {
+                f"{cohort}:{policy}": timing()
+                for cohort in ("short", "medium")
+                for policy in ("preserve", "reject", "fallback")
+            },
         },
         "reviewed_recognition_scaling": {
             "scaling": [

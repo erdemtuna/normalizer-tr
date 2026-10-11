@@ -70,6 +70,15 @@ def compare(base, head, same_inputs, contract_changes=()):
         ):
             for row in section.values():
                 validate_timing(row, SAMPLES)
+        if set(report["fallback_measurement"]["cohorts"]) != {"short", "medium"}:
+            raise RuntimeError("missing fallback cohorts")
+        expected_policies = {
+            f"{cohort}:{policy}"
+            for cohort in ("short", "medium")
+            for policy in ("preserve", "reject", "fallback")
+        }
+        if set(report["expanded_coverage_measurement"]["cohorts"]) != expected_policies:
+            raise RuntimeError("missing policy contract cohorts")
     same_primary = (
         same_inputs
         and base["distribution"] == head["distribution"]
@@ -95,9 +104,27 @@ def compare(base, head, same_inputs, contract_changes=()):
             head["expanded_coverage_measurement"]["cohorts"],
             policy_inputs_equal,
         ),
-        "per_class_policy": timing_rows(
-            base["per_class_policy"], head["per_class_policy"], same_primary
-        ),
+        "per_class_policy": {
+            "shared": timing_rows(
+                {
+                    key: value
+                    for key, value in base["per_class_policy"].items()
+                    if key in head["per_class_policy"]
+                },
+                {
+                    key: head["per_class_policy"][key]
+                    for key in base["per_class_policy"]
+                    if key in head["per_class_policy"]
+                },
+                same_primary,
+            ),
+            "base_only": sorted(
+                base["per_class_policy"].keys() - head["per_class_policy"].keys()
+            ),
+            "head_only": sorted(
+                head["per_class_policy"].keys() - base["per_class_policy"].keys()
+            ),
+        },
     }
     before = {
         (row["path"], row["bytes"], row["policy"]): row
