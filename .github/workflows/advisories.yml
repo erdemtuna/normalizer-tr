@@ -1,0 +1,52 @@
+name: Dependency advisories
+
+on:
+  workflow_call:
+    inputs:
+      scan:
+        type: boolean
+        default: true
+  workflow_dispatch:
+  schedule:
+    - cron: "19 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Rust and Python dependency advisories
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: No dependency changes
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !inputs.scan
+        run: echo "No dependency or workflow changes; scans run on dependency PRs and scheduled maintenance."
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        if: inputs.scan || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        if: inputs.scan || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        with:
+          python-version: "3.13"
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        if: inputs.scan || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        with:
+          toolchain: "1.99.0"
+      - name: Audit locked Rust and isolated Python tools
+        if: inputs.scan || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p reports
+          cargo install cargo-audit --version 0.22.2 --locked --root "$RUNNER_TEMP/audit-tool"
+          "$RUNNER_TEMP/audit-tool/bin/cargo-audit" audit --json > reports/rust-advisories.json
+          python -m venv "$RUNNER_TEMP/audit-python"
+          "$RUNNER_TEMP/audit-python/bin/python" -m pip install -r bindings/python/requirements-dev.txt -c bindings/python/constraints.lock
+          SITE=$("$RUNNER_TEMP/audit-python/bin/python" -c 'import sysconfig; print(sysconfig.get_path("purelib"))')
+          "$RUNNER_TEMP/audit-python/bin/python" -m pip_audit --path "$SITE" --format json > reports/python-advisories.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && (inputs.scan || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        with:
+          name: dependency-advisories
+          path: reports
+          if-no-files-found: warn

@@ -58,7 +58,7 @@ jobs:
       - name: Check Python types
         run: python -m mypy bindings\python\python --check-untyped-defs
       - name: Test verification helpers
-        run: python .\scripts\test_verification.py && python .\scripts\test_release_artifacts.py
+        run: python -m unittest discover -s scripts -p 'test_*.py' && python scripts\ci_checks.py pins
       - name: Build native wheel
         run: python -m maturin build --release --locked --manifest-path .\bindings\python\Cargo.toml --interpreter python --out .\target\ci-wheels
       - name: Install built wheel
@@ -117,3 +117,87 @@ jobs:
           python -m pip install --no-deps target/ci-wheels/*.whl
       - name: Test installed public API
         run: python -m pytest bindings/python/tests -q
+
+  contracts:
+    name: Public compatibility and workflow checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: head
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: "1.99.0"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+      - name: Lint workflow definitions
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
+      - name: Download pinned semver checker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/semver"
+          gh release download v0.51.0 --repo obi1kenobi/cargo-semver-checks --pattern cargo-semver-checks-x86_64-unknown-linux-gnu.tar.gz --dir "$RUNNER_TEMP/semver"
+          tar -xzf "$RUNNER_TEMP/semver/cargo-semver-checks-x86_64-unknown-linux-gnu.tar.gz" -C "$RUNNER_TEMP/semver"
+      - name: Check default and Serde public APIs against PR base
+        run: |
+          "$RUNNER_TEMP/semver/cargo-semver-checks" --manifest-path Cargo.toml --baseline-root ../base --package normalizer-tr --default-features --release-type patch
+          "$RUNNER_TEMP/semver/cargo-semver-checks" --manifest-path Cargo.toml --baseline-root ../base --package normalizer-tr --all-features --release-type patch
+      - name: Compare public policy outcomes
+        run: python scripts/compare_contracts.py --base ../base --output "$RUNNER_TEMP/contracts"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-contract-comparison
+          path: |
+            ${{ runner.temp }}/contracts/*.json
+            ${{ runner.temp }}/contracts/*.md
+            ${{ runner.temp }}/contracts/*/outcomes.json
+          if-no-files-found: error
+
+  dependency-scope:
+    name: Select dependency checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      audit: ${{ steps.scope.outputs.audit }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python scripts/ci_checks.py dependencies --base "$BASE_SHA"
+
+  advisories:
+    needs: dependency-scope
+    uses: ./.github/workflows/advisories.yml
+    with:
+      scan: ${{ needs.dependency-scope.outputs.audit == 'true' }}
+
+  gate:
+    name: CI gate
+    if: always()
+    needs: [windows, msrv, portable-binding, contracts, dependency-scope, advisories]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Require all checks to succeed
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python scripts/ci_checks.py gate

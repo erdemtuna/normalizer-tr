@@ -73,8 +73,8 @@ try {
     Invoke-Step 'ruff' $PythonPath @('-m','ruff','check','bindings\python','benches','scripts')
     Invoke-Step 'python-format' $PythonPath @('-m','ruff','format','--check','bindings\python','benches','scripts')
     Invoke-Step 'typing' $PythonPath @('-m','mypy','bindings\python\python','--check-untyped-defs')
-    Invoke-Step 'verification-machinery' $PythonPath @('scripts\test_verification.py')
-    Invoke-Step 'release-machinery' $PythonPath @('scripts\test_release_artifacts.py')
+    Invoke-Step 'verification-machinery' $PythonPath @('-m','unittest','discover','-s','scripts','-p','test_*.py')
+    Invoke-Step 'development-tool-pins' $PythonPath @('scripts\ci_checks.py','pins')
     $audit = Join-Path $root 'target\audit-tool\bin\cargo-audit.exe'
     if (-not (Test-Path -LiteralPath $audit)) {throw 'Missing local cargo-audit tool; provision it in the isolated target tool directory.'}
     Invoke-Step 'rust-advisories' $audit @('audit','--db',(Join-Path $root 'target\advisory-db'),'--no-fetch','--format','json')

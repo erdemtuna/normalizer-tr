@@ -17,6 +17,32 @@ Cooperative deadlines are not hard latency guarantees.
 
 ## Reproduce
 
+### PR evidence
+
+The non-required **Performance evidence** workflow compares exact base/head
+release builds serially on the same runner, with three paired repetitions and
+alternating order. It retains this sampler's inputs, warmups, call disposal,
+outliers and separate policy/scaling sections. The Actions summary links raw
+reports and checked comparisons; slower timings alone do not fail a PR.
+
+Input fingerprints and outcomes must agree before a timing ratio is interpreted
+as equivalent work. Public policy outcomes are checked with the same probe
+against both cores; changed work is labelled non-comparable, not an optimization.
+Build/tool/report failures remain failures. No hosted one-millisecond gate or
+new heap-allocation claim is made.
+
+Run locally against a separate baseline checkout and new output directory:
+
+```powershell
+python scripts\compare_performance.py --base <baseline-checkout> --output <new-output-directory>
+```
+
+Keep the host-specific target below for local verification. Hosted comparisons
+provide regression evidence, not a substitute for reviewing semantics or a
+universal latency promise.
+
+### Full local verification
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) to provision the isolated Python tools
 and advisory checker/database. From a clean committed Windows checkout:
 

@@ -1,0 +1,63 @@
+name: Performance evidence
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "benches/**"
+      - "tests/fixtures/**"
+      - "tests/support/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "scripts/compare_*.py"
+      - ".github/workflows/performance.yml"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Exact baseline commit or tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: head
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha || inputs.base }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: "1.99.0"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+      - name: Measure paired release calls
+        run: python scripts/compare_performance.py --base ../base --output "$RUNNER_TEMP/performance"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: paired-native-performance
+          path: |
+            ${{ runner.temp }}/performance/*.json
+            ${{ runner.temp }}/performance/*.md
+            ${{ runner.temp }}/performance/contracts/*.json
+            ${{ runner.temp }}/performance/contracts/*/outcomes.json
+          if-no-files-found: error
