@@ -6,40 +6,16 @@ import json
 import os
 import platform
 import shutil
-import subprocess
 import tarfile
 import tomllib
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def record(path):
-    return {"path": str(path), "sha256": sha(path), "bytes": path.stat().st_size}
-
-
-def write(path, value):
-    with path.open("x", encoding="utf-8") as stream:
-        json.dump(value, stream, ensure_ascii=False, indent=2)
-
-
-def version():
-    return tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))["package"][
-        "version"
-    ]
-
-
-def command(*args):
-    return subprocess.check_output(args, cwd=ROOT, text=True).strip()
+from .common import ROOT, command, policy_contract_fixture, record, sha, version, write
 
 
 def prepare(output):
-    release = version()
+    release = version(ROOT)
     archive = ROOT / "target" / "package" / f"normalizer-tr-{release}.crate"
     packages = output / "packages"
     packages.mkdir(exist_ok=True)
@@ -76,7 +52,9 @@ def prepare(output):
         f"[dependencies]\nnormalizer-tr={{path='{package.as_posix()}'}}\n",
         encoding="utf-8",
     )
-    shutil.copyfile(ROOT / "scripts" / "core_consumer.rs", consumer / "src" / "lib.rs")
+    shutil.copyfile(
+        ROOT / "scripts" / "rust" / "core_consumer.rs", consumer / "src" / "lib.rs"
+    )
     write(
         output / "prepared.json",
         {
@@ -188,24 +166,6 @@ def consume(output):
             "engine_required": False,
         },
     )
-
-
-def policy_contract_fixture(root=None):
-    catalog = (
-        (ROOT if root is None else root) / "tests" / "fixtures" / "policy-contract.json"
-    )
-    files = [catalog] + [
-        catalog.parent / name
-        for name in json.loads(catalog.read_text(encoding="utf-8"))
-    ]
-    cases = [
-        case
-        for file in files[1:]
-        for case in json.loads(file.read_text(encoding="utf-8"))
-    ]
-    if not cases or len({case["id"] for case in cases}) != len(cases):
-        raise RuntimeError("policy-contract fixture must have unique nonempty cases")
-    return cases, files
 
 
 def validate_policy_contract_measurement(value):

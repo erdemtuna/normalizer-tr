@@ -8,7 +8,7 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from verification import ROOT, policy_contract_fixture, write
+from .common import ROOT, policy_contract_fixture, write
 
 POLICIES = {"preserve", "reject", "fallback"}
 
@@ -79,7 +79,7 @@ def probe(root, directory, cases):
         "[workspace]\n"
         '[package]\nname="contract-probe"\nversion="0.0.0"\nedition="2024"\n'
         '[[bin]]\nname="contract-probe"\n'
-        f"path={json.dumps((ROOT / 'scripts' / 'contract_probe.rs').as_posix())}\n"
+        f"path={json.dumps((ROOT / 'scripts' / 'rust' / 'contract_probe.rs').as_posix())}\n"
         "[dependencies]\n"
         f"normalizer-tr={{path={json.dumps(root.as_posix())},features=['serde']}}\n"
         f"serde_json={json.dumps(dependency)}\n",

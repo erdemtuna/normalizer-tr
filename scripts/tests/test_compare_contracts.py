@@ -3,7 +3,7 @@
 import copy
 import unittest
 
-from compare_contracts import compare
+from scripts.compare_contracts import compare
 
 
 def rows():

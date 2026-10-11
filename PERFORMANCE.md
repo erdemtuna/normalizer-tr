@@ -34,7 +34,7 @@ new heap-allocation claim is made.
 Run locally against a separate baseline checkout and new output directory:
 
 ```powershell
-python scripts\compare_performance.py --base <baseline-checkout> --output <new-output-directory>
+python -m scripts.compare_performance --base <baseline-checkout> --output <new-output-directory>
 ```
 
 Keep the host-specific target below for local verification. Hosted comparisons

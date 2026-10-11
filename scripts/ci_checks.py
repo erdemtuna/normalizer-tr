@@ -6,7 +6,7 @@ import os
 import re
 import subprocess
 
-from verification import ROOT
+from .common import ROOT
 
 DEPENDENCY_FILES = {
     "Cargo.toml",

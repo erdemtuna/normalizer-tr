@@ -7,44 +7,14 @@ import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from verification import (
-    write,
+from scripts.verification import (
     wheel,
     prepare,
-    policy_contract_fixture,
     validate_policy_contract_measurement,
 )
 
 
 class VerificationTests(unittest.TestCase):
-    def test_policy_fixture_groups_preserve_order_and_fail_on_invalid_inputs(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            fixtures = root / "tests" / "fixtures"
-            groups = fixtures / "policy-contract"
-            groups.mkdir(parents=True)
-            catalog = fixtures / "policy-contract.json"
-            catalog.write_text(
-                json.dumps(
-                    ["policy-contract/second.json", "policy-contract/first.json"]
-                ),
-                encoding="utf-8",
-            )
-            first = groups / "first.json"
-            second = groups / "second.json"
-            first.write_text(json.dumps([{"id": "first"}]), encoding="utf-8")
-            second.write_text(json.dumps([{"id": "second"}]), encoding="utf-8")
-            with patch("verification.ROOT", root):
-                cases, files = policy_contract_fixture()
-                self.assertEqual(cases, [{"id": "second"}, {"id": "first"}])
-                self.assertEqual(files, [catalog, second, first])
-                first.write_text(json.dumps([{"id": "second"}]), encoding="utf-8")
-                with self.assertRaisesRegex(RuntimeError, "unique nonempty"):
-                    policy_contract_fixture()
-                first.unlink()
-                with self.assertRaises(FileNotFoundError):
-                    policy_contract_fixture()
-
     def test_policy_contract_reports_require_every_policy_and_reviewed_input(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -76,7 +46,7 @@ class VerificationTests(unittest.TestCase):
                     key.replace(":", ":money:"): {"count": 10000} for key in keys
                 },
             }
-            with patch("verification.ROOT", root):
+            with patch("scripts.common.ROOT", root):
                 validate_policy_contract_measurement(value)
                 broken = {**value, "input_cases": []}
                 with self.assertRaisesRegex(RuntimeError, "reviewed fixture"):
@@ -91,14 +61,6 @@ class VerificationTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "class/policy"):
                     validate_policy_contract_measurement(broken)
 
-    def test_reports_refuse_overwrite(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "report.json"
-            write(path, {"status": "failed"})
-            with self.assertRaises(FileExistsError):
-                write(path, {"status": "passed"})
-            self.assertEqual(json.loads(path.read_text()), {"status": "failed"})
-
     def test_missing_or_ambiguous_wheel_is_not_success(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -112,8 +74,10 @@ class VerificationTests(unittest.TestCase):
             (root / "Cargo.toml").write_text(
                 '[package]\nversion="0.3.0"\n', encoding="utf-8"
             )
-            (root / "scripts").mkdir()
-            (root / "scripts" / "core_consumer.rs").write_text("", encoding="utf-8")
+            (root / "scripts" / "rust").mkdir(parents=True)
+            (root / "scripts" / "rust" / "core_consumer.rs").write_text(
+                "", encoding="utf-8"
+            )
             fixture = root / "fixture"
             fixture.mkdir()
             (fixture / "Cargo.toml").write_text(
@@ -129,8 +93,8 @@ class VerificationTests(unittest.TestCase):
             output = root / "target" / "verification"
             output.mkdir()
             with (
-                patch("verification.ROOT", root),
-                patch("verification.command", return_value="a" * 40),
+                patch("scripts.verification.ROOT", root),
+                patch("scripts.verification.command", return_value="a" * 40),
             ):
                 prepare(output)
             manifest = tomllib.loads(

@@ -10,7 +10,7 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
-from release_artifacts import (
+from scripts.release_artifacts import (
     check_ci_run,
     check_members,
     check_metadata,
@@ -21,7 +21,7 @@ from release_artifacts import (
     verify_registry,
     wheel_platform,
 )
-from verification import version
+from scripts.common import version
 
 VERSION = version()
 
@@ -59,15 +59,19 @@ class ReleaseTests(unittest.TestCase):
 
     def test_preflight_rejects_wrong_tag_and_unreviewed_history(self):
         with (
-            patch("release_artifacts.subprocess.check_output", return_value="abc\n"),
+            patch(
+                "scripts.release_artifacts.subprocess.check_output",
+                return_value="abc\n",
+            ),
             patch.dict(
-                "release_artifacts.os.environ", {"GITHUB_REF": "refs/tags/v" + VERSION}
+                "scripts.release_artifacts.os.environ",
+                {"GITHUB_REF": "refs/tags/v" + VERSION},
             ),
         ):
             with self.assertRaisesRegex(RuntimeError, "version tag"):
                 preflight("v99.0.0", "owner/repo")
             with patch(
-                "release_artifacts.subprocess.run",
+                "scripts.release_artifacts.subprocess.run",
                 side_effect=[
                     None,
                     subprocess.CalledProcessError(1, ["git", "merge-base"]),
@@ -87,7 +91,8 @@ class ReleaseTests(unittest.TestCase):
             "html_url": "https://ci/run",
         }
         with patch.dict(
-            "release_artifacts.os.environ", {"GITHUB_REF": "refs/tags/v" + VERSION}
+            "scripts.release_artifacts.os.environ",
+            {"GITHUB_REF": "refs/tags/v" + VERSION},
         ):
             for runs, error in (
                 ([], "no main CI"),
@@ -95,16 +100,16 @@ class ReleaseTests(unittest.TestCase):
             ):
                 with (
                     patch(
-                        "release_artifacts.subprocess.check_output",
+                        "scripts.release_artifacts.subprocess.check_output",
                         side_effect=[head, head, json.dumps({"workflow_runs": runs})],
                     ),
-                    patch("release_artifacts.subprocess.run"),
+                    patch("scripts.release_artifacts.subprocess.run"),
                     self.assertRaisesRegex(RuntimeError, error),
                 ):
                     preflight("v" + VERSION, "owner/repo")
             with (
                 patch(
-                    "release_artifacts.subprocess.check_output",
+                    "scripts.release_artifacts.subprocess.check_output",
                     side_effect=[head, "different"],
                 ),
                 self.assertRaisesRegex(RuntimeError, "checked-out source"),
@@ -112,10 +117,10 @@ class ReleaseTests(unittest.TestCase):
                 preflight("v" + VERSION, "owner/repo")
             with (
                 patch(
-                    "release_artifacts.subprocess.check_output",
+                    "scripts.release_artifacts.subprocess.check_output",
                     side_effect=[head, head, json.dumps({"workflow_runs": [success]})],
                 ),
-                patch("release_artifacts.subprocess.run"),
+                patch("scripts.release_artifacts.subprocess.run"),
             ):
                 preflight("v" + VERSION, "owner/repo")
 
@@ -134,7 +139,7 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             data = b"reviewed bytes"
             with patch(
-                "release_artifacts.urllib.request.urlopen",
+                "scripts.release_artifacts.urllib.request.urlopen",
                 return_value=io.BytesIO(data),
             ):
                 download(
@@ -143,7 +148,7 @@ class ReleaseTests(unittest.TestCase):
                     hashlib.sha256(data).hexdigest(),
                 )
             with patch(
-                "release_artifacts.urllib.request.urlopen",
+                "scripts.release_artifacts.urllib.request.urlopen",
                 return_value=io.BytesIO(data),
             ):
                 with self.assertRaisesRegex(RuntimeError, "bytes differ"):
@@ -163,7 +168,7 @@ class ReleaseTests(unittest.TestCase):
             error = urllib.error.HTTPError(
                 "https://registry", 404, "missing", None, None
             )
-            with patch("release_artifacts.fetch_json", side_effect=error):
+            with patch("scripts.release_artifacts.fetch_json", side_effect=error):
                 with self.assertRaisesRegex(RuntimeError, "not all verified"):
                     verify_registry(root, ["pypi"], root / "missing")
             result = json.loads(
@@ -180,8 +185,8 @@ class ReleaseTests(unittest.TestCase):
                 ]
             }
             with (
-                patch("release_artifacts.fetch_json", return_value=metadata),
-                patch("release_artifacts.download", side_effect=error),
+                patch("scripts.release_artifacts.fetch_json", return_value=metadata),
+                patch("scripts.release_artifacts.download", side_effect=error),
             ):
                 with self.assertRaises(RuntimeError):
                     verify_registry(root, ["pypi"], root / "bad-file")
@@ -211,10 +216,10 @@ class ReleaseTests(unittest.TestCase):
                 ]
             }
             with (
-                patch("release_artifacts.fetch_json", return_value=metadata),
-                patch("release_artifacts.download"),
+                patch("scripts.release_artifacts.fetch_json", return_value=metadata),
+                patch("scripts.release_artifacts.download"),
                 patch(
-                    "release_artifacts.registry_consumer",
+                    "scripts.release_artifacts.registry_consumer",
                     side_effect=RuntimeError("bad consumer"),
                 ),
             ):

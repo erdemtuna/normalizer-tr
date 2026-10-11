@@ -8,8 +8,8 @@ import platform
 import subprocess
 from pathlib import Path
 
-from compare_contracts import revision, run_comparison, semantic_outcome
-from verification import ROOT, write
+from .common import ROOT, write
+from .compare_contracts import revision, run_comparison, semantic_outcome
 
 REPETITIONS = 3
 SAMPLES = 10000

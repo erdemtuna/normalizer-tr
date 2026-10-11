@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from compare_performance import SAMPLES, compare, validate_timing
+from scripts.compare_performance import SAMPLES, compare, validate_timing
 
 
 def timing(value=100, count=SAMPLES):

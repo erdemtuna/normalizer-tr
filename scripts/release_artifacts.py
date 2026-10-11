@@ -17,7 +17,8 @@ import urllib.error
 import urllib.request
 import zipfile
 
-from verification import ROOT, inspect_wheel, sha, version, write
+from .common import ROOT, sha, version, write
+from .verification import inspect_wheel
 
 PYTHONS = ("3.11", "3.12", "3.13", "3.14")
 PLATFORMS = ("windows", "linux", "macos-x64", "macos-arm64")
@@ -150,10 +151,12 @@ def registry_consumer(registry, directory, record):
         subprocess.run(
             [
                 str(python),
-                str(ROOT / "scripts/verification.py"),
+                "-m",
+                "scripts.verification",
                 "consume",
                 str(directory),
             ],
+            cwd=ROOT,
             check=True,
         )
         consumer = json.loads(
@@ -168,7 +171,7 @@ def registry_consumer(registry, directory, record):
         manifest.write_text(
             "[workspace]\n[package]\nname='registry-consumer'\nversion='0.0.0'\nedition='2024'\npublish=false\n"
             "[lib]\n"
-            f"path={json.dumps((ROOT / 'scripts/core_consumer.rs').as_posix())}\n"
+            f"path={json.dumps((ROOT / 'scripts/rust/core_consumer.rs').as_posix())}\n"
             "[features]\ndefault=[]\nserde=['normalizer-tr/serde']\n"
             f"[dependencies]\nnormalizer-tr='={record['version']}'\n",
             encoding="utf-8",
@@ -468,6 +471,7 @@ def verify(directory, tag):
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="action", required=True)
+    commands.add_parser("versions")
     check = commands.add_parser("inspect")
     check.add_argument("directory", type=Path)
     check.add_argument("--python", choices=PYTHONS)
@@ -498,6 +502,8 @@ def main():
         verify(args.directory, args.tag)
     elif args.action == "preflight":
         preflight(args.tag, args.repository)
+    elif args.action == "versions":
+        check_versions()
     else:
         verify_registry(args.directory.resolve(), args.registry, args.output.resolve())
 

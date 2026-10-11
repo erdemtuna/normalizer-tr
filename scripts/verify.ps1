@@ -73,8 +73,8 @@ try {
     Invoke-Step 'ruff' $PythonPath @('-m','ruff','check','bindings\python','benches','scripts')
     Invoke-Step 'python-format' $PythonPath @('-m','ruff','format','--check','bindings\python','benches','scripts')
     Invoke-Step 'typing' $PythonPath @('-m','mypy','bindings\python\python','--check-untyped-defs')
-    Invoke-Step 'verification-machinery' $PythonPath @('-m','unittest','discover','-s','scripts','-p','test_*.py')
-    Invoke-Step 'development-tool-pins' $PythonPath @('scripts\ci_checks.py','pins')
+    Invoke-Step 'verification-machinery' $PythonPath @('-m','unittest','discover','-s','scripts\tests','-t','.')
+    Invoke-Step 'development-tool-pins' $PythonPath @('-m','scripts.ci_checks','pins')
     $audit = Join-Path $root 'target\audit-tool\bin\cargo-audit.exe'
     if (-not (Test-Path -LiteralPath $audit)) {throw 'Missing local cargo-audit tool; provision it in the isolated target tool directory.'}
     Invoke-Step 'rust-advisories' $audit @('audit','--db',(Join-Path $root 'target\advisory-db'),'--no-fetch','--format','json')
@@ -83,7 +83,7 @@ try {
     Invoke-Step 'example-current' 'cargo' @('run','--locked','--example','normalize')
     Invoke-Step 'example-coverage' 'cargo' @('run','--locked','--example','general')
     Invoke-Step 'package-core' 'cargo' @('package','-p','normalizer-tr','--locked')
-    Invoke-Step 'prepare-core-consumer' $PythonPath @('scripts\verification.py','prepare',$OutputDirectory)
+    Invoke-Step 'prepare-core-consumer' $PythonPath @('-m','scripts.verification','prepare',$OutputDirectory)
     $prepared = Get-Content -LiteralPath (Join-Path $OutputDirectory 'prepared.json') -Raw | ConvertFrom-Json
     $consumerManifest = $prepared.consumer_manifest
     Invoke-Step 'consumer-lock' 'cargo' @('generate-lockfile','--manifest-path',$consumerManifest)
@@ -91,11 +91,11 @@ try {
     Invoke-Step 'consumer-serde' 'cargo' @('test','--locked','--all-features','--manifest-path',$consumerManifest)
     Invoke-Step 'packaged-tests' 'cargo' @('test','--locked','--all-features','--manifest-path',$prepared.package_manifest)
     Invoke-Step 'build-wheel' $PythonPath @('-m','maturin','build','--release','--locked','--manifest-path','bindings\python\Cargo.toml','--interpreter',$PythonPath,'--out',(Join-Path $OutputDirectory 'packages'))
-    Invoke-Step 'inspect-wheel' $PythonPath @('scripts\verification.py','wheel',$OutputDirectory)
+    Invoke-Step 'inspect-wheel' $PythonPath @('-m','scripts.verification','wheel',$OutputDirectory)
     Invoke-Step 'sdist-locked-metadata' 'cargo' @('metadata','--locked','--format-version','1')
     Invoke-Step 'build-sdist' $PythonPath @('-m','maturin','sdist','--manifest-path','bindings\python\Cargo.toml','--out',(Join-Path $OutputDirectory 'packages'))
     $sdist = (Get-ChildItem (Join-Path $OutputDirectory 'packages') -Filter '*.tar.gz').FullName
-    Invoke-Step 'inspect-sdist' $PythonPath @('-c','import sys; from pathlib import Path; sys.path.insert(0, "scripts"); from release_artifacts import inspect_python; print(inspect_python(Path(sys.argv[1])))',$sdist)
+    Invoke-Step 'inspect-sdist' $PythonPath @('-c','import sys; from pathlib import Path; from scripts.release_artifacts import inspect_python; print(inspect_python(Path(sys.argv[1])))',$sdist)
     Invoke-Step 'build-sdist-consumer' $PythonPath @('-m','pip','wheel','--no-index','--no-deps','--no-build-isolation',$sdist,'--wheel-dir',(Join-Path $OutputDirectory 'sdist-wheels'))
     Invoke-Step 'fresh-python-env' $PythonPath @('-m','venv',(Join-Path $OutputDirectory 'py'))
     $consumerPython = Join-Path $OutputDirectory 'py\Scripts\python.exe'
@@ -103,13 +103,13 @@ try {
     Invoke-Step 'install-wheel' $consumerPython @('-m','pip','install','--no-deps',$wheel)
     Invoke-Step 'install-test-tool' $consumerPython @('-m','pip','install','pytest==9.0.3')
     Invoke-Step 'installed-python-tests' $consumerPython @('-m','pytest','bindings\python\tests','-q')
-    Invoke-Step 'python-independent-consumer' $consumerPython @('scripts\verification.py','consume',$OutputDirectory)
+    Invoke-Step 'python-independent-consumer' $consumerPython @('-m','scripts.verification','consume',$OutputDirectory)
     foreach ($repeat in 1..3) {
         Invoke-Step "latency-$repeat" 'cargo' @('bench','--locked','--features','serde','--bench','latency','--','--output',(Join-Path $OutputDirectory "reports\rust-$repeat.json"))
     }
     Invoke-Step 'python-latency' $consumerPython @('benches\python_latency.py','--output',(Join-Path $OutputDirectory 'reports\python.json'))
     $stages | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $OutputDirectory 'stages.json') -Encoding utf8
-    Invoke-Step 'final-manifest' $consumerPython @('scripts\verification.py','finalize',$OutputDirectory)
+    Invoke-Step 'final-manifest' $consumerPython @('-m','scripts.verification','finalize',$OutputDirectory)
     Write-Host "Verification passed: $(Join-Path $OutputDirectory 'manifest.json')"
 }
 catch {

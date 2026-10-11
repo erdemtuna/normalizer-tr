@@ -5,7 +5,7 @@ use normalizer_tr::{AmbiguityPolicy, NormalizeError, NormalizeOptions, Normalize
 use serde_json::{Value, json};
 
 #[allow(dead_code)]
-#[path = "../tests/support/policy_contract.rs"]
+#[path = "../../tests/support/policy_contract.rs"]
 mod policy_fixtures;
 
 fn main() -> Result<(), Box<dyn Error>> {

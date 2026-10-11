@@ -37,10 +37,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
           REPOSITORY: ${{ github.repository }}
-        run: python scripts/release_artifacts.py preflight --tag "$RELEASE_TAG" --repository "$REPOSITORY"
+        run: python -m scripts.release_artifacts preflight --tag "$RELEASE_TAG" --repository "$REPOSITORY"
       - name: Verify consistent versions for build-only dispatch
         if: '!inputs.publish'
-        run: python -c "import sys; sys.path.insert(0, 'scripts'); from release_artifacts import check_versions; check_versions()"
+        run: python -m scripts.release_artifacts versions
 
   advisories:
     needs: preflight
@@ -112,7 +112,7 @@ jobs:
       - name: Install exact wheel and test public API
         run: |
           python -m pip install pytest==9.0.3 twine==7.0.0
-          python scripts/release_artifacts.py inspect dist --python "${{ matrix.python }}" --platform "${{ matrix.platform }}"
+          python -m scripts.release_artifacts inspect dist --python "${{ matrix.python }}" --platform "${{ matrix.platform }}"
           python -m twine check --strict dist/*
           python -m pip install --no-deps dist/*.whl
           python -m pytest bindings/python/tests -q
@@ -145,7 +145,7 @@ jobs:
           python -m pip install maturin==1.15.0 pytest==9.0.3 twine==7.0.0
           cargo metadata --locked --no-deps --format-version 1 > /dev/null
           python -m maturin sdist --manifest-path bindings/python/Cargo.toml --out dist
-          python scripts/release_artifacts.py inspect dist --sdist
+          python -m scripts.release_artifacts inspect dist --sdist
           python -m twine check --strict dist/*
           python -m pip install --no-deps dist/*.tar.gz
           python -m pytest bindings/python/tests -q
@@ -191,8 +191,8 @@ jobs:
           path: target/release-core
       - name: Check complete matrix and emit release manifest
         run: |
-          python scripts/test_release_artifacts.py
-          python scripts/release_artifacts.py manifest dist --core target/release-core --output release-manifest.json
+          python -m unittest scripts.tests.test_release_artifacts
+          python -m scripts.release_artifacts manifest dist --core target/release-core --output release-manifest.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: verified-release
@@ -224,14 +224,14 @@ jobs:
           name: verified-release
           path: verified
       - name: Verify release tag and exact artifact checksums
-        run: python scripts/release_artifacts.py verify verified --tag "${{ github.ref_name }}"
+        run: python -m scripts.release_artifacts verify verified --tag "${{ github.ref_name }}"
       - name: Publish with short-lived PyPI identity
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           packages-dir: verified/dist
           print-hash: true
       - name: Verify published bytes and a fresh Python consumer
-        run: python scripts/release_artifacts.py registry verified --registry pypi --output "$RUNNER_TEMP/registry-verification"
+        run: python -m scripts.release_artifacts registry verified --registry pypi --output "$RUNNER_TEMP/registry-verification"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

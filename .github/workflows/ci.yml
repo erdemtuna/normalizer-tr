@@ -58,7 +58,7 @@ jobs:
       - name: Check Python types
         run: python -m mypy bindings\python\python --check-untyped-defs
       - name: Test verification helpers
-        run: python -m unittest discover -s scripts -p 'test_*.py' && python scripts\ci_checks.py pins
+        run: python -m unittest discover -s scripts\tests -t . && python -m scripts.ci_checks pins
       - name: Build native wheel
         run: python -m maturin build --release --locked --manifest-path .\bindings\python\Cargo.toml --interpreter python --out .\target\ci-wheels
       - name: Install built wheel
@@ -155,7 +155,7 @@ jobs:
           "$RUNNER_TEMP/semver/cargo-semver-checks" --manifest-path Cargo.toml --baseline-root ../base --package normalizer-tr --default-features --release-type patch
           "$RUNNER_TEMP/semver/cargo-semver-checks" --manifest-path Cargo.toml --baseline-root ../base --package normalizer-tr --all-features --release-type patch
       - name: Compare public policy outcomes
-        run: python scripts/compare_contracts.py --base ../base --output "$RUNNER_TEMP/contracts"
+        run: python -m scripts.compare_contracts --base ../base --output "$RUNNER_TEMP/contracts"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: public-contract-comparison
@@ -179,7 +179,7 @@ jobs:
       - id: scope
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: python scripts/ci_checks.py dependencies --base "$BASE_SHA"
+        run: python -m scripts.ci_checks dependencies --base "$BASE_SHA"
 
   advisories:
     needs: dependency-scope
@@ -200,4 +200,4 @@ jobs:
       - name: Require all checks to succeed
         env:
           CI_NEEDS: ${{ toJSON(needs) }}
-        run: python scripts/ci_checks.py gate
+        run: python -m scripts.ci_checks gate

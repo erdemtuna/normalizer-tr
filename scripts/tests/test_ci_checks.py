@@ -2,7 +2,7 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from ci_checks import check_tool_pins, dependency_changes, require_success
+from scripts.ci_checks import check_tool_pins, dependency_changes, require_success
 
 
 class CiTests(unittest.TestCase):

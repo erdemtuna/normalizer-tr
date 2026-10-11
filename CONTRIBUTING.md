@@ -155,13 +155,20 @@ cargo doc --locked --no-deps --all-features
 .\.venv\Scripts\python.exe -m ruff check bindings\python benches scripts
 .\.venv\Scripts\python.exe -m ruff format --check bindings\python benches scripts
 .\.venv\Scripts\python.exe -m mypy bindings\python\python --check-untyped-defs
-.\.venv\Scripts\python.exe -m unittest discover -s scripts -p 'test_*.py'
-.\.venv\Scripts\python.exe scripts\ci_checks.py pins
+.\.venv\Scripts\python.exe -m unittest discover -s scripts\tests -t .
+.\.venv\Scripts\python.exe -m scripts.ci_checks pins
 ```
 
 Rebuild/reinstall the binding after native/facade changes before running its
 tests. CI also checks default/no-default Rust configurations and installed-wheel
 tests, without models.
+
+`scripts` is a stdlib-only development package, not part of the installed
+library. Run its CLI modules from the repository root with
+`python -m scripts.<tool>`. Shared paths/report IO and fixture loading live in
+`scripts/common.py`; tooling tests live in `scripts/tests/`, and standalone Rust
+probes/consumers in `scripts/rust/`. `scripts/verify.ps1` remains the full local
+verification entry point.
 
 `tests/reader_interactions.rs` generates combinations around the reviewed
 clock/range, arithmetic/address and electronic-boundary failures. It uses the
@@ -183,7 +190,7 @@ rework and CI feedback duration, not lines changed or PR counts.
 
 Dependabot proposes related Cargo, Python-tool and Actions updates. Keep exact
 pins coherent across manifests, `requirements-dev.txt`, `constraints.lock` and
-inline workflow tool versions; `scripts/ci_checks.py pins` checks the Python
+inline workflow tool versions; `python -m scripts.ci_checks pins` checks the Python
 duplication. Regenerate constraints in a fresh development environment, not a
 machine with unrelated packages, and review platform-specific entries.
 
@@ -249,7 +256,7 @@ publication, check both registries from the release checkout with a downloaded
 `verified-release` artifact and a new output directory:
 
 ```powershell
-python scripts\release_artifacts.py registry <verified-directory> --registry pypi --registry crates --output <new-output-directory>
+python -m scripts.release_artifacts registry <verified-directory> --registry pypi --registry crates --output <new-output-directory>
 ```
 
 Each registry reports verified, not-published or failed independently. Missing

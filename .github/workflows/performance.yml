@@ -11,6 +11,8 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "scripts/compare_*.py"
+      - "scripts/common.py"
+      - "scripts/rust/contract_probe.rs"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
     inputs:
@@ -50,7 +52,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Measure paired release calls
-        run: python scripts/compare_performance.py --base ../base --output "$RUNNER_TEMP/performance"
+        run: python -m scripts.compare_performance --base ../base --output "$RUNNER_TEMP/performance"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
