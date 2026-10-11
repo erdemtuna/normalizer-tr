@@ -1,0 +1,27 @@
+name: Coverage or feature request
+description: Propose a bounded behavior with concrete examples.
+body:
+  - type: markdown
+    attributes:
+      value: Use public or synthetic examples, not private customer text.
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: What useful behavior is missing?
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Expected examples
+      description: Written input and expected spoken output. Mention policy or hints if they matter.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Boundaries and counterexamples
+      description: Forms that should remain rejected or unchanged, including important mixed-sentence contexts.
+    validations:
+      required: true

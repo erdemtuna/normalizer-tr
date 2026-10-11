@@ -1,0 +1,27 @@
+name: Bug report
+description: Report an incorrect reading, diagnostic, or package behavior.
+body:
+  - type: markdown
+    attributes:
+      value: Use minimal synthetic text. Do not include private customer text, credentials, or real account identifiers.
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproducer
+      description: Input and a small Rust/Python example, including policy, options, or hints when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+      description: Include text and, when relevant, completeness, diagnostics, and original UTF-8 byte ranges.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Version and environment
+      description: Library version, Rust/Python version, and operating system.
+    validations:
+      required: true

@@ -1,14 +1,75 @@
 import concurrent.futures
 import dataclasses
+import inspect
 import sys
 import threading
 import time
 from pathlib import Path
 
 import pytest
+import normalizer_tr
 from normalizer_tr import CancellationToken, Hint, NormalizationError, Normalizer
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
+
+
+def test_public_exports_call_defaults_and_record_fields():
+    assert set(normalizer_tr.__all__) == {
+        "Normalizer",
+        "NormalizationError",
+        "Hint",
+        "Issue",
+        "Segment",
+        "NormalizeResult",
+        "FallbackDiagnostic",
+        "CancellationToken",
+        "NORMALIZER_ID",
+        "BUILD_VERSION",
+    }
+    assert list(inspect.signature(Normalizer).parameters) == []
+    parameters = inspect.signature(Normalizer.normalize).parameters
+    assert list(parameters) == [
+        "self",
+        "text",
+        "ambiguity_policy",
+        "hints",
+        "cancellation",
+        "deadline_ms",
+    ]
+    assert parameters["ambiguity_policy"].default == "preserve"
+    assert parameters["hints"].default == ()
+    assert parameters["cancellation"].default is None
+    assert parameters["deadline_ms"].default is None
+    assert all(
+        parameters[name].kind == inspect.Parameter.KEYWORD_ONLY
+        for name in ("ambiguity_policy", "hints", "cancellation", "deadline_ms")
+    )
+    for name, expected in {
+        "Hint": ("start_byte", "end_byte", "kind"),
+        "Issue": ("start_byte", "end_byte", "category", "explanation"),
+        "Segment": ("start_byte", "end_byte", "kind", "text", "rule_id"),
+        "FallbackDiagnostic": (
+            "start_byte",
+            "end_byte",
+            "attempted_class",
+            "reason",
+            "original_category",
+            "strategy",
+        ),
+        "NormalizeResult": (
+            "normalized_text",
+            "locale",
+            "normalizer_id",
+            "complete",
+            "segments",
+            "issues",
+            "fallbacks",
+        ),
+    }.items():
+        cls = getattr(normalizer_tr, name)
+        assert tuple(field.name for field in dataclasses.fields(cls)) == expected
+        assert cls.__dataclass_params__.frozen
+    assert dataclasses.fields(normalizer_tr.NormalizeResult)[-1].default == ()
 
 
 def test_golden_and_exact_original_ranges():

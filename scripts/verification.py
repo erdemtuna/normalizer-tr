@@ -190,8 +190,10 @@ def consume(output):
     )
 
 
-def policy_contract_fixture():
-    catalog = ROOT / "tests" / "fixtures" / "policy-contract.json"
+def policy_contract_fixture(root=None):
+    catalog = (
+        (ROOT if root is None else root) / "tests" / "fixtures" / "policy-contract.json"
+    )
     files = [catalog] + [
         catalog.parent / name
         for name in json.loads(catalog.read_text(encoding="utf-8"))
