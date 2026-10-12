@@ -8,7 +8,13 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from .common import ROOT, policy_contract_fixture, write
+from .common import (
+    ROOT,
+    check_source_revisions,
+    policy_contract_fixture,
+    source_revisions,
+    write,
+)
 
 POLICIES = {"preserve", "reject", "fallback"}
 
@@ -20,7 +26,7 @@ def semantic_outcome(outcome):
     return value
 
 
-def index_rows(rows):
+def index_rows(rows, case_ids=None):
     indexed = {}
     for row in rows:
         key = (row["id"], row["policy"])
@@ -29,14 +35,19 @@ def index_rows(rows):
         indexed[key] = semantic_outcome(row["outcome"])
     if not indexed:
         raise RuntimeError("probe produced no cases")
-    for case_id in {key[0] for key in indexed}:
-        if {key[1] for key in indexed if key[0] == case_id} != POLICIES:
-            raise RuntimeError(f"missing policies for {case_id}")
+    expected_ids = {key[0] for key in indexed} if case_ids is None else set(case_ids)
+    expected = {(case_id, policy) for case_id in expected_ids for policy in POLICIES}
+    if indexed.keys() != expected:
+        raise RuntimeError(
+            f"probe case/policy coverage differs: missing={sorted(expected - indexed.keys())}, "
+            f"unexpected={sorted(indexed.keys() - expected)}"
+        )
     return indexed
 
 
-def compare(base, head):
-    before, after = index_rows(base), index_rows(head)
+def compare(base, head, case_ids=None):
+    case_ids = None if case_ids is None else set(case_ids)
+    before, after = index_rows(base, case_ids), index_rows(head, case_ids)
     if before.keys() != after.keys():
         raise RuntimeError("base and head probes did not run the same cases")
     return [
@@ -122,29 +133,26 @@ def probe(root, directory, cases):
         check=True,
     )
     rows = json.loads(completed.stdout)
-    index_rows(rows)
+    index_rows(rows, {case["id"] for case in cases})
     write(directory / "outcomes.json", rows)
     return rows
 
 
-def revision(root):
-    return subprocess.check_output(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
-    ).strip()
-
-
 def run_comparison(base, head, output):
+    revisions = source_revisions(base, head, ROOT)
     output.mkdir()
     cases = inputs(base, head)
     write(output / "inputs.json", cases)
     before = probe(base, output / "base", cases)
     after = probe(head, output / "head", cases)
-    changes = compare(before, after)
+    changes = compare(before, after, {case["id"] for case in cases})
+    check_source_revisions(revisions)
     write(
         output / "comparison.json",
         {
-            "base_sha": revision(base),
-            "head_sha": revision(head),
+            "base_sha": revisions[base],
+            "head_sha": revisions[head],
+            "tooling_sha": revisions[ROOT],
             "cases": len(cases),
             "changes": changes,
         },

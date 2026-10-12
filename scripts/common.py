@@ -32,6 +32,38 @@ def command(*args):
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
 
 
+def source_revisions(*roots):
+    revisions = {}
+    for root in dict.fromkeys(roots):
+        args = ["git", "-C", str(root)]
+        revision = subprocess.check_output(
+            [*args, "rev-parse", "HEAD"], text=True
+        ).strip()
+        changes = subprocess.check_output(
+            [*args, "status", "--porcelain=v1", "--untracked-files=no"], text=True
+        ).strip()
+        if changes:
+            raise RuntimeError(
+                f"comparison requires clean tracked sources: {root}\n{changes}"
+            )
+        if (
+            subprocess.check_output([*args, "rev-parse", "HEAD"], text=True).strip()
+            != revision
+        ):
+            raise RuntimeError(
+                f"source revision changed while capturing provenance: {root}"
+            )
+        revisions[root] = revision
+    return revisions
+
+
+def check_source_revisions(expected):
+    actual = source_revisions(*expected)
+    for root, revision in expected.items():
+        if actual[root] != revision:
+            raise RuntimeError(f"source revision changed during comparison: {root}")
+
+
 def policy_contract_fixture(root=None):
     catalog = (
         (ROOT if root is None else root) / "tests" / "fixtures" / "policy-contract.json"

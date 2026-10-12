@@ -261,6 +261,8 @@ python -m scripts.release_artifacts registry <verified-directory> --registry pyp
 
 Each registry reports verified, not-published or failed independently. Missing
 publication, checksum differences and failed consumers do not produce success.
+Response-read timeouts retain a failed registry result and do not prevent other
+requested checks; the final report still causes a nonzero outcome.
 The verifier never uploads or retries publication.
 
 Never paste credentials into chat, command arguments or source. If an upload has

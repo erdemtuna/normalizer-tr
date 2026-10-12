@@ -16,6 +16,18 @@ const URL_PREFIX: &str = "https://ornek.com/";
 const URL_SPEECH: &str =
     "ha te te pe es iki nokta eğik çizgi eğik çizgi ornek nokta kom eğik çizgi";
 
+fn input_fingerprint(input: &str, options: &NormalizeOptions) -> Value {
+    let hints: Vec<_> = options
+        .hints
+        .iter()
+        .map(|hint| json!({"range": hint.range(), "kind": hint.kind()}))
+        .collect();
+    json!({
+        "text": input,
+        "options": {"ambiguity_policy": options.ambiguity_policy, "hints": hints},
+    })
+}
+
 fn check_phone(
     result: &Result<NormalizeResult, NormalizeError>,
     count: usize,
@@ -120,8 +132,10 @@ pub(super) fn measure(normalizer: &Normalizer) -> Value {
                     samples.push(start.elapsed().as_nanos() as u64);
                 }
                 assert_eq!(normalizer.normalize(&input, &options), expected);
+                let fingerprint = input_fingerprint(&input, &options);
                 scaling.push(json!({
                     "path":path,"bytes":bytes,"policy":name,
+                    "input_fingerprint":fingerprint,
                     "timing":super::quantiles(&mut samples),"outcome":super::outcome(expected),
                 }));
             }

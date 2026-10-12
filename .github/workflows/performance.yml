@@ -53,7 +53,7 @@ jobs:
           python-version: "3.13"
       - name: Measure paired release calls
         run: python -m scripts.compare_performance --base ../base --output "$RUNNER_TEMP/performance"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: paired-native-performance

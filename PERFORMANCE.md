@@ -31,6 +31,11 @@ against both cores; changed work is labelled non-comparable, not an optimization
 Build/tool/report failures remain failures. No hosted one-millisecond gate or
 new heap-allocation claim is made.
 
+Both comparison CLIs require clean tracked sources and check source/revision
+drift before emitting a successful comparison. Reports capture base, head and
+probe-tooling revisions before building. Unrelated untracked files and ignored
+build outputs are allowed; use an unchanged checkout for the entire run.
+
 Run locally against a separate baseline checkout and new output directory:
 
 ```powershell
@@ -127,6 +132,9 @@ the corpus inputs; timings are not evidence of equivalent semantic work.
 1/4/8/32 KiB failed-telephone inputs and 4/8/16/32 KiB electronic trailing
 parentheses. Each policy retains its text/diagnostic or genuine limit outcome
 and 100 individually timed calls, plus three 10 ms electronic deadline probes.
+Scaling rows also retain exact input/options snapshots outside the timed loop;
+the comparison hashes these snapshots and requires equal identities and outcomes.
+Older scaling reports without snapshots remain readable but have no timing ratio.
 These address measured pre-existing quadratic paths, not regressions introduced
 by the new notation grammar. Indexed phone traversal and linear parenthesis
 trimming retain admission and ownership; the deadline probes record completion

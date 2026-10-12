@@ -8,11 +8,12 @@ import platform
 import subprocess
 from pathlib import Path
 
-from .common import ROOT, write
-from .compare_contracts import revision, run_comparison, semantic_outcome
+from .common import ROOT, check_source_revisions, source_revisions, write
+from .compare_contracts import run_comparison, semantic_outcome
 
 REPETITIONS = 3
 SAMPLES = 10000
+SCALING_SAMPLES = 100
 QUANTILES = ("p50_ns", "p95_ns", "p99_ns", "max_ns")
 
 
@@ -55,6 +56,39 @@ def timing_rows(base, head, comparable):
             }
         )
     return rows
+
+
+def scaling_fingerprint(row):
+    fingerprint = row.get("input_fingerprint")
+    if fingerprint is None:
+        return None
+    if (
+        not isinstance(fingerprint, dict)
+        or set(fingerprint) != {"text", "options"}
+        or not isinstance(fingerprint["text"], str)
+        or len(fingerprint["text"].encode("utf-8")) != row["bytes"]
+        or not isinstance(fingerprint["options"], dict)
+        or not isinstance(fingerprint["options"].get("ambiguity_policy"), str)
+        or fingerprint["options"]["ambiguity_policy"].lower() != row["policy"]
+        or not isinstance(fingerprint["options"].get("hints"), list)
+    ):
+        raise RuntimeError(f"invalid recognition input fingerprint: {row['path']}")
+    return hashlib.sha256(
+        json.dumps(
+            fingerprint, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def index_scaling_rows(rows):
+    indexed = {}
+    for row in rows:
+        key = (row["path"], row["bytes"], row["policy"])
+        if key in indexed:
+            raise RuntimeError(f"duplicate recognition scaling workload: {key}")
+        validate_timing(row["timing"], SCALING_SAMPLES)
+        indexed[key] = {**row, "input_sha256": scaling_fingerprint(row)}
+    return indexed
 
 
 def compare(base, head, same_inputs, contract_changes=()):
@@ -126,14 +160,8 @@ def compare(base, head, same_inputs, contract_changes=()):
             ),
         },
     }
-    before = {
-        (row["path"], row["bytes"], row["policy"]): row
-        for row in base["reviewed_recognition_scaling"]["scaling"]
-    }
-    after = {
-        (row["path"], row["bytes"], row["policy"]): row
-        for row in head["reviewed_recognition_scaling"]["scaling"]
-    }
+    before = index_scaling_rows(base["reviewed_recognition_scaling"]["scaling"])
+    after = index_scaling_rows(head["reviewed_recognition_scaling"]["scaling"])
     if not before or before.keys() != after.keys():
         raise RuntimeError("recognition scaling workloads differ")
     result["recognition_scaling"] = [
@@ -141,10 +169,14 @@ def compare(base, head, same_inputs, contract_changes=()):
             "path": key[0],
             "bytes": key[1],
             "policy": key[2],
+            "base_input_sha256": before[key]["input_sha256"],
+            "head_input_sha256": after[key]["input_sha256"],
             **timing_rows(
                 {str(key): before[key]["timing"]},
                 {str(key): after[key]["timing"]},
-                semantic_outcome(before[key]["outcome"])
+                before[key]["input_sha256"] is not None
+                and before[key]["input_sha256"] == after[key]["input_sha256"]
+                and semantic_outcome(before[key]["outcome"])
                 == semantic_outcome(after[key]["outcome"]),
             )[0],
         }
@@ -203,6 +235,8 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     base, head, output = args.base.resolve(), args.head.resolve(), args.output.resolve()
+    revisions = source_revisions(base, head, ROOT)
+    corpus_hashes = {"base": corpus_hash(base), "head": corpus_hash(head)}
     output.mkdir()
     contract_changes = run_comparison(base, head, output / "contracts")
     executables = {
@@ -221,23 +255,23 @@ def main():
             compare(
                 reports["base"],
                 reports["head"],
-                corpus_hash(base) == corpus_hash(head),
+                corpus_hashes["base"] == corpus_hashes["head"],
                 contract_changes,
             )
         )
-    write(
-        output / "comparison.json",
-        {
-            "base_sha": revision(base),
-            "head_sha": revision(head),
-            "compiler": subprocess.check_output(["rustc", "-vV"], text=True),
-            "host": platform.platform(),
-            "runner": os.environ.get("RUNNER_NAME"),
-            "corpus_sha256": {"base": corpus_hash(base), "head": corpus_hash(head)},
-            "repetitions": paired,
-            "contract_changes": contract_changes,
-        },
-    )
+    comparison = {
+        "base_sha": revisions[base],
+        "head_sha": revisions[head],
+        "tooling_sha": revisions[ROOT],
+        "compiler": subprocess.check_output(["rustc", "-vV"], text=True),
+        "host": platform.platform(),
+        "runner": os.environ.get("RUNNER_NAME"),
+        "corpus_sha256": corpus_hashes,
+        "repetitions": paired,
+        "contract_changes": contract_changes,
+    }
+    check_source_revisions(revisions)
+    write(output / "comparison.json", comparison)
     lines = [
         "## Native performance comparison",
         "",

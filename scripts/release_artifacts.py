@@ -8,7 +8,6 @@ import os
 import platform
 from pathlib import Path, PurePosixPath
 import re
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -23,6 +22,7 @@ from .verification import inspect_wheel
 PYTHONS = ("3.11", "3.12", "3.13", "3.14")
 PLATFORMS = ("windows", "linux", "macos-x64", "macos-arm64")
 NETWORK_TIMEOUT = 30
+DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 
 
 def check_versions():
@@ -97,9 +97,16 @@ def check_registry_files(expected, published):
     return actual
 
 
+def read_response(response, size=-1):
+    try:
+        return response.read(size)
+    except TimeoutError as error:
+        raise RuntimeError(f"registry response read timed out: {error}") from error
+
+
 def fetch_json(url):
     with urllib.request.urlopen(url, timeout=NETWORK_TIMEOUT) as response:
-        return json.load(response)
+        return json.loads(read_response(response))
 
 
 def download(url, path, expected_sha):
@@ -107,7 +114,8 @@ def download(url, path, expected_sha):
         urllib.request.urlopen(url, timeout=NETWORK_TIMEOUT) as response,
         path.open("xb") as stream,
     ):
-        shutil.copyfileobj(response, stream)
+        while chunk := read_response(response, DOWNLOAD_CHUNK_BYTES):
+            stream.write(chunk)
     if sha(path) != expected_sha:
         raise RuntimeError(f"downloaded bytes differ from manifest: {path.name}")
 

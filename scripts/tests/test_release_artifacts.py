@@ -17,6 +17,7 @@ from scripts.release_artifacts import (
     check_registry_files,
     check_versions,
     download,
+    fetch_json,
     preflight,
     verify_registry,
     wheel_platform,
@@ -31,6 +32,16 @@ METADATA = (
     "Requires-Python: <3.15, >=3.11\n"
     "License-Expression: Apache-2.0\n"
 )
+
+
+class TimedOutBody(io.BytesIO):
+    def read(self, size=-1):
+        raise TimeoutError("response body timed out")
+
+
+class TimedOutWriter(io.BytesIO):
+    def write(self, value):
+        raise TimeoutError("disk write timed out")
 
 
 class ReleaseTests(unittest.TestCase):
@@ -194,6 +205,108 @@ class ReleaseTests(unittest.TestCase):
                 (root / "bad-file/registry-verification.json").read_text()
             )
             self.assertEqual(result["registries"]["pypi"]["status"], "failed")
+
+    def test_response_read_timeouts_are_explicit_network_failures(self):
+        with patch(
+            "scripts.release_artifacts.urllib.request.urlopen",
+            return_value=TimedOutBody(),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "registry response read timed out"
+            ):
+                fetch_json("https://registry/metadata")
+        with tempfile.TemporaryDirectory() as directory:
+            with patch(
+                "scripts.release_artifacts.urllib.request.urlopen",
+                return_value=TimedOutBody(),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "registry response read timed out"
+                ):
+                    download(
+                        "https://registry/file", Path(directory) / "partial", "abc"
+                    )
+
+    def test_metadata_and_artifact_timeouts_preserve_both_registry_results(self):
+        for timed_out in ("metadata", "artifact"):
+            with (
+                self.subTest(timed_out=timed_out),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                wheel, core = b"reviewed wheel", b"reviewed core"
+                wheel_sha = hashlib.sha256(wheel).hexdigest()
+                core_sha = hashlib.sha256(core).hexdigest()
+                record = {
+                    "version": VERSION,
+                    "python_artifacts": [{"name": "wheel.whl", "sha256": wheel_sha}],
+                    "core": {"name": "normalizer-tr.crate", "sha256": core_sha},
+                }
+                (root / "release-manifest.json").write_text(
+                    json.dumps(record), encoding="utf-8"
+                )
+                requested = []
+
+                def response(url, timeout):
+                    requested.append(url)
+                    if "pypi.org/pypi/" in url:
+                        if timed_out == "metadata":
+                            return TimedOutBody()
+                        return io.BytesIO(
+                            json.dumps(
+                                {
+                                    "urls": [
+                                        {
+                                            "filename": "wheel.whl",
+                                            "digests": {"sha256": wheel_sha},
+                                            "url": "https://registry/wheel",
+                                        }
+                                    ]
+                                }
+                            ).encode("utf-8")
+                        )
+                    if url == "https://registry/wheel":
+                        return TimedOutBody()
+                    if "crates.io/api/" in url:
+                        return io.BytesIO(
+                            json.dumps({"version": {"checksum": core_sha}}).encode(
+                                "utf-8"
+                            )
+                        )
+                    if "static.crates.io/" in url:
+                        return io.BytesIO(core)
+                    raise AssertionError(f"unexpected URL: {url}")
+
+                output = root / "results"
+                with (
+                    patch(
+                        "scripts.release_artifacts.urllib.request.urlopen",
+                        side_effect=response,
+                    ),
+                    patch("scripts.release_artifacts.registry_consumer") as consume,
+                    self.assertRaisesRegex(RuntimeError, "not all verified"),
+                ):
+                    verify_registry(root, ["pypi", "crates"], output)
+                results = json.loads(
+                    (output / "registry-verification.json").read_text()
+                )["registries"]
+                self.assertEqual(results["pypi"]["status"], "failed")
+                self.assertIn("response read timed out", results["pypi"]["error"])
+                self.assertEqual(results["crates"], {"status": "verified", "files": 1})
+                self.assertTrue(any("pypi.org/pypi/" in url for url in requested))
+                self.assertTrue(any("crates.io/api/" in url for url in requested))
+                consume.assert_called_once_with("crates", output / "crates", record)
+
+    def test_disk_write_timeout_is_not_disguised_as_network_failure(self):
+        with (
+            patch(
+                "scripts.release_artifacts.urllib.request.urlopen",
+                return_value=io.BytesIO(b"bytes"),
+            ),
+            patch.object(Path, "open", return_value=TimedOutWriter()),
+            self.assertRaisesRegex(TimeoutError, "disk write timed out"),
+        ):
+            download("https://registry/file", Path("destination"), "abc")
 
     def test_consumer_failure_is_reported(self):
         with tempfile.TemporaryDirectory() as directory:
