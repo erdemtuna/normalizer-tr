@@ -30,6 +30,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
+      - name: Check locked Python tool pins
+        run: python -m scripts.ci_checks pins
       - name: Set up pinned Rust
         uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
         with:
@@ -50,7 +52,10 @@ jobs:
       - name: Build API documentation
         run: cargo doc --locked --no-deps --all-features
       - name: Install Python development tools
-        run: python -m pip install -r .\bindings\python\requirements-dev.txt -c .\bindings\python\constraints.lock
+        run: |
+          python -m pip install -r .\bindings\python\requirements-dev.txt &&
+          python -m pip check &&
+          python -m scripts.ci_checks installed
       - name: Check Python formatting and lint
         run: |
           python -m ruff check bindings\python benches scripts &&
@@ -110,7 +115,10 @@ jobs:
           toolchain: "1.99.0"
           components: rustfmt, clippy
       - name: Install build and test tools
-        run: python -m pip install maturin==1.15.0 pytest==9.0.3
+        run: |
+          python -m pip install --constraint bindings/python/requirements-dev.txt maturin pytest
+          python -m pip check
+          python -m scripts.ci_checks installed --tools maturin pytest
       - name: Build and install reviewed native binding
         run: |
           python -m maturin build --release --locked --manifest-path bindings/python/Cargo.toml --interpreter python --out target/ci-wheels

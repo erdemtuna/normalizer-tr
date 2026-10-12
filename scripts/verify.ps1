@@ -101,7 +101,8 @@ try {
     $consumerPython = Join-Path $OutputDirectory 'py\Scripts\python.exe'
     $wheel = (Get-ChildItem (Join-Path $OutputDirectory 'packages') -Filter '*.whl').FullName
     Invoke-Step 'install-wheel' $consumerPython @('-m','pip','install','--no-deps',$wheel)
-    Invoke-Step 'install-test-tool' $consumerPython @('-m','pip','install','pytest==9.0.3')
+    Invoke-Step 'install-test-tool' $consumerPython @('-m','pip','install','--constraint','bindings\python\requirements-dev.txt','pytest')
+    Invoke-Step 'installed-test-tool-pins' $consumerPython @('-m','scripts.ci_checks','installed','--tools','pytest')
     Invoke-Step 'installed-python-tests' $consumerPython @('-m','pytest','bindings\python\tests','-q')
     Invoke-Step 'python-independent-consumer' $consumerPython @('-m','scripts.verification','consume',$OutputDirectory)
     foreach ($repeat in 1..3) {

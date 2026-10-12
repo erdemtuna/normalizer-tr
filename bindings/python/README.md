@@ -38,6 +38,7 @@ This builds a wheel locally. To install an existing compatible wheel, use
 
 ```python
 from normalizer_tr import Normalizer, Hint, NormalizationError, NORMALIZER_ID
+
 n = Normalizer()
 assert n.normalizer_id == NORMALIZER_ID
 r = n.normalize("25 TL; 1.234")

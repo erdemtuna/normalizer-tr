@@ -1,0 +1,15 @@
+maturin==1.15.0
+pytest==9.1.1
+ruff==0.16.10
+pip-audit==2.10.1
+mypy==1.20.2
+twine==7.0.0
+pip==26.2.1
+pip-tools==7.6.1
+
+# Include conditional tool dependencies so one lock covers supported OS/Python versions.
+colorama
+pywin32-ctypes
+SecretStorage
+importlib-metadata
+backports.tarfile

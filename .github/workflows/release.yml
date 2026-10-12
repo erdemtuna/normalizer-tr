@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.13"
+      - name: Verify locked Python tool pins
+        run: python -m scripts.ci_checks pins
       - name: Verify publishing source against exact main CI
         if: inputs.publish
         env:
@@ -101,17 +103,22 @@ jobs:
           components: rustfmt, clippy
       - name: Test native core on host
         run: cargo test --locked --all-features
+      - id: tools
+        name: Read reviewed build tool version
+        run: echo "maturin=$(python -m scripts.ci_checks tool-version --tool maturin)" >> "$GITHUB_OUTPUT"
       - name: Build interpreter-specific wheel
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b
         with:
-          maturin-version: "1.15.0"
+          maturin-version: ${{ steps.tools.outputs.maturin }}
           rust-toolchain: "1.99.0"
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --manifest-path bindings/python/Cargo.toml --interpreter ${{ matrix.platform == 'linux' && format('python{0}', matrix.python) || 'python' }} --out dist
       - name: Install exact wheel and test public API
         run: |
-          python -m pip install pytest==9.0.3 twine==7.0.0
+          python -m pip install --constraint bindings/python/requirements-dev.txt pytest twine
+          python -m pip check
+          python -m scripts.ci_checks installed --tools pytest twine
           python -m scripts.release_artifacts inspect dist --python "${{ matrix.python }}" --platform "${{ matrix.platform }}"
           python -m twine check --strict dist/*
           python -m pip install --no-deps dist/*.whl
@@ -142,7 +149,9 @@ jobs:
           components: rustfmt, clippy
       - name: Build and consume sdist
         run: |
-          python -m pip install maturin==1.15.0 pytest==9.0.3 twine==7.0.0
+          python -m pip install --constraint bindings/python/requirements-dev.txt maturin pytest twine
+          python -m pip check
+          python -m scripts.ci_checks installed --tools maturin pytest twine
           cargo metadata --locked --no-deps --format-version 1 > /dev/null
           python -m maturin sdist --manifest-path bindings/python/Cargo.toml --out dist
           python -m scripts.release_artifacts inspect dist --sdist

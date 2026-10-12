@@ -21,7 +21,8 @@ For Python development:
 
 ```powershell
 py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r .\bindings\python\requirements-dev.txt -c .\bindings\python\constraints.lock
+.\.venv\Scripts\python.exe -m pip install -r .\bindings\python\requirements-dev.txt
+.\.venv\Scripts\python.exe -m scripts.ci_checks installed
 .\.venv\Scripts\python.exe -m pip install .\bindings\python
 .\.venv\Scripts\python.exe -m pytest .\bindings\python\tests -q
 ```
@@ -188,11 +189,43 @@ rework and CI feedback duration, not lines changed or PR counts.
 
 ## Dependency maintenance
 
-Dependabot proposes related Cargo, Python-tool and Actions updates. Keep exact
-pins coherent across manifests, `requirements-dev.txt`, `constraints.lock` and
-inline workflow tool versions; `python -m scripts.ci_checks pins` checks the Python
-duplication. Regenerate constraints in a fresh development environment, not a
-machine with unrelated packages, and review platform-specific entries.
+Dependabot proposes related Cargo, Python-tool and Actions updates. Edit exact
+direct-tool pins in `bindings/python/requirements-dev.in`, then regenerate the
+committed `requirements-dev.txt` with its pinned pip-tools generator in an isolated
+CPython 3.13 environment:
+
+```powershell
+$python = (Resolve-Path .\.venv\Scripts\python.exe).Path
+Push-Location .\bindings\python
+try {
+    & $python -m piptools compile --allow-unsafe --strip-extras --no-emit-index-url --no-emit-trusted-host --output-file requirements-dev.txt requirements-dev.in
+    if ($LASTEXITCODE -ne 0) { throw 'Tool lock generation failed.' }
+} finally {
+    Pop-Location
+}
+& $python -m pip install -r .\bindings\python\requirements-dev.txt
+& $python -m scripts.ci_checks pins
+& $python -m scripts.ci_checks installed
+```
+
+Do not hand-edit the generated lock or upgrade unrelated packages incidentally.
+The matching `.in`/`.txt` files let Dependabot use its native pip-compile updater.
+The source explicitly includes conditional tooling dependencies for Windows,
+Linux and older supported Python versions; subset consumers install only their
+needed tools using the lock as pip constraints. CI verifies their actual
+dependency closure, including enabled extras and environment markers, so a new
+platform dependency cannot silently remain unpinned. Revalidate Windows/Linux
+tool environments and supported release subsets after regenerating.
+
+Workflows and `scripts/verify.ps1` consume these pins rather than maintain their
+own versions. The necessary isolated-build maturin pin in `pyproject.toml` must
+still match; `python -m scripts.ci_checks pins` checks that invariant and rejects
+duplicate installer pins. No write-enabled PR repair workflow or automatic merge
+policy is used. Native updates can still require maintainer reconciliation if
+upstream platform requirements change.
+
+`ruff.toml` explicitly preserves the existing lint-rule policy; a Ruff version
+update does not implicitly add or remove rule families.
 
 RustSec and the isolated Python development/build environment are audited on
 dependency/workflow PRs, scheduled maintenance and release builds. Network/tool
