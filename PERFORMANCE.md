@@ -50,6 +50,12 @@ partial outcomes and malformed timings. Exact text/options and full outcomes
 are captured outside timed calls. Only identical validated work receives
 a ratio; changed valid inputs/outcomes retain both timings and an explicit
 non-comparability reason. Genuine limit kinds remain recorded outcomes.
+All 625 actual recipe keys are checked against that inventory before the first
+clock or normalizer initialization, then the same prepared cases are measured
+in the original order. The original recipes are shared in
+`benches/latency/legacy_inputs.rs`; default-options construction and disposal
+inside the original large-input timer remain unchanged. The final emitted-row
+check remains as a second guard.
 
 Three serial base/head pairs retain their alternating order. The Markdown
 summary lists coverage/non-comparability by long-input suite; detailed row

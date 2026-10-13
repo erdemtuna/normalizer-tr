@@ -1,9 +1,11 @@
 //! Dev-only checked per-call latency sampler; never a product CLI.
 use std::{collections::BTreeMap, hint::black_box, time::Instant};
 
-use normalizer_tr::{AmbiguityPolicy, Hint, HintKind, NormalizeOptions, Normalizer, SourceRange};
+use normalizer_tr::{AmbiguityPolicy, Hint, NormalizeOptions, Normalizer, SourceRange};
 use serde_json::{Value, json};
 
+#[path = "latency/legacy_inputs.rs"]
+mod legacy_inputs;
 #[path = "../tests/support/policy_contract.rs"]
 mod policy_fixtures;
 #[path = "latency/recognition_scaling.rs"]
@@ -136,7 +138,10 @@ fn check_policy_contract(
     }
 }
 
-fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
+fn policy_contract_measurements(
+    normalizer: &Normalizer,
+    scaling_inputs: Vec<support::ScalingCase>,
+) -> Value {
     let (cases, input_bytes) = policy_fixtures::load();
     let mut cohorts = BTreeMap::new();
     let mut classes = BTreeMap::<String, Vec<u64>>::new();
@@ -215,81 +220,23 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
         }
     }
     let mut scaling = Vec::new();
-    for size in [4096, 16384, 32768] {
-        for (class, pattern) in [
-            ("ungrouped-run", "123 "),
-            ("grouped-money", "1 234,50TL; "),
-            ("quoted-list", "‘25TL’,5kg; "),
-            ("unmatched-quotes", "'25TL 123 "),
-            ("invalid-group", "12 34,50 TL; "),
-            ("decomposed", "o\u{308} 5kg; "),
-            ("pronunciation-name", "Claude; "),
-            ("pronunciation-phrase", "GitHub Copilot; "),
-            ("pronunciation-prefix-miss", "Visual Studio Nope; "),
-            ("pronunciation-list", "ChatGPT,Claude; "),
-            ("pronunciation-possessive", "iPhone'umdan; "),
-            ("pronunciation-plural-possessive", "iPhone'larımıza; "),
-            ("pronunciation-syncretic", "iPhone'una; "),
-            ("pronunciation-nominal-phrase", "GitHub Copilot'ımızda; "),
-            ("pronunciation-invalid-harmony", "Instagram'de; "),
-            ("pronunciation-long-tail", "lar"),
-            ("malformed-comma-token", "1,"),
-            ("malformed-dot-token", "1."),
-            ("mixed-quantity-list", "25kg;CHP,AKP; "),
-            ("rejected-phrase-list", "Claude,Hugging Face,UNKNOWN; "),
-            ("number-tail", "2026'dakidir; "),
-            ("quantity-possession", "25,50 TL'm; "),
-            ("rate-tail", "5 km/sa'tir; "),
-            ("clock-range", "13:00-17:00 arasında; "),
-            ("date-source-tail", "tarih 2026-12-31'de; "),
-            ("account-period", "TR33 0006 1005 1978 6457 8413 26.; "),
-            (
-                "account-malformed-continuation",
-                "TR33 0006 1005 1978 6457 8413 26 00abc; ",
-            ),
-            ("address-fields", "Kat:3 Daire:7; adres: "),
-            ("address-invalid-field", "Kat:xyz; adres: "),
-            ("multiplication-chain", "*1"),
-            ("multiplication-invalid-chain", "1**"),
-        ] {
-            let prefix = match class {
-                "pronunciation-long-tail" => "iPhone'",
-                "address-fields" | "address-invalid-field" => "adres: ",
-                "multiplication-chain" => "1",
-                _ => "",
-            };
-            let remaining = size - prefix.len();
-            let mut text = String::with_capacity(size);
-            text.push_str(prefix);
-            text.push_str(&pattern.repeat(remaining / pattern.len()));
-            text.push_str(&" ".repeat(size - text.len()));
-            for (_name, policy) in [
-                ("preserve", AmbiguityPolicy::Preserve),
-                ("reject", AmbiguityPolicy::Reject),
-                ("fallback", AmbiguityPolicy::Fallback),
-            ] {
-                let options = NormalizeOptions {
-                    ambiguity_policy: policy,
-                    ..Default::default()
-                };
-                let expected = outcome(normalizer.normalize(&text, &options));
-                let mut samples = Vec::with_capacity(100);
-                for _ in 0..100 {
-                    let start = Instant::now();
-                    drop(black_box(normalizer.normalize(black_box(&text), &options)));
-                    samples.push(start.elapsed().as_nanos() as u64);
-                }
-                assert_eq!(outcome(normalizer.normalize(&text, &options)), expected);
-                scaling.push(scaling_row(
-                    "expanded",
-                    class,
-                    &text,
-                    &options,
-                    quantiles(&mut samples),
-                    expected,
-                ));
-            }
+    for support::ScalingCase { id, text, options } in scaling_inputs {
+        let expected = outcome(normalizer.normalize(&text, &options));
+        let mut samples = Vec::with_capacity(100);
+        for _ in 0..100 {
+            let start = Instant::now();
+            drop(black_box(normalizer.normalize(black_box(&text), &options)));
+            samples.push(start.elapsed().as_nanos() as u64);
         }
+        assert_eq!(outcome(normalizer.normalize(&text, &options)), expected);
+        scaling.push(scaling_row(
+            "expanded",
+            id,
+            &text,
+            &options,
+            quantiles(&mut samples),
+            expected,
+        ));
     }
     let per_class: BTreeMap<_, _> = classes
         .into_iter()
@@ -311,6 +258,29 @@ fn main() {
     };
     let mut corpus: Vec<Value> = serde_json::from_str(include_str!("corpus.json")).unwrap();
     corpus.extend(serde_json::from_str::<Vec<Value>>(include_str!("intent-corpus.json")).unwrap());
+    let inventory: Value =
+        serde_json::from_str(include_str!("latency/workload_inventory.json")).unwrap();
+    let expanded_inputs = legacy_inputs::expanded();
+    let large_inputs = legacy_inputs::large();
+    let limit_inputs = legacy_inputs::limits();
+    let recognition_inputs = recognition_scaling::cases();
+    let scanner_inputs = scanner_scaling::cases();
+    let mapping_inputs = source_mapping::cases();
+    let unicode_inputs = unicode_fallback_scaling::cases();
+    let resource_inputs = support::resource_cases();
+    support::validate_prepared(
+        &inventory,
+        &[
+            ("expanded", &expanded_inputs),
+            ("large", &large_inputs),
+            ("limits", &limit_inputs),
+            ("recognition", &recognition_inputs),
+            ("scanner", &scanner_inputs),
+            ("source-map", &mapping_inputs),
+            ("unicode-fallback", &unicode_inputs),
+            ("resources", &resource_inputs),
+        ],
+    );
     let first_start = Instant::now();
     drop(black_box(Normalizer::new().unwrap()));
     let first_init_ns = first_start.elapsed().as_nanos() as u64;
@@ -412,65 +382,31 @@ fn main() {
         })
         .collect::<Vec<_>>();
     let mut large = Vec::new();
-    for size in [4096, 16384, 32768] {
-        for (class, pattern) in [
-            ("verbatim", "sözcük "),
-            ("candidates", "1 "),
-            ("amplification", "999999999999999999 "),
-        ] {
-            let mut text = pattern.repeat(size / pattern.len());
-            text.push_str(&" ".repeat(size - text.len()));
-            let mut times = Vec::new();
-            let expected = outcome(normalizer.normalize(&text, &NormalizeOptions::default()));
-            for _ in 0..100 {
-                let start = Instant::now();
-                drop(black_box(
-                    normalizer.normalize(black_box(&text), &NormalizeOptions::default()),
-                ));
-                times.push(start.elapsed().as_nanos() as u64);
-            }
-            assert_eq!(
-                outcome(normalizer.normalize(&text, &NormalizeOptions::default())),
-                expected
-            );
-            large.push(scaling_row(
-                "large",
-                class,
-                &text,
-                &NormalizeOptions::default(),
-                quantiles(&mut times),
-                expected,
+    for support::ScalingCase { id, text, .. } in large_inputs {
+        let mut times = Vec::new();
+        let expected = outcome(normalizer.normalize(&text, &NormalizeOptions::default()));
+        for _ in 0..100 {
+            let start = Instant::now();
+            drop(black_box(
+                normalizer.normalize(black_box(&text), &NormalizeOptions::default()),
             ));
+            times.push(start.elapsed().as_nanos() as u64);
         }
+        assert_eq!(
+            outcome(normalizer.normalize(&text, &NormalizeOptions::default())),
+            expected
+        );
+        large.push(scaling_row(
+            "large",
+            id,
+            &text,
+            &NormalizeOptions::default(),
+            quantiles(&mut times),
+            expected,
+        ));
     }
     let mut controls = Vec::new();
-    for (name, text, options) in [
-        (
-            "maximum-hints",
-            "1;".repeat(256),
-            NormalizeOptions {
-                hints: (0..256)
-                    .map(|i| Hint::new(SourceRange::new(i * 2, i * 2 + 1), HintKind::Cardinal))
-                    .collect(),
-                ..Default::default()
-            },
-        ),
-        (
-            "candidate-limit",
-            "1 ".repeat(4097),
-            NormalizeOptions::default(),
-        ),
-        (
-            "long-identifier",
-            format!("https://ornek.com/{}", "a".repeat(16000)),
-            NormalizeOptions::default(),
-        ),
-        (
-            "invalid-compounds",
-            "TR33 0006 1005 1978 6457 8413 2A; ".repeat(400),
-            NormalizeOptions::default(),
-        ),
-    ] {
+    for support::ScalingCase { id, text, options } in limit_inputs {
         let expected = outcome(normalizer.normalize(&text, &options));
         let mut times = Vec::new();
         for _ in 0..100 {
@@ -483,7 +419,7 @@ fn main() {
         assert_eq!(expected, outcome(normalizer.normalize(&text, &options)));
         controls.push(scaling_row(
             "limits",
-            name,
+            id,
             &text,
             &options,
             quantiles(&mut times),
@@ -491,35 +427,35 @@ fn main() {
         ));
     }
     let fallback = fallback_measurements(&normalizer, &corpus);
-    let expanded = policy_contract_measurements(&normalizer);
-    let reviewed = recognition_scaling::measure(&normalizer);
+    let expanded = policy_contract_measurements(&normalizer, expanded_inputs);
+    let reviewed = recognition_scaling::measure(&normalizer, recognition_inputs);
     let mut supplementary = support::measure_cases(
         &normalizer,
         "scanner",
-        scanner_scaling::cases(),
+        scanner_inputs,
         scanner_scaling::check,
     );
     supplementary.extend(support::measure_cases(
         &normalizer,
         "source-map",
-        source_mapping::cases(),
+        mapping_inputs,
         source_mapping::check,
     ));
     supplementary.extend(support::measure_cases(
         &normalizer,
         "unicode-fallback",
-        unicode_fallback_scaling::cases(),
+        unicode_inputs,
         unicode_fallback_scaling::check,
     ));
     supplementary.extend(support::measure_cases(
         &normalizer,
         "resources",
-        support::resource_cases(),
+        resource_inputs,
         support::check_resource,
     ));
     let report = json!({
         "schema_version":2,"report_kind":"native","method_id":"instant-frozen-cohorts-v1",
-        "workload_inventory":serde_json::from_str::<Value>(include_str!("latency/workload_inventory.json")).unwrap(),
+        "workload_inventory":inventory,
         "source_sha":source_sha,"normalizer_id":normalizer.normalizer_id(),"package_version":env!("CARGO_PKG_VERSION"),
         "method":{"samples_per_cohort":10000,"warmup_per_cohort":2000,
                   "timing":"Instant per call; validation mapping recognition rendering owned result disposal included",

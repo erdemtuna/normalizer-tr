@@ -167,6 +167,26 @@ pub(super) fn inventory_keys(inventory: &Value) -> BTreeSet<(String, String, usi
     keys
 }
 
+pub(super) fn validate_prepared(inventory: &Value, suites: &[(&str, &[ScalingCase])]) {
+    let expected = inventory_keys(inventory);
+    let mut actual = BTreeSet::new();
+    for (suite, cases) in suites {
+        for case in *cases {
+            let key = (
+                (*suite).to_owned(),
+                case.id.to_owned(),
+                case.text.len(),
+                policy_name(case.options.ambiguity_policy).to_owned(),
+            );
+            assert!(actual.insert(key), "duplicate prepared workload");
+        }
+    }
+    assert_eq!(
+        actual, expected,
+        "prepared workload coverage differs before timing"
+    );
+}
+
 pub(super) fn validate_inventory(report: &Value) {
     let expected = inventory_keys(&report["workload_inventory"]);
     let mut actual = BTreeSet::new();

@@ -10,7 +10,7 @@ use normalizer_tr::{
 };
 use serde_json::{Value, json};
 
-use super::support::{SCALING_SAMPLES as SAMPLES, scaling_row};
+use super::support::{SCALING_SAMPLES as SAMPLES, ScalingCase, scaling_row};
 const PHONE_PATTERN: &str = "01 1 ";
 const URL_PREFIX: &str = "https://ornek.com/";
 const URL_SPEECH: &str =
@@ -78,8 +78,8 @@ fn check_url(result: &Result<NormalizeResult, NormalizeError>, input: &str) {
     );
 }
 
-pub(super) fn measure(normalizer: &Normalizer) -> Value {
-    let mut scaling = Vec::new();
+pub(super) fn cases() -> Vec<ScalingCase> {
+    let mut cases = Vec::new();
     for (path, sizes) in [
         ("failed-telephone", [1024, 4096, 8192, 32768]),
         (
@@ -96,40 +96,60 @@ pub(super) fn measure(normalizer: &Normalizer) -> Value {
                 format!("{URL_PREFIX}{}", ")".repeat(bytes - URL_PREFIX.len()))
             };
             assert_eq!(input.len(), bytes);
-            for (_name, policy) in [
-                ("preserve", AmbiguityPolicy::Preserve),
-                ("reject", AmbiguityPolicy::Reject),
-                ("fallback", AmbiguityPolicy::Fallback),
+            for ambiguity_policy in [
+                AmbiguityPolicy::Preserve,
+                AmbiguityPolicy::Reject,
+                AmbiguityPolicy::Fallback,
             ] {
-                let options = NormalizeOptions {
-                    ambiguity_policy: policy,
-                    ..Default::default()
-                };
-                let expected = normalizer.normalize(&input, &options);
-                if path == "failed-telephone" {
-                    check_phone(&expected, bytes / PHONE_PATTERN.len(), policy);
-                } else {
-                    check_url(&expected, &input);
-                }
-                let mut samples = Vec::with_capacity(SAMPLES);
-                for _ in 0..SAMPLES {
-                    let start = Instant::now();
-                    drop(black_box(
-                        normalizer.normalize(black_box(&input), black_box(&options)),
-                    ));
-                    samples.push(start.elapsed().as_nanos() as u64);
-                }
-                assert_eq!(normalizer.normalize(&input, &options), expected);
-                scaling.push(scaling_row(
-                    "recognition",
-                    path,
-                    &input,
-                    &options,
-                    super::quantiles(&mut samples),
-                    super::outcome(expected),
-                ));
+                cases.push(ScalingCase {
+                    id: path,
+                    text: input.clone(),
+                    options: NormalizeOptions {
+                        ambiguity_policy,
+                        ..Default::default()
+                    },
+                });
             }
         }
+    }
+    cases
+}
+
+pub(super) fn measure(normalizer: &Normalizer, cases: Vec<ScalingCase>) -> Value {
+    let mut scaling = Vec::new();
+    for ScalingCase {
+        id: path,
+        text: input,
+        options,
+    } in cases
+    {
+        let expected = normalizer.normalize(&input, &options);
+        if path == "failed-telephone" {
+            check_phone(
+                &expected,
+                input.len() / PHONE_PATTERN.len(),
+                options.ambiguity_policy,
+            );
+        } else {
+            check_url(&expected, &input);
+        }
+        let mut samples = Vec::with_capacity(SAMPLES);
+        for _ in 0..SAMPLES {
+            let start = Instant::now();
+            drop(black_box(
+                normalizer.normalize(black_box(&input), black_box(&options)),
+            ));
+            samples.push(start.elapsed().as_nanos() as u64);
+        }
+        assert_eq!(normalizer.normalize(&input, &options), expected);
+        scaling.push(scaling_row(
+            "recognition",
+            path,
+            &input,
+            &options,
+            super::quantiles(&mut samples),
+            super::outcome(expected),
+        ));
     }
     let input = format!("{URL_PREFIX}{}", ")".repeat(32768 - URL_PREFIX.len()));
     let options = NormalizeOptions::default();
