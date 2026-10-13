@@ -219,7 +219,7 @@ def report_header(report, kind, catalog):
         fail(kind, "unsupported measurement method")
 
 
-def coordinates(record, text_bytes, path, python=False):
+def coordinates(record, source_bytes, path, python=False):
     if python:
         start, end = record["start_byte"], record["end_byte"]
     else:
@@ -227,12 +227,15 @@ def coordinates(record, text_bytes, path, python=False):
         start, end = value["start"], value["end"]
     integer(start, f"{path}.start")
     integer(end, f"{path}.end")
-    if not start < end <= text_bytes:
+    if not start < end <= len(source_bytes):
         fail(path, "invalid original UTF-8 range")
+    for endpoint in (start, end):
+        if endpoint < len(source_bytes) and source_bytes[endpoint] & 0xC0 == 0x80:
+            fail(path, "output endpoint splits an original UTF-8 scalar")
     return start, end
 
 
-def diagnostics(records, text_bytes, path, python=False, fallback=False):
+def diagnostics(records, source_bytes, path, python=False, fallback=False):
     previous = 0
     range_fields = ("start_byte", "end_byte") if python else ("range",)
     fields = (
@@ -243,7 +246,7 @@ def diagnostics(records, text_bytes, path, python=False, fallback=False):
     for index, record in enumerate(array(records, path)):
         location = f"{path}[{index}]"
         object_value(record, location, (*range_fields, *fields))
-        start, previous_end = coordinates(record, text_bytes, location, python)
+        start, previous_end = coordinates(record, source_bytes, location, python)
         if start < previous:
             fail(location, "diagnostic ranges overlap or are unordered")
         previous = previous_end
@@ -260,7 +263,8 @@ def diagnostics(records, text_bytes, path, python=False, fallback=False):
 
 def validate_outcome(value, text, path, python=False, deadline=False, identity=None):
     object_value(value, path)
-    size = len(text.encode("utf-8"))
+    source_bytes = text.encode("utf-8")
+    size = len(source_bytes)
     if "result" in value:
         object_value(value, path, ("result",))
         result = object_value(
@@ -289,7 +293,7 @@ def validate_outcome(value, text, path, python=False, deadline=False, identity=N
             location = f"{path}.segments[{index}]"
             ranges = ("start_byte", "end_byte") if python else ("range",)
             object_value(segment, location, (*ranges, "kind", "text", "rule_id"))
-            start, end = coordinates(segment, size, location, python)
+            start, end = coordinates(segment, source_bytes, location, python)
             if start != previous:
                 fail(location, "segments do not form ordered original-source partition")
             previous = end
@@ -303,8 +307,10 @@ def validate_outcome(value, text, path, python=False, deadline=False, identity=N
             != result["normalized_text"]
         ):
             fail(path, "segment text differs from normalized text")
-        diagnostics(result["issues"], size, f"{path}.issues", python)
-        diagnostics(result["fallbacks"], size, f"{path}.fallbacks", python, True)
+        diagnostics(result["issues"], source_bytes, f"{path}.issues", python)
+        diagnostics(
+            result["fallbacks"], source_bytes, f"{path}.fallbacks", python, True
+        )
         if result["complete"] != (not result["issues"]):
             fail(path, "complete disagrees with issues")
         if result["fallback_used"] != bool(result["fallbacks"]):
@@ -329,7 +335,7 @@ def validate_outcome(value, text, path, python=False, deadline=False, identity=N
             label(value["limit_kind"], ("input", "hints", "candidates", "result"), path)
         elif value["limit_kind"] is not None:
             fail(path, "unexpected limit kind")
-        diagnostics(value["issues"], size, f"{path}.issues", True)
+        diagnostics(value["issues"], source_bytes, f"{path}.issues", True)
         if (code == "unresolved") != bool(value["issues"]):
             fail(path, "error issues disagree with code")
         if code == "cancelled" and not deadline:
@@ -338,7 +344,7 @@ def validate_outcome(value, text, path, python=False, deadline=False, identity=N
         code = value.get("error")
         if code == "Unresolved":
             object_value(value, path, ("error", "issues"))
-            diagnostics(value["issues"], size, f"{path}.issues")
+            diagnostics(value["issues"], source_bytes, f"{path}.issues")
             if not value["issues"]:
                 fail(path, "empty unresolved error")
         elif code == "LimitExceeded":
@@ -518,7 +524,18 @@ def admit_native(report, root=ROOT):
             fail("native.cohorts", "cohort coverage differs")
         for timing in cohorts.values():
             validate_timing(timing, 10000, "native.cohort")
-    if report["expanded_coverage_measurement"].get("input_cases") != contract:
+    reported_cases = array(
+        report["expanded_coverage_measurement"].get("input_cases"),
+        "native.policy_cases",
+    )
+
+    def input_metadata(cases):
+        return [
+            {key: case[key] for key in ("id", "text", "class", "hint") if key in case}
+            for case in (object_value(case, "native.policy_cases") for case in cases)
+        ]
+
+    if input_metadata(reported_cases) != input_metadata(contract):
         fail("native", "policy fixture coverage differs")
     integer(report.get("constructor_first_process_init_ns"), "native.constructor", 1)
     validate_timing(report.get("constructors"), 100, "native.constructors")

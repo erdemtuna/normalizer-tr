@@ -24,6 +24,119 @@ from scripts.verification import validate_python_identity
 
 
 class ReportAdmissionTests(ReportTestCase):
+    def test_output_endpoints_cannot_split_utf8_scalars_in_either_schema(self):
+        for python in (False, True):
+
+            def bounds(start, end):
+                return (
+                    {"start_byte": start, "end_byte": end}
+                    if python
+                    else {"range": {"start": start, "end": end}}
+                )
+
+            issue = {
+                **bounds(0, 1),
+                "category": "ambiguous" if python else "Ambiguous",
+                "explanation": "split",
+            }
+            for kind in ("segments", "issues", "fallbacks", "unresolved"):
+                value = result("ö", python)
+                record = value["result"]
+                if kind == "segments":
+                    record["segments"] = [
+                        {
+                            **bounds(0, 1),
+                            "kind": "verbatim" if python else "Verbatim",
+                            "text": "ö",
+                            "rule_id": "text.verbatim",
+                        },
+                        {
+                            **bounds(1, 2),
+                            "kind": "verbatim" if python else "Verbatim",
+                            "text": "",
+                            "rule_id": "text.verbatim",
+                        },
+                    ]
+                elif kind == "issues":
+                    record["issues"] = [issue]
+                    record["complete"] = False
+                elif kind == "fallbacks":
+                    record["fallbacks"] = [
+                        {
+                            **bounds(1, 2),
+                            "attempted_class": "symbol" if python else "Symbol",
+                            "reason": "unhandled_symbol"
+                            if python
+                            else "UnhandledSymbol",
+                            "original_category": None,
+                            "strategy": "literal" if python else "Literal",
+                        }
+                    ]
+                    record["fallback_used"] = True
+                else:
+                    value = (
+                        {
+                            "error": "unresolved",
+                            "message": "split",
+                            "issues": [issue],
+                            "limit_kind": None,
+                        }
+                        if python
+                        else {"error": "Unresolved", "issues": [issue]}
+                    )
+                with (
+                    self.subTest(python=python, kind=kind),
+                    self.assertRaisesRegex(RuntimeError, "UTF-8 scalar"),
+                ):
+                    validate_outcome(value, "ö", "outcome", python)
+
+    def test_valid_multibyte_and_decomposed_output_endpoints_remain_valid(self):
+        for python in (False, True):
+            for text in ("ö", "o\u0308", "ö 1\r\n"):
+                with self.subTest(python=python, text=text):
+                    validate_outcome(result(text, python), text, "valid", python)
+            bounds = (
+                {"start_byte": 0, "end_byte": 3}
+                if python
+                else {"range": {"start": 0, "end": 3}}
+            )
+            issue = {
+                **bounds,
+                "category": "ambiguous" if python else "Ambiguous",
+                "explanation": "whole",
+            }
+            value = (
+                {
+                    "error": "unresolved",
+                    "message": "whole",
+                    "issues": [issue],
+                    "limit_kind": None,
+                }
+                if python
+                else {"error": "Unresolved", "issues": [issue]}
+            )
+            validate_outcome(value, "o\u0308", "valid", python)
+        fingerprint = {
+            "text": "ö",
+            "options": {
+                "ambiguity_policy": "Preserve",
+                "hints": [{"range": {"start": 0, "end": 1}, "kind": "Cardinal"}],
+            },
+        }
+        validate_input(fingerprint, "intentional-invalid-input-hint")
+        fingerprint = {
+            "text": "ö",
+            "options": {
+                "ambiguity_policy": "preserve",
+                "hints": [{"start_byte": 0, "end_byte": 1, "kind": "cardinal"}],
+                "cancellation": None,
+                "deadline_ms": None,
+            },
+        }
+        validate_input(
+            fingerprint, "intentional-invalid-python-input-hint", python=True
+        )
+
     def test_only_clock_overhead_can_have_zero_quantiles(self):
         value = self.report()
         value["clock_overhead"]["p50_ns"] = 0

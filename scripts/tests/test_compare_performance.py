@@ -12,6 +12,88 @@ from scripts.tests.performance_fixtures import ReportTestCase, timing
 
 
 class PerformanceTests(ReportTestCase):
+    def test_shared_invalid_utf8_output_cannot_acquire_a_ratio(self):
+        before, after = self.report(), self.report()
+        for value in (before, after):
+            row = value["reviewed_recognition_scaling"]["scaling"][0]
+            row["input_fingerprint"]["text"] = "a" * 1022 + "ö"
+            result = row["outcome"]["result"]
+            result["segments"] = [
+                {
+                    "range": {"start": 0, "end": 1023},
+                    "kind": "Verbatim",
+                    "text": "x" * 1023,
+                    "rule_id": "text.verbatim",
+                },
+                {
+                    "range": {"start": 1023, "end": 1024},
+                    "kind": "Verbatim",
+                    "text": "x",
+                    "rule_id": "text.verbatim",
+                },
+            ]
+        with self.assertRaisesRegex(RuntimeError, "UTF-8 scalar"):
+            compare(before, after, True)
+
+    def test_expanded_outcome_only_changes_block_policy_cohort_ratios(self):
+        for field in ("text", "ranges", "issues", "fallbacks", "medium-rule"):
+            before, after = self.report(), self.report()
+            snapshots = after["expanded_coverage_measurement"]["snapshots"]
+            key = (
+                "medium:example:preserve"
+                if field == "medium-rule"
+                else "short:example:preserve"
+            )
+            result = snapshots[key]["result"]
+            if field == "medium-rule":
+                result["segments"][0]["rule_id"] = "changed.medium.rule"
+            elif field == "text":
+                result["normalized_text"] = "new"
+                result["segments"][0]["text"] = "new"
+            elif field == "ranges":
+                result["segments"] = [
+                    {
+                        "range": {"start": 0, "end": 2},
+                        "kind": "Verbatim",
+                        "text": "te",
+                        "rule_id": "text.verbatim",
+                    },
+                    {
+                        "range": {"start": 2, "end": 4},
+                        "kind": "Verbatim",
+                        "text": "xt",
+                        "rule_id": "text.verbatim",
+                    },
+                ]
+            elif field == "issues":
+                result["issues"] = [
+                    {
+                        "range": {"start": 0, "end": 4},
+                        "category": "Ambiguous",
+                        "explanation": "changed",
+                    }
+                ]
+                result["complete"] = False
+            else:
+                result["fallbacks"] = [
+                    {
+                        "range": {"start": 0, "end": 4},
+                        "attempted_class": "Expression",
+                        "reason": "UnsupportedForm",
+                        "original_category": None,
+                        "strategy": "Literal",
+                    }
+                ]
+                result["fallback_used"] = True
+            with self.subTest(field=field):
+                compared = compare(before, after, True)
+                self.assertTrue(
+                    all(
+                        not row["comparable"] and row["p95_ratio"] is None
+                        for row in compared["policy_contract"]
+                    )
+                )
+
     def test_build_identity_only_does_not_change_semantic_work(self):
         before, after = self.report(), self.report()
 
@@ -26,7 +108,14 @@ class PerformanceTests(ReportTestCase):
                     change(item)
 
         change(after)
-        self.assertTrue(compare(before, after, True)["scaling"][0]["comparable"])
+        compared = compare(before, after, True)
+        self.assertTrue(compared["scaling"][0]["comparable"])
+        self.assertTrue(
+            all(
+                row["comparable"] and row["p95_ratio"] == 1
+                for row in compared["policy_contract"]
+            )
+        )
 
     def test_diagnostics_ranges_and_rule_changes_block_ratios(self):
         for field in ("issues", "fallbacks", "rule", "partition"):
@@ -101,6 +190,13 @@ class PerformanceTests(ReportTestCase):
         )
         self.assertIsNone(
             compare(self.report(), self.report(), False)["primary"][0]["p95_ratio"]
+        )
+        after = self.report()
+        after["expanded_coverage_measurement"]["input_cases"][0]["expected"] = (
+            "changed golden"
+        )
+        self.assertIsNone(
+            compare(self.report(), after, True)["policy_contract"][0]["p95_ratio"]
         )
         after = self.report()
         after["method"] = {}

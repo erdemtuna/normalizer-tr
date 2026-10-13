@@ -86,10 +86,23 @@ def compare(base, head, same_inputs, contract_changes=()):
         base["fallback_measurement"]["snapshots"],
         head["fallback_measurement"]["snapshots"],
     )
-    policy_inputs_equal = (
-        base["expanded_coverage_measurement"]["input_cases"]
-        == head["expanded_coverage_measurement"]["input_cases"]
-    ) and not any(row["id"].startswith(("base:", "head:")) for row in contract_changes)
+    same_policy = (
+        (
+            base["expanded_coverage_measurement"]["input_cases"]
+            == head["expanded_coverage_measurement"]["input_cases"]
+        )
+        and (
+            base["expanded_coverage_measurement"]["inputs"]
+            == head["expanded_coverage_measurement"]["inputs"]
+        )
+        and snapshots_equal(
+            base["expanded_coverage_measurement"]["snapshots"],
+            head["expanded_coverage_measurement"]["snapshots"],
+        )
+        and not any(
+            row["id"].startswith(("base:", "head:")) for row in contract_changes
+        )
+    )
     result = {
         "primary": timing_rows(base["cohorts"], head["cohorts"], same_primary),
         "fallback": timing_rows(
@@ -100,7 +113,7 @@ def compare(base, head, same_inputs, contract_changes=()):
         "policy_contract": timing_rows(
             base["expanded_coverage_measurement"]["cohorts"],
             head["expanded_coverage_measurement"]["cohorts"],
-            policy_inputs_equal,
+            same_policy,
         ),
         "per_class_policy": {
             "shared": timing_rows(
