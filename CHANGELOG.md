@@ -15,6 +15,8 @@ Platform requirements are in the [README](README.md) and
   identities before timing, and retain genuine failures and non-comparable
   outcomes. Keep hosted timing informational; see [PERFORMANCE.md](PERFORMANCE.md)
   for the measurement methodology and bounded optimization decisions.
+- Exclude Python bytecode caches from the core package's explicit source list,
+  so importing benchmark helpers does not break clean-source packaging.
 
 ## 0.7.0 - 2026-10-11
 
