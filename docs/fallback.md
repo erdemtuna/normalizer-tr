@@ -48,7 +48,7 @@ calendar/checksum results.
 | `40.03.2026` | `kırk Mart iki bin yirmi altı` | Surface date, still invalid |
 | `saat 25:70` | `saat yirmi beş yetmiş` | Surface time, still invalid |
 | `12:30` | `on iki otuz` | Preferred clock format, validated components |
-| `hello🙂` | `hello gülümseyen yüz` | Named symbol |
+| `hello🙂` | `hello gülümseyen yüz` | Literal (named symbol) |
 | `🫠` | `unikod u artı bir fe a e sıfır` | Unicode code point U+1FAE0 |
 
 An invalid month is not given an invented month name; its notation is literal.
@@ -121,7 +121,7 @@ Fallback output still has segment kind `"Fallback"` / `"fallback"` and rule
 Both Rust variants were appended, preserving existing enum/Serde tag order;
 that does not preserve source compatibility for exhaustive Rust matches.
 Update those matches and strict serialized allowlists as described in the
-[migration notes](../CHANGELOG.md#migration).
+[0.5.0 migration notes](../CHANGELOG.md#050---2026-10-09).
 Record fields, other labels and the derived fallback boolean are unchanged.
 
 No `fully_rendered` flag or second independently stored fallback boolean exists.

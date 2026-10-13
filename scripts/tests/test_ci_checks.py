@@ -8,6 +8,7 @@ from scripts.ci_checks import (
     check_installed_tools,
     check_tool_pins,
     dependency_changes,
+    main,
     read_requirements,
     require_success,
     tool_version,
@@ -15,6 +16,52 @@ from scripts.ci_checks import (
 
 
 class CiTests(unittest.TestCase):
+    def test_performance_reference_output_is_explicit(self):
+        from scripts.compare_performance import PRE_V2_BASE_SHA, V2_REFERENCE_SHA
+
+        for pr_base, requested, expected in (
+            (PRE_V2_BASE_SHA, "", V2_REFERENCE_SHA),
+            ("other-base", "ignored", "other-base"),
+            ("", PRE_V2_BASE_SHA, PRE_V2_BASE_SHA),
+            ("", "v0.7.0", "v0.7.0"),
+        ):
+            with (
+                self.subTest(pr_base=pr_base, requested=requested),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                output = Path(directory) / "outputs"
+                with (
+                    patch("sys.argv", ["ci-checks", "performance-reference"]),
+                    patch.dict(
+                        "os.environ",
+                        {
+                            "PR_BASE_SHA": pr_base,
+                            "REQUESTED_BASE_REF": requested,
+                            "GITHUB_OUTPUT": str(output),
+                        },
+                    ),
+                ):
+                    main()
+                self.assertEqual(output.read_text(), f"reference={expected}\n")
+
+    def test_missing_performance_reference_cannot_emit_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "outputs"
+            with (
+                patch("sys.argv", ["ci-checks", "performance-reference"]),
+                patch.dict(
+                    "os.environ",
+                    {
+                        "PR_BASE_SHA": "",
+                        "REQUESTED_BASE_REF": "",
+                        "GITHUB_OUTPUT": str(output),
+                    },
+                ),
+                self.assertRaisesRegex(RuntimeError, "exact base ref"),
+            ):
+                main()
+            self.assertFalse(output.exists())
+
     def test_gate_requires_every_job_to_succeed(self):
         require_success(
             {"core": {"result": "success"}, "binding": {"result": "success"}}

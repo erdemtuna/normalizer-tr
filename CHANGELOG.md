@@ -7,19 +7,22 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
-- Require version-two native and installed-Python performance reports with
-  complete input/options, outcome, coverage and source/binary identity evidence.
-  Regenerate older reports; no legacy report adapter is provided. Public library
-  APIs, normalization behavior and limits are unchanged.
-- Compare all 625 declared native long-input workloads, preflight their prepared
-  identities before timing, and retain genuine failures and non-comparable
-  outcomes. Keep hosted timing informational; see [PERFORMANCE.md](PERFORMANCE.md)
-  for the measurement methodology and bounded optimization decisions.
+- Include long-input and failed work in performance comparisons, with exact
+  input/options, full outcomes and explicit non-comparability. Native and
+  installed-Python reports require version two; regenerate older artifacts
+  instead of adapting them. Public library APIs, behavior and limits are unchanged.
+- Record the requested and measured baseline revisions explicitly. For the
+  known version-two instrumentation transition, hosted PR comparisons use the
+  frozen instrumented reference and run the complete measurements; other PRs
+  use their actual base. Public compatibility still checks the actual PR base.
+  See [PERFORMANCE.md](PERFORMANCE.md#hosted-pr-evidence) for the policy and usage.
 - Exclude Python bytecode caches from the core package's explicit source list,
   so importing benchmark helpers does not break clean-source packaging.
 - Label successful and failed long-input work in checked comparisons and stream
   native report serialization through a checked buffered writer. Frozen call
   timing boundaries and full evidence remain unchanged.
+- Clarify fallback diagnostic strategies, pin published-library guide links and
+  make the measurement guide focus on running and interpreting comparisons.
 
 ## 0.7.0 - 2026-10-11
 

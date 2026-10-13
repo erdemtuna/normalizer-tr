@@ -3,15 +3,51 @@
 import copy
 import json
 import tempfile
+from functools import partial
 from pathlib import Path
 from unittest.mock import patch
 
 from scripts.common import ROOT
-from scripts.compare_performance import compare, main, preflight, validate_timing
+from scripts.compare_performance import (
+    PRE_V2_BASE_SHA,
+    V2_REFERENCE_SHA,
+    compare,
+    comparison_basis,
+    main,
+    preflight,
+    select_reference,
+    validate_timing,
+)
 from scripts.tests.performance_fixtures import ReportTestCase, timing
 
 
 class PerformanceTests(ReportTestCase):
+    def test_only_the_known_pr_transition_selects_a_frozen_reference(self):
+        self.assertEqual(select_reference(PRE_V2_BASE_SHA, ""), V2_REFERENCE_SHA)
+        self.assertEqual(select_reference("new-base", "ignored"), "new-base")
+        self.assertEqual(select_reference("", PRE_V2_BASE_SHA), PRE_V2_BASE_SHA)
+        self.assertEqual(select_reference("", "v0.7.0"), "v0.7.0")
+        for value in ("", " ", "base\nreference=other", "base\r", "base\0"):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                select_reference("", value)
+
+    def test_reference_substitution_requires_the_exact_approved_source_pair(self):
+        basis = comparison_basis(PRE_V2_BASE_SHA, V2_REFERENCE_SHA)
+        self.assertEqual(basis["kind"], "v2-instrumented-reference")
+        self.assertEqual(basis["requested_base_sha"], PRE_V2_BASE_SHA)
+        self.assertEqual(basis["measurement_base_sha"], V2_REFERENCE_SHA)
+        self.assertIn("not the literal PR base", basis["explanation"])
+        self.assertEqual(comparison_basis("base", "base")["kind"], "requested-base")
+        for requested, measured in (
+            ("other", V2_REFERENCE_SHA),
+            (PRE_V2_BASE_SHA, "other"),
+        ):
+            with (
+                self.subTest(requested=requested),
+                self.assertRaisesRegex(RuntimeError, "unapproved"),
+            ):
+                comparison_basis(requested, measured)
+
     def test_long_work_labels_preserve_result_completeness(self):
         for complete in (True, False):
             before = self.report()
@@ -343,27 +379,34 @@ class PerformanceTests(ReportTestCase):
 
 
 class PerformanceSourceTests(ReportTestCase):
-    def run_sampler(self, args, **kwargs):
+    def run_sampler(self, args, base_sha="base-A", **kwargs):
         value = self.report()
-        value["source_sha"] = "base-A" if args[0] == "base-bin" else "head-A"
+        value["source_sha"] = base_sha if args[0] == "base-bin" else "head-A"
         Path(args[-1]).write_text(json.dumps(value), encoding="utf-8")
 
-    def run_main(self, root, drift=False):
+    def run_main(self, root, drift=False, base_sha="base-A", requested_sha=None):
         root = root.resolve()
         base, head, output = root / "base", root / "head", root / "report"
-        revisions = {base: "base-A", head: "head-A", ROOT: "tooling-A"}
+        revisions = {base: base_sha, head: "head-A", ROOT: "tooling-A"}
+        arguments = [
+            "compare",
+            "--base",
+            str(base),
+            "--head",
+            str(head),
+            "--output",
+            str(output),
+        ]
+        capture_roots = (base, head, ROOT)
+        if requested_sha is not None:
+            requested = root / "requested-base"
+            revisions[requested] = requested_sha
+            arguments += ["--requested-base", str(requested)]
+            capture_roots += (requested,)
         with (
             patch(
                 "sys.argv",
-                [
-                    "compare",
-                    "--base",
-                    str(base),
-                    "--head",
-                    str(head),
-                    "--output",
-                    str(output),
-                ],
+                arguments,
             ),
             patch(
                 "scripts.compare_performance.source_revisions", return_value=revisions
@@ -376,7 +419,7 @@ class PerformanceSourceTests(ReportTestCase):
             ),
             patch(
                 "scripts.compare_performance.subprocess.run",
-                side_effect=self.run_sampler,
+                side_effect=partial(self.run_sampler, base_sha=base_sha),
             ) as sampler,
             patch(
                 "scripts.compare_performance.subprocess.check_output",
@@ -389,7 +432,7 @@ class PerformanceSourceTests(ReportTestCase):
             ) as check,
         ):
             main()
-        capture.assert_called_once_with(base, head, ROOT)
+        capture.assert_called_once_with(*capture_roots)
         check.assert_called_once_with(revisions)
         self.assertEqual(
             [call.args[0][0] for call in sampler.call_args_list],
@@ -404,10 +447,45 @@ class PerformanceSourceTests(ReportTestCase):
             self.assertEqual(value["base_sha"], "base-A")
             self.assertEqual(value["tooling_sha"], "tooling-A")
             self.assertEqual(value["schema_version"], 2)
+            self.assertEqual(value["comparison_basis"]["kind"], "requested-base")
             summary = (output / "summary.md").read_text()
             self.assertIn("recognition", summary)
             self.assertIn("Base work | Head work", summary)
             self.assertIn("result (complete) | result (complete)", summary)
+
+    def test_migration_reports_actual_and_measured_bases_without_skipping_calls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = self.run_main(
+                Path(directory),
+                base_sha=V2_REFERENCE_SHA,
+                requested_sha=PRE_V2_BASE_SHA,
+            )
+            value = json.loads((output / "comparison.json").read_text())
+            self.assertEqual(
+                value["comparison_basis"],
+                comparison_basis(PRE_V2_BASE_SHA, V2_REFERENCE_SHA),
+            )
+            summary = (output / "summary.md").read_text()
+            self.assertIn(PRE_V2_BASE_SHA, summary)
+            self.assertIn(V2_REFERENCE_SHA, summary)
+            self.assertIn("not the literal PR base", summary)
+            self.assertEqual(len(value["repetitions"]), 3)
+
+    def test_unapproved_substitution_and_requested_source_drift_fail(self):
+        for base_sha, drift, message in (
+            ("other-reference", False, "unapproved"),
+            (V2_REFERENCE_SHA, True, "revision changed"),
+        ):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                with self.assertRaisesRegex(RuntimeError, message):
+                    self.run_main(
+                        root,
+                        drift=drift,
+                        base_sha=base_sha,
+                        requested_sha=PRE_V2_BASE_SHA,
+                    )
+                self.assertFalse((root / "report" / "comparison.json").exists())
 
     def test_failed_work_labels_remain_visible_in_markdown(self):
         value = self.report()

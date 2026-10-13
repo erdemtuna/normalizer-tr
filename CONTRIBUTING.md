@@ -172,7 +172,7 @@ probes/consumers in `scripts/rust/`. `scripts/verify.ps1` remains the full local
 verification entry point.
 
 Native and installed-Python performance artifacts use the strict version-two
-formats described in [performance](PERFORMANCE.md#pr-evidence). Regenerate both
+formats described in [performance](PERFORMANCE.md#run-a-comparison). Regenerate both
 old formats rather than repairing reports. Shared report admission lives in
 `scripts/performance_report.py`; native workload registration/evidence lives
 in `benches/latency.rs` and `benches/latency/support.rs`. Disjoint workload

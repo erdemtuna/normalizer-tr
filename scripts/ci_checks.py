@@ -168,7 +168,15 @@ def check_tool_pins(root=ROOT):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "action", choices=("gate", "dependencies", "pins", "tool-version", "installed")
+        "action",
+        choices=(
+            "gate",
+            "dependencies",
+            "pins",
+            "tool-version",
+            "installed",
+            "performance-reference",
+        ),
     )
     parser.add_argument("--base")
     parser.add_argument("--tool")
@@ -184,6 +192,15 @@ def main():
         print(tool_version(args.tool))
     elif args.action == "installed":
         check_installed_tools(args.tools)
+    elif args.action == "performance-reference":
+        from .compare_performance import select_reference
+
+        reference = select_reference(
+            os.environ.get("PR_BASE_SHA", ""),
+            os.environ.get("REQUESTED_BASE_REF", ""),
+        )
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
+            stream.write(f"reference={reference}\n")
     else:
         changed = True
         if args.base:

@@ -29,7 +29,7 @@ assert result.complete
 
 Wheels support CPython 3.11 to 3.14 on Windows and Linux x64, and macOS
 x64 and arm64. Compatible wheels need no Rust compiler.
-[Platform requirements and source builds](https://github.com/erdemtuna/normalizer-tr/blob/main/bindings/python/README.md).
+[Platform requirements and source builds](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/bindings/python/README.md#install).
 
 ## Rust
 
@@ -85,40 +85,22 @@ UTF-8 byte offsets, not character positions.
 
 | Guide | Contents |
 |---|---|
-| [Rust API](https://docs.rs/normalizer-tr) | Types, methods and examples |
-| [Python API](https://github.com/erdemtuna/normalizer-tr/blob/main/bindings/python/README.md) | Hints, errors, cancellation and building |
-| [Normalization reference](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md) | Supported formats and boundaries |
-| [Fallback](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/fallback.md) | Reading strategies and diagnostics |
-| [Contributing](https://github.com/erdemtuna/normalizer-tr/blob/main/CONTRIBUTING.md) | Setup, architecture and verification |
+| [Rust API](https://docs.rs/normalizer-tr/0.7.0) | Types, methods and examples |
+| [Python API](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/bindings/python/README.md) | Hints, errors, cancellation and building |
+| [Normalization reference](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/docs/normalization.md) | Supported formats and boundaries |
+| [Fallback](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/docs/fallback.md) | Reading strategies and diagnostics |
+| [Contributing (main)](https://github.com/erdemtuna/normalizer-tr/blob/main/CONTRIBUTING.md) | Repository setup, architecture and verification |
+| [Performance (main)](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) | Running and interpreting development measurements |
 
 This is a pre 1.0 library with bounded coverage, not a universal pronunciation
-engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) for measurements and
-[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for release status and migration notes.
-Development performance reports require freshly generated version-two native
-and installed-Python evidence; this artifact change does not change the library API.
-
-The guides track repository behavior: expanded initialism coverage and
-[foreign-name speech aliases](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#approved-foreign-names)
-are included in **0.5.0**. Review the changelog's migration notes before upgrading,
-especially exhaustive Rust enum matches and strict serialized allowlists.
-
-**0.6.0:** approved names support plural and possessive suffixes followed
-by a case suffix, such as `iPhone'umdan` -> `ayfonumdan`.
-Review [coverage](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#nominal-suffixes)
-and [migration notes](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md#060---2026-10-11),
-including changed Instagram and WhatsApp readings, before upgrading.
-
-**0.7.0:** expanded numeric/quantity suffixes, date formats and clock ranges,
-flat multiplication readings and contextual address fields. See the
-[normalization reference](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md)
-and [migration notes](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md#070---2026-10-11)
-for intentional rate-reading and source-boundary changes. Mixed arithmetic and
-protected telephone operands remain unresolved; adjacent address fields keep
-independent ownership.
+engine. Library guides above describe the published **0.7.0** API; guides marked
+main describe repository development. Before upgrading, read the
+[release migration notes](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/CHANGELOG.md)
+for changed readings, diagnostics and exhaustive Rust enum matches.
 
 ## License
 
-[Apache-2.0](https://github.com/erdemtuna/normalizer-tr/blob/main/LICENSE),
-with [third party notices](https://github.com/erdemtuna/normalizer-tr/blob/main/THIRD_PARTY_NOTICES.md).
+[Apache-2.0](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/LICENSE),
+with [third party notices](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/THIRD_PARTY_NOTICES.md).
 
 Thanks to [@canberk7](https://github.com/canberk7) for his contribution to fallback support.

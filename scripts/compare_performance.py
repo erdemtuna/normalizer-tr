@@ -23,6 +23,37 @@ SAMPLES = 10000
 SCALING_SAMPLES = 100
 QUANTILES = ("p50_ns", "p95_ns", "p99_ns", "max_ns")
 SUMMARY_ROWS_PER_SUITE = 5
+PRE_V2_BASE_SHA = "e82bb205c091ca65d97ea8d24a7dcdb6d4fb511b"
+V2_REFERENCE_SHA = "233c099cf25599ee13193d10e0a2260851f3eced"
+
+
+def select_reference(pr_base, requested_base):
+    reference = pr_base or requested_base
+    if not reference or any(char.isspace() or ord(char) < 32 for char in reference):
+        raise RuntimeError("performance comparison requires a nonempty exact base ref")
+    if pr_base == PRE_V2_BASE_SHA:
+        return V2_REFERENCE_SHA
+    return reference
+
+
+def comparison_basis(requested_sha, measured_sha):
+    if requested_sha == measured_sha:
+        kind = "requested-base"
+        explanation = "Measurements use the requested base revision."
+    elif (requested_sha, measured_sha) == (PRE_V2_BASE_SHA, V2_REFERENCE_SHA):
+        kind = "v2-instrumented-reference"
+        explanation = (
+            "The requested PR base predates version-two instrumentation. "
+            "Measurements use the frozen instrumented reference, not the literal PR base."
+        )
+    else:
+        raise RuntimeError("unapproved performance reference substitution")
+    return {
+        "kind": kind,
+        "requested_base_sha": requested_sha,
+        "measurement_base_sha": measured_sha,
+        "explanation": explanation,
+    }
 
 
 def snapshots_equal(base, head):
@@ -246,10 +277,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", required=True, type=Path)
     parser.add_argument("--head", default=ROOT, type=Path)
+    parser.add_argument("--requested-base", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     base, head, output = args.base.resolve(), args.head.resolve(), args.output.resolve()
-    revisions = source_revisions(base, head, ROOT)
+    roots = (base, head, ROOT)
+    requested_base = base
+    if args.requested_base is not None:
+        requested_base = args.requested_base.resolve()
+        roots += (requested_base,)
+    revisions = source_revisions(*roots)
+    basis = comparison_basis(revisions[requested_base], revisions[base])
     catalog = preflight(base, head)
     corpus_hashes = {"base": corpus_hash(base), "head": corpus_hash(head)}
     output.mkdir()
@@ -284,6 +322,7 @@ def main():
         "report_kind": "native-comparison",
         "workload_inventory": catalog,
         "base_sha": revisions[base],
+        "comparison_basis": basis,
         "head_sha": revisions[head],
         "tooling_sha": revisions[ROOT],
         "compiler": subprocess.check_output(["rustc", "-vV"], text=True),
@@ -297,6 +336,10 @@ def main():
     write(output / "comparison.json", comparison)
     lines = [
         "## Native performance comparison",
+        "",
+        f"Requested base: `{basis['requested_base_sha']}`; measured base: `{basis['measurement_base_sha']}`; head: `{revisions[head]}`.",
+        "",
+        basis["explanation"],
         "",
         "Informational only. Ratios compare equivalent inputs/outcomes; changed work is not a speedup.",
         "",
