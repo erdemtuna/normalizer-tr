@@ -17,6 +17,9 @@ Platform requirements are in the [README](README.md) and
   for the measurement methodology and bounded optimization decisions.
 - Exclude Python bytecode caches from the core package's explicit source list,
   so importing benchmark helpers does not break clean-source packaging.
+- Label successful and failed long-input work in checked comparisons and stream
+  native report serialization through a checked buffered writer. Frozen call
+  timing boundaries and full evidence remain unchanged.
 
 ## 0.7.0 - 2026-10-11
 

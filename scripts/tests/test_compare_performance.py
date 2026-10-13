@@ -12,6 +12,63 @@ from scripts.tests.performance_fixtures import ReportTestCase, timing
 
 
 class PerformanceTests(ReportTestCase):
+    def test_long_work_labels_preserve_result_completeness(self):
+        for complete in (True, False):
+            before = self.report()
+            result = before["reviewed_recognition_scaling"]["scaling"][0]["outcome"][
+                "result"
+            ]
+            result["complete"] = complete
+            if not complete:
+                result["issues"] = [
+                    {
+                        "range": {"start": 0, "end": 1024},
+                        "category": "Ambiguous",
+                        "explanation": "unresolved work",
+                    }
+                ]
+            with self.subTest(complete=complete):
+                row = compare(before, copy.deepcopy(before), True)["scaling"][0]
+                expected = {"kind": "result", "complete": complete}
+                self.assertEqual(row["base_outcome"], expected)
+                self.assertEqual(row["head_outcome"], expected)
+                self.assertTrue(row["comparable"])
+
+    def test_equal_failed_work_keeps_ratios_and_error_labels(self):
+        for outcome in (
+            {"error": "LimitExceeded", "limit": "Result"},
+            {"error": "InvalidHint"},
+        ):
+            before, after = self.report(), self.report()
+            for value in (before, after):
+                value["reviewed_recognition_scaling"]["scaling"][0]["outcome"] = outcome
+            timing = after["reviewed_recognition_scaling"]["scaling"][0]["timing"]
+            for key in ("p50_ns", "p95_ns", "p99_ns", "max_ns"):
+                timing[key] //= 2
+            with self.subTest(outcome=outcome):
+                row = compare(before, after, True)["scaling"][0]
+                self.assertEqual(row["base_outcome"], {"kind": "error", **outcome})
+                self.assertEqual(row["head_outcome"], row["base_outcome"])
+                self.assertTrue(row["comparable"])
+                self.assertEqual(row["p95_ratio"], 0.5)
+                self.assertIsNone(row["reason"])
+
+    def test_success_to_error_keeps_work_labels_without_a_ratio(self):
+        before, after = self.report(), self.report()
+        after["reviewed_recognition_scaling"]["scaling"][0]["outcome"] = {
+            "error": "LimitExceeded",
+            "limit": "Result",
+        }
+        row = compare(before, after, True)["scaling"][0]
+        self.assertEqual(row["base_outcome"], {"kind": "result", "complete": True})
+        self.assertEqual(
+            row["head_outcome"],
+            {"kind": "error", "error": "LimitExceeded", "limit": "Result"},
+        )
+        self.assertFalse(row["comparable"])
+        self.assertIsNone(row["p95_ratio"])
+        self.assertEqual(row["reason"], "semantic outcome changed")
+
     def test_shared_invalid_utf8_output_cannot_acquire_a_ratio(self):
         before, after = self.report(), self.report()
         for value in (before, after):
@@ -248,7 +305,10 @@ class PerformanceTests(ReportTestCase):
             "error": "LimitExceeded",
             "limit": "Result",
         }
-        self.assertIsNone(compare(before, after, True)["scaling"][0]["p95_ratio"])
+        row = compare(before, after, True)["scaling"][0]
+        self.assertIsNone(row["p95_ratio"])
+        self.assertEqual(row["base_outcome"]["limit"], "Candidates")
+        self.assertEqual(row["head_outcome"]["limit"], "Result")
 
     def test_empty_outcomes_old_versions_and_absent_identity_fail(self):
         for change in ("outcome", "input", "version", "count"):
@@ -344,7 +404,28 @@ class PerformanceSourceTests(ReportTestCase):
             self.assertEqual(value["base_sha"], "base-A")
             self.assertEqual(value["tooling_sha"], "tooling-A")
             self.assertEqual(value["schema_version"], 2)
-            self.assertIn("recognition", (output / "summary.md").read_text())
+            summary = (output / "summary.md").read_text()
+            self.assertIn("recognition", summary)
+            self.assertIn("Base work | Head work", summary)
+            self.assertIn("result (complete) | result (complete)", summary)
+
+    def test_failed_work_labels_remain_visible_in_markdown(self):
+        value = self.report()
+        value["reviewed_recognition_scaling"]["scaling"][0]["outcome"] = {
+            "error": "LimitExceeded",
+            "limit": "Result",
+        }
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(self, "report", return_value=value),
+        ):
+            output = self.run_main(Path(directory))
+            summary = (output / "summary.md").read_text()
+            self.assertIn(
+                "error: LimitExceeded (Result) | error: LimitExceeded (Result)",
+                summary,
+            )
+            self.assertIn("failed work, not successful throughput", summary)
 
     def test_source_drift_cannot_publish_success(self):
         with tempfile.TemporaryDirectory() as directory:

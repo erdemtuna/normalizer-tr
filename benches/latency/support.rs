@@ -1,5 +1,10 @@
 //! Shared development evidence; preparation and serialization are never timed.
-use std::{collections::BTreeSet, hint::black_box, time::Instant};
+use std::{
+    collections::BTreeSet,
+    hint::black_box,
+    io::{self, BufWriter, Write},
+    time::Instant,
+};
 
 use normalizer_tr::{
     AmbiguityPolicy, Hint, HintKind, LimitKind, MAX_HINTS, MAX_INPUT_BYTES, NormalizeError,
@@ -9,6 +14,12 @@ use serde_json::{Value, json};
 
 pub(super) const SCALING_SAMPLES: usize = 100;
 pub(super) const LONG_METHOD: &str = "instant-full-call-disposal-100-no-warmup-v1";
+
+pub(super) fn write_report(writer: impl Write, report: &Value) -> io::Result<()> {
+    let mut writer = BufWriter::new(writer);
+    serde_json::to_writer_pretty(&mut writer, report)?;
+    writer.flush()
+}
 
 pub(super) struct ScalingCase {
     pub(super) id: &'static str,

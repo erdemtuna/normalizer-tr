@@ -8,6 +8,65 @@ use normalizer_tr::{
     Hint, HintKind, LimitKind, NormalizeError, NormalizeOptions, Normalizer, SourceRange,
 };
 use serde_json::json;
+use std::io::{self, Write};
+
+struct FailingWriter {
+    fail_on_flush: bool,
+}
+
+impl Write for FailingWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.fail_on_flush {
+            Ok(bytes.len())
+        } else {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "write failed"))
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.fail_on_flush {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "flush failed",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[test]
+fn buffered_report_preserves_pretty_json_bytes() {
+    let report = json!({
+        "input": "x".repeat(32 * 1024),
+        "unicode": "ö\n\"",
+        "outcome": {"error": "LimitExceeded", "limit": "Result"},
+        "timing": {"p50_ns": 1, "p95_ns": 2},
+    });
+    let mut bytes = Vec::new();
+    support::write_report(&mut bytes, &report).unwrap();
+    assert_eq!(bytes, serde_json::to_vec_pretty(&report).unwrap());
+}
+
+#[test]
+fn buffered_report_propagates_write_and_flush_errors() {
+    let report = json!({"input": "x".repeat(32 * 1024)});
+    for (fail_on_flush, expected_kind) in [
+        (false, io::ErrorKind::BrokenPipe),
+        (true, io::ErrorKind::PermissionDenied),
+    ] {
+        let error = support::write_report(FailingWriter { fail_on_flush }, &report).unwrap_err();
+        assert_eq!(error.kind(), expected_kind);
+        assert_eq!(
+            error.to_string(),
+            if fail_on_flush {
+                "flush failed"
+            } else {
+                "write failed"
+            }
+        );
+    }
+}
 
 #[test]
 fn snapshots_preserve_exact_options_and_structured_failures() {

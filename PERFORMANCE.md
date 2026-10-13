@@ -62,9 +62,18 @@ summary lists coverage/non-comparability by long-input suite; detailed row
 identities, timings, digests and reasons are in `comparison.json`, and full
 text/options/outcomes remain in the raw reports. Deadline observations remain
 separate, without ratios or a hard wall-clock assertion.
+Each long comparison row also retains compact base/head work kinds: result
+completeness, or error code and limit kind. The bounded Markdown table displays
+these labels so genuine-error ratios are not mistaken for successful throughput.
+Full-outcome equality, not these descriptive labels, determines comparability.
 The summary also shows the five largest comparable p95 ratios per suite and
 repetition; that display bound is not an adoption threshold or evidence of
 repeatable gains.
+
+Native JSON serialization uses a buffered writer with an explicitly checked
+final flush, outside every call timer. This avoids another complete serialized
+report string while retaining the full in-memory report and identical pretty
+JSON bytes; it is not a measured peak-memory or allocator-event claim.
 
 The informational workflow has a **90-minute execution ceiling**, an operational
 policy rather than a hosted runtime estimate or latency SLA. A full same-source

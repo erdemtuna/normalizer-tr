@@ -477,14 +477,12 @@ fn main() {
         source_sha,
         "source changed during sampling"
     );
-    use std::io::Write;
-    let mut file = std::fs::OpenOptions::new()
+    let file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(output)
         .unwrap();
-    file.write_all(serde_json::to_string_pretty(&report).unwrap().as_bytes())
-        .unwrap();
+    support::write_report(file, &report).expect("report write and flush must succeed");
     println!("Saved checked per-call measurements to {output}");
 }
 

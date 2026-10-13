@@ -54,6 +54,22 @@ def timing_rows(base, head, comparable):
     return rows
 
 
+def outcome_summary(outcome):
+    if "result" in outcome:
+        return {"kind": "result", "complete": outcome["result"]["complete"]}
+    summary = {"kind": "error", "error": outcome["error"]}
+    if "limit" in outcome:
+        summary["limit"] = outcome["limit"]
+    return summary
+
+
+def outcome_label(summary):
+    if summary["kind"] == "result":
+        return "result (complete)" if summary["complete"] else "result (incomplete)"
+    label = f"error: {summary['error']}"
+    return f"{label} ({summary['limit']})" if "limit" in summary else label
+
+
 def compare(base, head, same_inputs, contract_changes=()):
     before_report, after_report = admit_native(base), admit_native(head)
     if base["method"] != head["method"]:
@@ -157,6 +173,8 @@ def compare(base, head, same_inputs, contract_changes=()):
                 "policy": key[3],
                 "base_input_sha256": row.input_sha256,
                 "head_input_sha256": other.input_sha256,
+                "base_outcome": outcome_summary(row.outcome),
+                "head_outcome": outcome_summary(other.outcome),
                 "reason": "; ".join(reasons) or None,
                 **timing_rows(
                     {str(key): row.timing}, {str(key): other.timing}, not reasons
@@ -293,7 +311,7 @@ def main():
                 f"| {row['head']['p95_ns'] / 1000:.1f} | {ratio} |"
             )
     lines.append(
-        "\nAll checked long-input comparisons (including non-comparability reasons): `comparison.json`; complete input/options/outcomes: raw base/head reports.\n"
+        "\nAll checked long-input comparisons (including work kinds and non-comparability reasons): `comparison.json`; complete input/options/outcomes: raw base/head reports. Comparable error timings measure failed work, not successful throughput.\n"
     )
     lines.extend(
         [
@@ -313,8 +331,8 @@ def main():
             "",
             f"Largest {SUMMARY_ROWS_PER_SUITE} comparable p95 ratios per suite/repetition below (informational, not adoption thresholds). All rows and non-comparability reasons remain in `comparison.json`.",
             "",
-            "| Repetition | Suite / workload | Bytes | Policy | Base p95 (us) | Head p95 (us) | Ratio |",
-            "|---|---|---:|---|---:|---:|---:|",
+            "| Repetition | Suite / workload | Bytes | Policy | Base work | Head work | Base p95 (us) | Head p95 (us) | Ratio |",
+            "|---|---|---:|---|---|---|---:|---:|---:|",
         ]
     )
     for index, pair in enumerate(paired, 1):
@@ -331,6 +349,7 @@ def main():
             for row in selected:
                 lines.append(
                     f"| {index} | {suite} / {row['id']} | {row['bytes']} | {row['policy']} "
+                    f"| {outcome_label(row['base_outcome'])} | {outcome_label(row['head_outcome'])} "
                     f"| {row['base']['p95_ns'] / 1000:.1f} | {row['head']['p95_ns'] / 1000:.1f} | {row['p95_ratio']:.2f} |"
                 )
     summary = "\n".join(lines)
