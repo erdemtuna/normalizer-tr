@@ -2,18 +2,56 @@
 
 import argparse
 import concurrent.futures
+import dataclasses
 import hashlib
+import importlib
 import json
 import platform
+import sys
 import time
 from pathlib import Path
 
-from normalizer_tr import (
-    Normalizer,
-    Hint,
-    NormalizationError,
-    _native,
+from scripts.common import ROOT, check_source_revisions, source_revisions, write
+from scripts.performance_report import (
+    VERSION,
+    admit_python,
+    inventory,
 )
+
+
+def binding():
+    global Normalizer, Hint, NormalizationError
+    from normalizer_tr import Hint, NormalizationError, Normalizer
+
+    return importlib.import_module("normalizer_tr")
+
+
+def fingerprint(text, options):
+    return {
+        "text": text,
+        "options": {
+            "ambiguity_policy": options["ambiguity_policy"],
+            "hints": [dataclasses.asdict(hint) for hint in options.get("hints", ())],
+            "cancellation": None,
+            "deadline_ms": None,
+        },
+    }
+
+
+def snapshot(n, text, options):
+    try:
+        result = n.normalize(text, **options)
+    except NormalizationError as error:
+        return {
+            "error": error.code,
+            "message": str(error),
+            "issues": [dataclasses.asdict(issue) for issue in error.issues],
+            "limit_kind": error.limit_kind,
+        }
+    value = dataclasses.asdict(result)
+    for field in ("segments", "issues", "fallbacks"):
+        value[field] = list(value[field])
+    return {"result": {**value, "fallback_used": result.fallback_used}}
 
 
 def quantiles(values):
@@ -39,6 +77,7 @@ def invoke(n, text, options):
 
 
 def measure(corpus, policies=("preserve", "reject")):
+    binding()
     begin = time.perf_counter_ns()
     n = Normalizer()
     first = time.perf_counter_ns() - begin
@@ -51,6 +90,9 @@ def measure(corpus, policies=("preserve", "reject")):
     cohorts = {}
     per_class = {}
     concurrent_timings = {}
+    inputs = {}
+    snapshots = {}
+    order = []
     for cohort in ("short", "medium"):
         prepared = []
         for case in corpus:
@@ -62,6 +104,10 @@ def measure(corpus, policies=("preserve", "reject")):
                     h = case["hint"]
                     options["hints"] = (Hint(h["start"], h["end"], h["kind"]),)
                 expected = invoke(n, case["text"], options)
+                key = f"{cohort}:{case['id']}:{policy}"
+                inputs[key] = fingerprint(case["text"], options)
+                snapshots[key] = snapshot(n, case["text"], options)
+                order.append(key)
                 prepared.append((case, options, expected, policy))
         for index in range(2000):
             case, options, _, _ = prepared[index % len(prepared)]
@@ -79,8 +125,10 @@ def measure(corpus, policies=("preserve", "reject")):
             per_class.setdefault(f"{cohort}:{case['class']}:{policy}", []).append(
                 elapsed
             )
-        for case, options, expected, _ in prepared:
+        for case, options, expected, policy in prepared:
             assert invoke(n, case["text"], options) == expected
+            key = f"{cohort}:{case['id']}:{policy}"
+            assert snapshot(n, case["text"], options) == snapshots[key]
         cohorts[cohort] = quantiles(times)
 
         def worker(index):
@@ -94,17 +142,24 @@ def measure(corpus, policies=("preserve", "reject")):
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             samples = list(pool.map(worker, range(1000)))
         concurrent_timings[cohort] = quantiles(samples)
+        for case, options, _, policy in prepared:
+            key = f"{cohort}:{case['id']}:{policy}"
+            assert snapshot(n, case["text"], options) == snapshots[key]
     return {
+        "inputs": inputs,
+        "snapshots": snapshots,
+        "order": order,
         "normalizer_id": n.normalizer_id,
         "constructor_first_ns": first,
         "subsequent_same_process_constructor": quantiles(constructors),
         "cohorts": cohorts,
         "per_class_policy": {k: quantiles(v) for k, v in per_class.items()},
-        "eight_thread_public_call_including_gil_wait_not_executor_queue": concurrent_timings,
+        "concurrent": concurrent_timings,
     }
 
 
 def policy_contract_measurement():
+    binding()
     path = (
         Path(__file__).resolve().parents[1]
         / "tests"
@@ -122,6 +177,9 @@ def policy_contract_measurement():
     n = Normalizer()
     cohorts = {}
     per_class = {}
+    inputs = {}
+    snapshots = {}
+    order = []
     for cohort in ("short", "medium"):
         prefix = (
             (
@@ -148,6 +206,10 @@ def policy_contract_measurement():
                         Hint(hint["start"] + shift, hint["end"] + shift, hint["kind"]),
                     )
                 expected = invoke(n, text, options)
+                key = f"{cohort}:{case['id']}:{policy}"
+                inputs[key] = fingerprint(text, options)
+                snapshots[key] = snapshot(n, text, options)
+                order.append(key)
                 unresolved = "category" in case
                 if unresolved and policy == "reject":
                     assert isinstance(expected, tuple) and expected[0] == "unresolved"
@@ -179,10 +241,15 @@ def policy_contract_measurement():
                 per_class.setdefault(f"{cohort}:{case['class']}:{policy}", []).append(
                     elapsed
                 )
-            for _, text, options, expected in prepared:
+            for case, text, options, expected in prepared:
                 assert invoke(n, text, options) == expected
+                key = f"{cohort}:{case['id']}:{policy}"
+                assert snapshot(n, text, options) == snapshots[key]
             cohorts[f"{cohort}:{policy}"] = quantiles(samples)
     return {
+        "inputs": inputs,
+        "snapshots": snapshots,
+        "order": order,
         "input_sha256": hashlib.sha256(
             b"".join(file.read_bytes() for file in files)
         ).hexdigest(),
@@ -199,6 +266,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    revisions = source_revisions(ROOT)
+    module = binding()
+    native_path = Path(module._native.__file__).resolve()
+    native_hash = hashlib.sha256(native_path.read_bytes()).hexdigest()
+    if "site-packages" not in module.__file__:
+        raise RuntimeError(
+            "sampler requires the installed wheel, not the source facade"
+        )
+    catalog, _ = inventory()
     files = [
         Path(__file__).with_name(name) for name in ("corpus.json", "intent-corpus.json")
     ]
@@ -210,25 +286,40 @@ def main():
         start = time.perf_counter_ns()
         clock.append(time.perf_counter_ns() - start)
     report = {
-        "schema_version": 1,
-        "python": platform.python_version(),
-        "native_path": _native.__file__,
-        "native_sha256": hashlib.sha256(
-            Path(_native.__file__).read_bytes()
-        ).hexdigest(),
+        "schema_version": VERSION,
+        "report_kind": "installed-python",
+        "method_id": catalog["python_method"],
+        "workload_inventory": catalog,
+        "methods": catalog["python"],
+        "identity": {
+            "python": platform.python_version(),
+            "implementation": platform.python_implementation(),
+            "executable": str(Path(sys.executable).resolve()),
+            "native_path": str(native_path),
+            "native_sha256": native_hash,
+            "import_path": str(Path(module.__file__).resolve()),
+            "build_version": module.BUILD_VERSION,
+            "normalizer_id": module.NORMALIZER_ID,
+            "source_sha": revisions[ROOT],
+            "tooling_sha": revisions[ROOT],
+        },
         "corpus_sha256": {
             file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in files
         },
-        "method": "10000 public calls/cohort after2000warmup; argument validation native Rust marshal/disposal included; deterministic preserve/reject; no outlier removal/overhead subtraction",
         "clock_overhead": quantiles(clock),
         "measurement": measure(corpus),
         "fallback_measurement": measure(corpus, ("fallback",)),
         "expanded_coverage_measurement": policy_contract_measurement(),
-        "fallback_method": "separate fallback-only cohorts, same corpus; 10000 calls/cohort after 2000 warmup; no filtering or overhead subtraction; not equivalent to preserve/reject",
         "allocation_instrumentation": "unavailable for Rust native allocations; no inferred counts or peak-memory claim",
     }
-    with args.output.open("x", encoding="utf-8") as stream:
-        json.dump(report, stream, ensure_ascii=False, indent=2)
+    report["policy_contract_sha256"] = report["expanded_coverage_measurement"][
+        "input_sha256"
+    ]
+    check_source_revisions(revisions)
+    if hashlib.sha256(native_path.read_bytes()).hexdigest() != native_hash:
+        raise RuntimeError("loaded native file changed during sampling")
+    admit_python(report)
+    write(args.output, report)
 
 
 if __name__ == "__main__":

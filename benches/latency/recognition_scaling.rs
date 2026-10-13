@@ -10,23 +10,11 @@ use normalizer_tr::{
 };
 use serde_json::{Value, json};
 
-const SAMPLES: usize = 100;
+use super::support::{SCALING_SAMPLES as SAMPLES, scaling_row};
 const PHONE_PATTERN: &str = "01 1 ";
 const URL_PREFIX: &str = "https://ornek.com/";
 const URL_SPEECH: &str =
     "ha te te pe es iki nokta eğik çizgi eğik çizgi ornek nokta kom eğik çizgi";
-
-fn input_fingerprint(input: &str, options: &NormalizeOptions) -> Value {
-    let hints: Vec<_> = options
-        .hints
-        .iter()
-        .map(|hint| json!({"range": hint.range(), "kind": hint.kind()}))
-        .collect();
-    json!({
-        "text": input,
-        "options": {"ambiguity_policy": options.ambiguity_policy, "hints": hints},
-    })
-}
 
 fn check_phone(
     result: &Result<NormalizeResult, NormalizeError>,
@@ -108,7 +96,7 @@ pub(super) fn measure(normalizer: &Normalizer) -> Value {
                 format!("{URL_PREFIX}{}", ")".repeat(bytes - URL_PREFIX.len()))
             };
             assert_eq!(input.len(), bytes);
-            for (name, policy) in [
+            for (_name, policy) in [
                 ("preserve", AmbiguityPolicy::Preserve),
                 ("reject", AmbiguityPolicy::Reject),
                 ("fallback", AmbiguityPolicy::Fallback),
@@ -132,12 +120,14 @@ pub(super) fn measure(normalizer: &Normalizer) -> Value {
                     samples.push(start.elapsed().as_nanos() as u64);
                 }
                 assert_eq!(normalizer.normalize(&input, &options), expected);
-                let fingerprint = input_fingerprint(&input, &options);
-                scaling.push(json!({
-                    "path":path,"bytes":bytes,"policy":name,
-                    "input_fingerprint":fingerprint,
-                    "timing":super::quantiles(&mut samples),"outcome":super::outcome(expected),
-                }));
+                scaling.push(scaling_row(
+                    "recognition",
+                    path,
+                    &input,
+                    &options,
+                    super::quantiles(&mut samples),
+                    super::outcome(expected),
+                ));
             }
         }
     }
@@ -156,6 +146,8 @@ pub(super) fn measure(normalizer: &Normalizer) -> Value {
     }
     json!({
         "method":"exact input sizes; 100 individual release calls including disposal; checked independent text, diagnostics and limits before/after; no timing assertion",
-        "scaling":scaling,"electronic_deadline_10ms":deadlines,
+        "scaling":scaling,
+        "deadline_input_fingerprint":super::support::input_fingerprint(&input, &options),
+        "deadline_ms":10,"electronic_deadline_10ms":deadlines,
     })
 }

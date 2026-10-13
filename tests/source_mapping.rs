@@ -1,7 +1,60 @@
 //! Original UTF-8 grapheme mapping and hint validity.
 use normalizer_tr::{
-    Hint, HintKind, NormalizeError, NormalizeOptions, Normalizer, SegmentKind, SourceRange,
+    AmbiguityPolicy, FallbackClass, FallbackReason, FallbackStrategy, Hint, HintKind,
+    IssueCategory, NormalizeError, NormalizeOptions, NormalizeResult, Normalizer, SegmentKind,
+    SourceRange,
 };
+use unicode_segmentation::UnicodeSegmentation;
+
+const POLICIES: [AmbiguityPolicy; 3] = [
+    AmbiguityPolicy::Preserve,
+    AmbiguityPolicy::Reject,
+    AmbiguityPolicy::Fallback,
+];
+
+fn assert_partition(input: &str, result: &NormalizeResult) {
+    let boundaries: Vec<_> = input
+        .grapheme_indices(true)
+        .map(|(start, _)| start)
+        .chain(std::iter::once(input.len()))
+        .collect();
+    let mut cursor = 0;
+    for segment in result.segments() {
+        let range = segment.range();
+        assert_eq!(range.start(), cursor);
+        assert!(range.start() < range.end());
+        assert!(boundaries.contains(&range.start()));
+        assert!(boundaries.contains(&range.end()));
+        if matches!(
+            segment.kind(),
+            SegmentKind::Verbatim | SegmentKind::Unresolved
+        ) {
+            assert_eq!(segment.text(), &input[range.start()..range.end()]);
+        }
+        cursor = range.end();
+    }
+    assert_eq!(cursor, input.len());
+    assert_eq!(
+        result
+            .segments()
+            .iter()
+            .map(|s| s.text())
+            .collect::<String>(),
+        result.normalized_text()
+    );
+    assert_eq!(result.complete(), result.issues().is_empty());
+    assert_eq!(result.fallback_used(), !result.fallbacks().is_empty());
+    for range in result
+        .issues()
+        .iter()
+        .map(|issue| issue.range())
+        .chain(result.fallbacks().iter().map(|record| record.range()))
+    {
+        assert!(range.start() < range.end());
+        assert!(boundaries.contains(&range.start()));
+        assert!(boundaries.contains(&range.end()));
+    }
+}
 
 #[test]
 fn nfc_recognition_keeps_original_graphemes_and_case() {
@@ -267,4 +320,149 @@ fn colon_cues_use_nfc_lookup_but_keep_original_case_and_coordinates() {
             SourceRange::new(start, start + expression.len())
         );
     }
+}
+
+#[test]
+fn allowed_ascii_controls_preserve_graphemes_in_all_policies() {
+    let normalizer = Normalizer::new().unwrap();
+    for input in [
+        "word\tword\rword\nword\r\nword",
+        "\r\nword\r\n",
+        "word\r\r\nword\n",
+        "word\r\n\nword",
+    ] {
+        for policy in POLICIES {
+            let result = normalizer
+                .normalize(
+                    input,
+                    &NormalizeOptions {
+                        ambiguity_policy: policy,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            assert_eq!(result.normalized_text(), input);
+            assert!(result.complete());
+            assert!(result.issues().is_empty() && result.fallbacks().is_empty());
+            assert_partition(input, &result);
+            for segment in result.segments() {
+                assert_eq!(segment.kind(), SegmentKind::Verbatim);
+                assert_eq!(segment.rule_id(), "source.verbatim");
+            }
+        }
+    }
+}
+
+#[test]
+fn original_hints_do_not_split_crlf_or_weaken_whole_owner_validation() {
+    let normalizer = Normalizer::new().unwrap();
+    let hint = |start, end| Hint::new(SourceRange::new(start, end), HintKind::Cardinal);
+    for policy in POLICIES {
+        for (input, hints) in [
+            ("1\r\n2", vec![hint(0, 2)]),
+            ("1\r\n2", vec![hint(2, 4)]),
+            ("1\r\n2", vec![hint(1, 2)]),
+            ("1\r\n2", vec![hint(2, 3)]),
+            ("1\r\n2", vec![hint(0, 5)]),
+            ("1\r\n2", vec![hint(0, usize::MAX)]),
+            ("1\r\n2", vec![hint(usize::MAX, usize::MAX)]),
+            ("1\r\n2", vec![hint(3, 3)]),
+            ("1\r\n2", vec![hint(4, 3)]),
+            ("1\r\n2", vec![hint(0, 4), hint(0, 1)]),
+            ("1\r\n2", vec![hint(0, 1), hint(0, 1)]),
+            ("12", vec![hint(0, 1), hint(1, 2)]),
+            ("25 TL\r\n2", vec![hint(0, 2)]),
+            ("AB12\r\n2", vec![hint(2, 4)]),
+            ("e\u{301}\r\n2", vec![hint(0, 1)]),
+            ("ü\r\n2", vec![hint(1, 2)]),
+        ] {
+            assert_eq!(
+                normalizer.normalize(
+                    input,
+                    &NormalizeOptions {
+                        ambiguity_policy: policy,
+                        hints,
+                    },
+                ),
+                Err(NormalizeError::InvalidHint),
+                "{input:?} {policy:?}"
+            );
+        }
+        let input = "1;\r\n2;\t3";
+        let result = normalizer
+            .normalize(
+                input,
+                &NormalizeOptions {
+                    ambiguity_policy: policy,
+                    hints: vec![hint(7, 8), hint(0, 1), hint(4, 5)],
+                },
+            )
+            .unwrap();
+        assert_eq!(result.normalized_text(), "bir;\r\niki;\tüç");
+        assert!(result.complete());
+        assert!(result.issues().is_empty() && result.fallbacks().is_empty());
+        assert_partition(input, &result);
+        assert_eq!(
+            result
+                .segments()
+                .iter()
+                .filter(|s| s.kind() == SegmentKind::Cardinal)
+                .map(|s| s.range())
+                .collect::<Vec<_>>(),
+            [
+                SourceRange::new(0, 1),
+                SourceRange::new(4, 5),
+                SourceRange::new(7, 8)
+            ]
+        );
+    }
+}
+
+#[test]
+fn decomposed_prefix_and_crlf_keep_original_policy_diagnostics() {
+    let normalizer = Normalizer::new().unwrap();
+    let prefix = "o\u{308}\r\n";
+    let input = format!("{prefix}1.234; word");
+    let range = SourceRange::new(prefix.len(), prefix.len() + "1.234".len());
+    let preserved = normalizer
+        .normalize(&input, &NormalizeOptions::default())
+        .unwrap();
+    assert_eq!(preserved.normalized_text(), input);
+    assert!(!preserved.complete());
+    assert_partition(&input, &preserved);
+    assert_eq!(preserved.issues().len(), 1);
+    assert_eq!(preserved.issues()[0].range(), range);
+    assert_eq!(preserved.issues()[0].category(), IssueCategory::Ambiguous);
+    assert_eq!(
+        normalizer.normalize(
+            &input,
+            &NormalizeOptions {
+                ambiguity_policy: AmbiguityPolicy::Reject,
+                ..Default::default()
+            },
+        ),
+        Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+    );
+    let fallback = normalizer
+        .normalize(
+            &input,
+            &NormalizeOptions {
+                ambiguity_policy: AmbiguityPolicy::Fallback,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        fallback.normalized_text(),
+        format!("{prefix}bin iki yüz otuz dört; word")
+    );
+    assert!(fallback.complete() && fallback.issues().is_empty());
+    assert_partition(&input, &fallback);
+    assert_eq!(fallback.fallbacks().len(), 1);
+    let record = &fallback.fallbacks()[0];
+    assert_eq!(record.range(), range);
+    assert_eq!(record.attempted_class(), FallbackClass::Number);
+    assert_eq!(record.reason(), FallbackReason::MissingIntent);
+    assert_eq!(record.original_category(), Some(IssueCategory::Ambiguous));
+    assert_eq!(record.strategy(), FallbackStrategy::PreferredNumber);
 }

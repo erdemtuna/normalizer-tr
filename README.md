@@ -94,6 +94,8 @@ UTF-8 byte offsets, not character positions.
 This is a pre 1.0 library with bounded coverage, not a universal pronunciation
 engine. See [performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) for measurements and
 [changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md) for release status and migration notes.
+Development performance reports require freshly generated version-two native
+and installed-Python evidence; this artifact change does not change the library API.
 
 The guides track repository behavior: expanded initialism coverage and
 [foreign-name speech aliases](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md#approved-foreign-names)

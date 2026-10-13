@@ -1,13 +1,338 @@
 //! Source-faithful fallback policy acceptance contract.
 use normalizer_tr::{
-    AmbiguityPolicy, FallbackStrategy, Hint, HintKind, NormalizeError, NormalizeOptions,
-    Normalizer, SegmentKind, SourceRange, WorkControl,
+    AmbiguityPolicy, FallbackClass, FallbackDiagnostic, FallbackReason, FallbackStrategy, Hint,
+    HintKind, IssueCategory, LimitKind, MAX_INPUT_BYTES, MAX_RESULT_BYTES, NormalizeError,
+    NormalizeOptions, NormalizeResult, Normalizer, Segment, SegmentKind, SourceRange, WorkControl,
 };
+
+const MELTING_FACE: &str = "\u{1FAE0}";
+const MELTING_FACE_SPEECH: &str = "unikod u artı bir fe a e sıfır";
+const FAMILY: &str = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+const FAMILY_SPEECH: &str = concat!(
+    "unikod u artı bir fe dört altı sekiz ",
+    "unikod u artı iki sıfır sıfır de ",
+    "unikod u artı bir fe dört altı dokuz ",
+    "unikod u artı iki sıfır sıfır de ",
+    "unikod u artı bir fe dört altı yedi"
+);
+const VARIATION: &str = "\u{1F642}\u{FE0F}";
+const VARIATION_SPEECH: &str = "unikod u artı bir fe altı dört iki unikod u artı fe e sıfır fe";
+const POLICIES: [AmbiguityPolicy; 3] = [
+    AmbiguityPolicy::Preserve,
+    AmbiguityPolicy::Reject,
+    AmbiguityPolicy::Fallback,
+];
 
 fn options() -> NormalizeOptions {
     NormalizeOptions {
         ambiguity_policy: AmbiguityPolicy::Fallback,
         ..Default::default()
+    }
+}
+
+fn assert_partition(input: &str, result: &NormalizeResult) {
+    use unicode_segmentation::UnicodeSegmentation;
+    let mut boundaries: Vec<_> = input
+        .grapheme_indices(true)
+        .map(|(start, _)| start)
+        .collect();
+    boundaries.push(input.len());
+    let mut cursor = 0;
+    for segment in result.segments() {
+        assert_eq!(segment.range().start(), cursor);
+        cursor = segment.range().end();
+        assert!(boundaries.contains(&cursor));
+        assert!(!segment.text().is_empty());
+        if segment.kind() == SegmentKind::Verbatim {
+            assert_eq!(segment.text(), &input[segment.range().start()..cursor]);
+        }
+    }
+    assert_eq!(cursor, input.len());
+    assert_eq!(
+        result
+            .segments()
+            .iter()
+            .map(|segment| segment.text())
+            .collect::<String>(),
+        result.normalized_text()
+    );
+}
+
+fn assert_symbol_owner(
+    input: &str,
+    result: &NormalizeResult,
+    range: SourceRange,
+    expected: &str,
+    strategy: FallbackStrategy,
+) {
+    assert_eq!(result.normalized_text(), expected);
+    assert!(result.complete());
+    assert!(result.issues().is_empty());
+    assert!(result.fallback_used());
+    assert_eq!(result.fallbacks().len(), 1);
+    let record = &result.fallbacks()[0];
+    assert_eq!(record.range(), range);
+    assert_eq!(record.attempted_class(), FallbackClass::Symbol);
+    assert_eq!(record.reason(), FallbackReason::UnhandledSymbol);
+    assert_eq!(record.original_category(), None);
+    assert_eq!(record.strategy(), strategy);
+    let owners: Vec<_> = result
+        .segments()
+        .iter()
+        .filter(|segment| segment.kind() == SegmentKind::Fallback)
+        .collect();
+    assert_eq!(owners.len(), 1);
+    assert_eq!(owners[0].range(), range);
+    assert_eq!(owners[0].rule_id(), "source.fallback");
+    assert_partition(input, result);
+}
+
+#[test]
+fn unicode_scalar_sequences_keep_exact_speech_and_one_original_owner() {
+    let normalizer = Normalizer::new().unwrap();
+    for (input, expected) in [
+        (MELTING_FACE, MELTING_FACE_SPEECH),
+        (FAMILY, FAMILY_SPEECH),
+        (VARIATION, VARIATION_SPEECH),
+        ("\u{301}", "unikod u artı sıfır üç sıfır bir"),
+        ("\u{10FFFF}", "unikod u artı bir sıfır fe fe fe fe"),
+    ] {
+        for policy in POLICIES {
+            let options = NormalizeOptions {
+                ambiguity_policy: policy,
+                ..Default::default()
+            };
+            let result = normalizer.normalize(input, &options).unwrap();
+            if policy == AmbiguityPolicy::Fallback {
+                assert_symbol_owner(
+                    input,
+                    &result,
+                    SourceRange::new(0, input.len()),
+                    expected,
+                    FallbackStrategy::UnicodeCodePoint,
+                );
+            } else {
+                assert_eq!(result.normalized_text(), input);
+                assert!(result.complete());
+                assert!(result.issues().is_empty());
+                assert!(!result.fallback_used());
+                assert_eq!(result.segments().len(), 1);
+                assert_eq!(result.segments()[0].kind(), SegmentKind::Verbatim);
+                assert_partition(input, &result);
+            }
+        }
+    }
+    let input = format!("{FAMILY}{VARIATION}{MELTING_FACE}");
+    let expected = format!("{FAMILY_SPEECH} {VARIATION_SPEECH} {MELTING_FACE_SPEECH}");
+    let result = normalizer.normalize(&input, &options()).unwrap();
+    assert_symbol_owner(
+        &input,
+        &result,
+        SourceRange::new(0, input.len()),
+        &expected,
+        FallbackStrategy::UnicodeCodePoint,
+    );
+}
+
+#[test]
+fn unicode_spelling_uses_nfc_recognition_with_original_identifier_provenance() {
+    let normalizer = Normalizer::new().unwrap();
+    for (input, expected) in [
+        ("Ж12", "unikod u artı sıfır dört bir altı bir iki"),
+        ("A\u{30A}12", "unikod u artı sıfır sıfır ce beş bir iki"),
+        ("\u{C5}12", "unikod u artı sıfır sıfır ce beş bir iki"),
+    ] {
+        let mut preserved_issues = None;
+        for policy in POLICIES {
+            let options = NormalizeOptions {
+                ambiguity_policy: policy,
+                ..Default::default()
+            };
+            match normalizer.normalize(input, &options) {
+                Ok(result) => {
+                    assert_partition(input, &result);
+                    assert_eq!(result.segments().len(), 1);
+                    assert_eq!(
+                        result.segments()[0].range(),
+                        SourceRange::new(0, input.len())
+                    );
+                    if policy == AmbiguityPolicy::Fallback {
+                        assert_eq!(result.normalized_text(), expected);
+                        assert!(result.complete() && result.issues().is_empty());
+                        assert_eq!(result.segments()[0].kind(), SegmentKind::Fallback);
+                        assert_eq!(result.segments()[0].rule_id(), "source.fallback");
+                        assert_eq!(result.fallbacks().len(), 1);
+                        let record = &result.fallbacks()[0];
+                        assert_eq!(record.range(), SourceRange::new(0, input.len()));
+                        assert_eq!(record.attempted_class(), FallbackClass::Identifier);
+                        assert_eq!(record.reason(), FallbackReason::ProtectedIdentifier);
+                        assert_eq!(
+                            record.original_category(),
+                            Some(IssueCategory::ProtectedIdentifier)
+                        );
+                        assert_eq!(record.strategy(), FallbackStrategy::UnicodeCodePoint);
+                    } else {
+                        assert_eq!(policy, AmbiguityPolicy::Preserve);
+                        assert_eq!(result.normalized_text(), input);
+                        assert!(!result.complete());
+                        assert!(!result.fallback_used());
+                        assert_eq!(result.segments()[0].kind(), SegmentKind::Unresolved);
+                        assert_eq!(result.issues().len(), 1);
+                        assert_eq!(result.issues()[0].range(), SourceRange::new(0, input.len()));
+                        assert_eq!(
+                            result.issues()[0].category(),
+                            IssueCategory::ProtectedIdentifier
+                        );
+                        preserved_issues = Some(result.issues().to_vec());
+                    }
+                }
+                Err(NormalizeError::Unresolved(issues)) => {
+                    assert_eq!(policy, AmbiguityPolicy::Reject);
+                    assert_eq!(Some(issues), preserved_issues);
+                }
+                other => panic!("unexpected identifier outcome for {input:?}: {other:?}"),
+            }
+        }
+    }
+}
+
+#[test]
+fn unicode_owners_keep_decomposed_neighbors_padding_crlf_and_hint_protection() {
+    let normalizer = Normalizer::new().unwrap();
+    let prefix = "o\u{308}";
+    let suffix = "eve\r\n";
+    let input = format!("{prefix}{FAMILY}{suffix}");
+    let expected = format!("{prefix} {FAMILY_SPEECH} {suffix}");
+    let owner = SourceRange::new(prefix.len(), prefix.len() + FAMILY.len());
+    let result = normalizer.normalize(&input, &options()).unwrap();
+    assert_symbol_owner(
+        &input,
+        &result,
+        owner,
+        &expected,
+        FallbackStrategy::UnicodeCodePoint,
+    );
+    for policy in POLICIES {
+        for (source, hint) in [
+            (
+                input.as_str(),
+                Hint::new(SourceRange::new(0, 1), HintKind::Digits),
+            ),
+            (
+                FAMILY,
+                Hint::new(
+                    SourceRange::new(0, '\u{1F468}'.len_utf8()),
+                    HintKind::Digits,
+                ),
+            ),
+            (
+                "Ж12",
+                Hint::new(SourceRange::new("Ж".len(), "Ж12".len()), HintKind::Digits),
+            ),
+        ] {
+            let options = NormalizeOptions {
+                ambiguity_policy: policy,
+                hints: vec![hint],
+            };
+            assert_eq!(
+                normalizer.normalize(source, &options),
+                Err(NormalizeError::InvalidHint)
+            );
+        }
+        for source in ["\u{0}", "a\u{202E}b"] {
+            let options = NormalizeOptions {
+                ambiguity_policy: policy,
+                ..Default::default()
+            };
+            assert_eq!(
+                normalizer.normalize(source, &options),
+                Err(NormalizeError::InvalidInput)
+            );
+        }
+    }
+}
+
+#[test]
+fn unicode_result_boundary_neighbors_follow_actual_target_record_sizes() {
+    use std::mem::size_of;
+    let normalizer = Normalizer::new().unwrap();
+    for (prefix, suffix) in [("", ""), ("o\u{308}", ""), ("o\u{308}", "eve\r\n")] {
+        let padding = usize::from(!prefix.is_empty()) + usize::from(!suffix.is_empty());
+        let segments = 1 + padding;
+        let overhead = size_of::<NormalizeResult>()
+            + size_of::<FallbackDiagnostic>()
+            + segments * size_of::<Segment>();
+        let text_allowance = (MAX_RESULT_BYTES - overhead) / 2;
+        let other_text = prefix.len() + suffix.len() + padding;
+        let spoken_step = MELTING_FACE_SPEECH.len() + " ".len();
+        let last_success = (text_allowance - other_text + " ".len()) / spoken_step;
+        assert!(last_success > 0);
+        for count in [last_success - 1, last_success, last_success + 1] {
+            let input = format!("{prefix}{}{suffix}", MELTING_FACE.repeat(count));
+            assert!(input.len() <= MAX_INPUT_BYTES);
+            let outcome = normalizer.normalize(&input, &options());
+            if count > last_success {
+                assert_eq!(
+                    outcome,
+                    Err(NormalizeError::LimitExceeded(LimitKind::Result))
+                );
+                continue;
+            }
+            let speech = vec![MELTING_FACE_SPEECH; count].join(" ");
+            let expected = format!(
+                "{prefix}{}{speech}{}{suffix}",
+                if prefix.is_empty() { "" } else { " " },
+                if suffix.is_empty() { "" } else { " " },
+            );
+            let result = outcome.unwrap();
+            assert_eq!(result.segments().len(), segments);
+            assert_symbol_owner(
+                &input,
+                &result,
+                SourceRange::new(prefix.len(), input.len() - suffix.len()),
+                &expected,
+                FallbackStrategy::UnicodeCodePoint,
+            );
+        }
+    }
+}
+
+#[test]
+fn all_policies_keep_named_symbols_primary_readings_and_ordinary_combining_prose() {
+    let normalizer = Normalizer::new().unwrap();
+    for policy in POLICIES {
+        let mut options = NormalizeOptions {
+            ambiguity_policy: policy,
+            ..Default::default()
+        };
+        for source in ["25 TL; saat 09:30", "q\u{301}", "προ Hello"] {
+            let expected = normalizer
+                .normalize(source, &NormalizeOptions::default())
+                .unwrap();
+            let result = normalizer.normalize(source, &options).unwrap();
+            assert_eq!(result, expected);
+            assert!(result.complete() && !result.fallback_used());
+        }
+        let source = "hello🙂world";
+        let result = normalizer.normalize(source, &options).unwrap();
+        if policy == AmbiguityPolicy::Fallback {
+            assert_symbol_owner(
+                source,
+                &result,
+                SourceRange::new("hello".len(), "hello🙂".len()),
+                "hello gülümseyen yüz world",
+                FallbackStrategy::Literal,
+            );
+        } else {
+            assert_eq!(result.normalized_text(), source);
+            assert!(result.complete() && !result.fallback_used());
+        }
+        options
+            .hints
+            .push(Hint::new(SourceRange::new(0, 2), HintKind::Roman));
+        let result = normalizer.normalize("IV", &options).unwrap();
+        assert_eq!(result.normalized_text(), "dört");
+        assert!(result.complete() && !result.fallback_used());
     }
 }
 
@@ -375,6 +700,40 @@ fn serialized_fallback_contract_has_no_parallel_completion_flag() {
     );
     assert!(serialized.get("fully_rendered").is_none());
     assert_eq!(serialized["segments"][0]["kind"], "Fallback");
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn serialized_code_point_provenance_retains_owner_level_contract() {
+    let result = Normalizer::new()
+        .unwrap()
+        .normalize(VARIATION, &options())
+        .unwrap();
+    let serialized = serde_json::to_value(&result).unwrap();
+    assert_eq!(serialized["normalized_text"], VARIATION_SPEECH);
+    assert_eq!(serialized["complete"], true);
+    assert_eq!(serialized["fallback_used"], true);
+    assert_eq!(serialized["issues"], serde_json::json!([]));
+    assert_eq!(
+        serialized["fallbacks"],
+        serde_json::json!([{
+            "range": {"start": 0, "end": VARIATION.len()},
+            "attempted_class": "Symbol",
+            "reason": "UnhandledSymbol",
+            "original_category": null,
+            "strategy": "UnicodeCodePoint",
+        }])
+    );
+    assert_eq!(
+        serialized["segments"],
+        serde_json::json!([{
+            "range": {"start": 0, "end": VARIATION.len()},
+            "kind": "Fallback",
+            "text": VARIATION_SPEECH,
+            "rule_id": "source.fallback",
+        }])
+    );
+    assert!(serialized.get("fully_rendered").is_none());
 }
 
 proptest::proptest! {

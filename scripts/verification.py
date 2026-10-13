@@ -12,6 +12,14 @@ import zipfile
 from pathlib import Path
 
 from .common import ROOT, command, policy_contract_fixture, record, sha, version, write
+from .performance_report import (
+    VERSION,
+    admit_native,
+    admit_python,
+    digest,
+    inventory,
+    load,
+)
 
 
 def prepare(output):
@@ -101,6 +109,7 @@ def consume(output):
     import importlib.util
     import socket
     import normalizer_tr
+    import sys
 
     if (
         importlib.util.find_spec("torch") is not None
@@ -161,7 +170,11 @@ def consume(output):
             "normalizer_id": normalizer.normalizer_id,
             "native_sha256": sha(Path(normalizer_tr._native.__file__)),
             "python": platform.python_version(),
-            "import_path": normalizer_tr.__file__,
+            "implementation": platform.python_implementation(),
+            "executable": str(Path(sys.executable).resolve()),
+            "native_path": str(Path(normalizer_tr._native.__file__).resolve()),
+            "build_version": normalizer_tr.BUILD_VERSION,
+            "import_path": str(Path(normalizer_tr.__file__).resolve()),
             "network_used": False,
             "engine_required": False,
         },
@@ -215,7 +228,12 @@ def finalize(output):
         raise RuntimeError("final source revision is not clean")
     native = []
     for path in sorted((output / "reports").glob("rust-*.json")):
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = load(path)
+        admitted = admit_native(value)
+        if value.get("source_sha") != head:
+            raise RuntimeError(
+                "native sampler source revision differs from clean source"
+            )
         if any(
             cohort["count"] < 10000 or cohort["p95_ns"] >= 1000000
             for cohort in value["cohorts"].values()
@@ -233,6 +251,10 @@ def finalize(output):
                 "limit_diagnostics": value["limit_diagnostics"],
                 "fallback_measurement": value["fallback_measurement"],
                 "expanded_coverage_measurement": value["expanded_coverage_measurement"],
+                "report_schema_version": VERSION,
+                "inventory_sha256": admitted.inventory_sha256,
+                "reviewed_recognition_scaling": value["reviewed_recognition_scaling"],
+                "supplementary_scaling": value["supplementary_scaling"],
             }
         )
     if len(native) != 3:
@@ -257,9 +279,8 @@ def finalize(output):
                 "consumer native binary differs from authoritative wheel"
             )
     identity = installed["normalizer_id"]
-    python_report = json.loads(
-        (output / "reports" / "python.json").read_text(encoding="utf-8")
-    )
+    python_report = admit_python(load(output / "reports" / "python.json"))
+    validate_python_identity(python_report, installed, head)
     validate_policy_contract_measurement(python_report["expanded_coverage_measurement"])
     _, contract_files = policy_contract_fixture()
     contract_hash = hashlib.sha256(
@@ -276,7 +297,7 @@ def finalize(output):
     ):
         raise RuntimeError("measurement/consumer identity mismatch")
     manifest = {
-        "schema_version": 1,
+        "schema_version": VERSION,
         "status": "passed",
         "source_head": head,
         "normalizer_id": identity,
@@ -293,6 +314,8 @@ def finalize(output):
         "core_archive_vcs": vcs,
         "native_repetitions": native,
         "python_report": record(output / "reports" / "python.json"),
+        "python_report_schema_version": VERSION,
+        "workload_inventory_sha256": digest(inventory()[0]),
         "corpora": [
             record(ROOT / "benches" / name)
             for name in ("corpus.json", "intent-corpus.json")
@@ -325,6 +348,24 @@ def finalize(output):
     ]
     with (output / "summary.txt").open("x", encoding="utf-8") as stream:
         stream.write("\n".join(lines) + "\n")
+
+
+def validate_python_identity(report, installed, head):
+    identity = report["identity"]
+    for key in (
+        "normalizer_id",
+        "native_sha256",
+        "native_path",
+        "python",
+        "implementation",
+        "executable",
+        "import_path",
+        "build_version",
+    ):
+        if identity[key] != installed.get(key):
+            raise RuntimeError(f"installed Python latency identity differs: {key}")
+    if identity["source_sha"] != head or identity["tooling_sha"] != head:
+        raise RuntimeError("Python latency source/tooling revision differs")
 
 
 def main():

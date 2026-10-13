@@ -108,7 +108,7 @@ try {
     foreach ($repeat in 1..3) {
         Invoke-Step "latency-$repeat" 'cargo' @('bench','--locked','--features','serde','--bench','latency','--','--output',(Join-Path $OutputDirectory "reports\rust-$repeat.json"))
     }
-    Invoke-Step 'python-latency' $consumerPython @('benches\python_latency.py','--output',(Join-Path $OutputDirectory 'reports\python.json'))
+    Invoke-Step 'python-latency' $consumerPython @('-m','benches.python_latency','--output',(Join-Path $OutputDirectory 'reports\python.json'))
     $stages | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $OutputDirectory 'stages.json') -Encoding utf8
     Invoke-Step 'final-manifest' $consumerPython @('-m','scripts.verification','finalize',$OutputDirectory)
     Write-Host "Verification passed: $(Join-Path $OutputDirectory 'manifest.json')"

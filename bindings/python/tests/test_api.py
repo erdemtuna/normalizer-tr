@@ -101,6 +101,72 @@ def test_golden_and_exact_original_ranges():
     assert "torch" not in sys.modules and "huggingface_hub" not in sys.modules
 
 
+@pytest.mark.parametrize("policy", ["preserve", "reject", "fallback"])
+def test_crlf_and_decomposed_hints_keep_original_coordinates(policy):
+    normalizer = Normalizer()
+    source = "o\u0308\r\n1;\r\n2;\t3"
+    result = normalizer.normalize(
+        source,
+        ambiguity_policy=policy,
+        hints=(
+            Hint(12, 13, "cardinal"),
+            Hint(5, 6, "cardinal"),
+            Hint(9, 10, "cardinal"),
+        ),
+    )
+    assert result.normalized_text == "o\u0308\r\nbir;\r\niki;\tüç"
+    assert result.complete and not result.issues and not result.fallbacks
+    assert [
+        (s.start_byte, s.end_byte, s.kind, s.rule_id)
+        for s in result.segments
+        if s.kind != "verbatim"
+    ] == [
+        (5, 6, "cardinal", "number"),
+        (9, 10, "cardinal", "number"),
+        (12, 13, "cardinal", "number"),
+    ]
+    encoded = source.encode("utf-8")
+    boundaries = set(range(len(encoded) + 1)) - {1, 2, 4, 8}
+    cursor = 0
+    for segment in result.segments:
+        assert segment.start_byte == cursor
+        assert segment.start_byte < segment.end_byte
+        assert segment.start_byte in boundaries and segment.end_byte in boundaries
+        if segment.kind == "verbatim":
+            original = encoded[segment.start_byte : segment.end_byte].decode()
+            assert segment.text == original
+        cursor = segment.end_byte
+    assert cursor == len(encoded)
+    assert "".join(s.text for s in result.segments) == result.normalized_text
+
+
+@pytest.mark.parametrize("policy", ["preserve", "reject", "fallback"])
+@pytest.mark.parametrize(
+    ("source", "start", "end"),
+    [
+        ("1\r\n2", 0, 2),
+        ("1\r\n2", 2, 4),
+        ("1\r\n2", 0, 5),
+        ("1\r\n2", 0, (1 << 63) - 1),
+        ("1\r\n2", 3, 3),
+        ("1\r\n2", 4, 3),
+        ("o\u0308\r\n2", 0, 1),
+        ("25 TL\r\n2", 0, 2),
+        ("AB12\r\n2", 2, 4),
+    ],
+)
+def test_invalid_original_hints_remain_errors_in_all_policies(
+    policy, source, start, end
+):
+    with pytest.raises(NormalizationError) as error:
+        Normalizer().normalize(
+            source, ambiguity_policy=policy, hints=(Hint(start, end, "cardinal"),)
+        )
+    assert error.value.code == "invalid_hint"
+    assert error.value.issues == () and error.value.limit_kind is None
+    assert not hasattr(error.value, "normalized_text")
+
+
 def test_partial_strict_and_unicode():
     normalizer = Normalizer()
     partial = normalizer.normalize("25 TL; 1.234")

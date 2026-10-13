@@ -12,6 +12,10 @@ on:
       - "rust-toolchain.toml"
       - "scripts/compare_*.py"
       - "scripts/common.py"
+      - "scripts/performance_report.py"
+      - "scripts/verification.py"
+      - "scripts/verify.ps1"
+      - "scripts/tests/**"
       - "scripts/rust/contract_probe.rs"
       - ".github/workflows/performance.yml"
   workflow_dispatch:

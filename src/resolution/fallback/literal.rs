@@ -163,3 +163,132 @@ pub(super) fn render(
     }
     Ok(used_code_point)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{LimitKind, WorkControl};
+    use std::time::Instant;
+
+    fn standard_code_point(scalar: char, output: &mut Output<'_>) -> Result<(), NormalizeError> {
+        output.word("unikod u artı")?;
+        for hexadecimal in format!("{:04X}", u32::from(scalar)).chars() {
+            let name = numerals::digit_name(hexadecimal)
+                .or_else(|| letter_name(hexadecimal))
+                .ok_or(NormalizeError::Internal)?;
+            output.word(name)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn code_point_width_padding_order_and_scalar_extremes_are_exact() {
+        for (value, digits) in [
+            (0, "sıfır sıfır sıfır sıfır"),
+            (1, "sıfır sıfır sıfır bir"),
+            (9, "sıfır sıfır sıfır dokuz"),
+            (0xA, "sıfır sıfır sıfır a"),
+            (0xB, "sıfır sıfır sıfır be"),
+            (0xC, "sıfır sıfır sıfır ce"),
+            (0xD, "sıfır sıfır sıfır de"),
+            (0xE, "sıfır sıfır sıfır e"),
+            (0xF, "sıfır sıfır sıfır fe"),
+            (0xFF, "sıfır sıfır fe fe"),
+            (0xFFF, "sıfır fe fe fe"),
+            (0x1000, "bir sıfır sıfır sıfır"),
+            (0xD7FF, "de yedi fe fe"),
+            (0xE000, "e sıfır sıfır sıfır"),
+            (0xFFFF, "fe fe fe fe"),
+            (0x10000, "bir sıfır sıfır sıfır sıfır"),
+            (0x1FAE0, "bir fe a e sıfır"),
+            (0xABCDE, "a be ce de e"),
+            (0xFFFFF, "fe fe fe fe fe"),
+            (0x100000, "bir sıfır sıfır sıfır sıfır sıfır"),
+            (0x10FFFF, "bir sıfır fe fe fe fe"),
+        ] {
+            let scalar = char::from_u32(value).unwrap();
+            let expected = format!("unikod u artı {digits}");
+            let control = WorkControl::default();
+            let mut output = Output::new(expected.len(), &control);
+            assert_eq!(code_point(scalar, &mut output), Ok(()), "U+{value:X}");
+            assert_eq!(output.finish(), expected, "U+{value:X}");
+        }
+        for surrogate in 0xD800..=0xDFFF {
+            assert!(char::from_u32(surrogate).is_none());
+        }
+    }
+
+    #[test]
+    fn code_point_allowance_cutoffs_match_standard_emission_and_partial_text() {
+        for scalar in ['\u{301}', '\u{1FAE0}', '\u{10FFFF}'] {
+            for prefix in ["", "ö", "ö "] {
+                let control = WorkControl::default();
+                let mut reference = Output::new(usize::MAX, &control);
+                reference.append(prefix).unwrap();
+                standard_code_point(scalar, &mut reference).unwrap();
+                let expected = reference.finish();
+                for maximum in prefix.len()..=expected.len() {
+                    let mut actual = Output::new(maximum, &control);
+                    let mut reference = Output::new(maximum, &control);
+                    actual.append(prefix).unwrap();
+                    reference.append(prefix).unwrap();
+                    let result = code_point(scalar, &mut actual);
+                    assert_eq!(result, standard_code_point(scalar, &mut reference));
+                    assert_eq!(
+                        result,
+                        if maximum == expected.len() {
+                            Ok(())
+                        } else {
+                            Err(NormalizeError::LimitExceeded(LimitKind::Result))
+                        }
+                    );
+                    assert_eq!(actual.finish(), reference.finish(), "{scalar:?} {maximum}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn code_point_cancellation_precedes_an_insufficient_allowance() {
+        for prefix in ["", "ö"] {
+            let control = WorkControl::default();
+            let mut output = Output::new(prefix.len(), &control);
+            output.append(prefix).unwrap();
+            control.cancel();
+            assert_eq!(
+                code_point('\u{1FAE0}', &mut output),
+                Err(NormalizeError::Cancelled)
+            );
+            assert_eq!(output.finish(), prefix);
+        }
+        let expired = WorkControl::new(Some(Instant::now()));
+        let mut output = Output::new(0, &expired);
+        assert_eq!(
+            code_point('\u{10FFFF}', &mut output),
+            Err(NormalizeError::Cancelled)
+        );
+        assert_eq!(output.finish(), "");
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(256))]
+        #[test]
+        fn arbitrary_scalar_matches_the_standard_format_oracle(
+            scalar in proptest::prelude::any::<char>(),
+            maximum in 0_usize..100,
+            prefix in proptest::sample::select(vec!["", "ö", "ö "]),
+        ) {
+            let control = WorkControl::default();
+            let maximum = maximum + prefix.len();
+            let mut actual = Output::new(maximum, &control);
+            let mut reference = Output::new(maximum, &control);
+            actual.append(prefix).unwrap();
+            reference.append(prefix).unwrap();
+            proptest::prop_assert_eq!(
+                code_point(scalar, &mut actual),
+                standard_code_point(scalar, &mut reference)
+            );
+            proptest::prop_assert_eq!(actual.finish(), reference.finish());
+        }
+    }
+}

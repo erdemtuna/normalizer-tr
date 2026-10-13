@@ -10,9 +10,13 @@ use normalizer_tr::{
 };
 
 #[test]
-fn engineering_failures_are_errors_in_both_policies() {
+fn engineering_failures_are_errors_in_all_policies() {
     let normalizer = Normalizer::new().unwrap();
-    for policy in [AmbiguityPolicy::Preserve, AmbiguityPolicy::Reject] {
+    for policy in [
+        AmbiguityPolicy::Preserve,
+        AmbiguityPolicy::Reject,
+        AmbiguityPolicy::Fallback,
+    ] {
         let options = NormalizeOptions {
             ambiguity_policy: policy,
             ..Default::default()
@@ -22,6 +26,9 @@ fn engineering_failures_are_errors_in_both_policies() {
             " \n\t\r ",
             "\u{2003}",
             "a\0b",
+            "a\u{000b}b",
+            "a\u{000c}b",
+            "a\u{007f}b",
             "a\u{202e}b",
             "a\u{2066}b",
             "\u{061c}12",
@@ -85,7 +92,11 @@ fn result_allocation_limit_counts_segment_and_final_text_buffers() {
     // Fewer than 4096 candidates; spoken large integers exceed the result budget.
     let input = "999999999999999999 ".repeat(1500);
     assert!(input.len() < MAX_INPUT_BYTES);
-    for policy in [AmbiguityPolicy::Preserve, AmbiguityPolicy::Reject] {
+    for policy in [
+        AmbiguityPolicy::Preserve,
+        AmbiguityPolicy::Reject,
+        AmbiguityPolicy::Fallback,
+    ] {
         assert!(matches!(
             normalizer.normalize(
                 &input,

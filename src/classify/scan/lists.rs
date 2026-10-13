@@ -165,3 +165,77 @@ fn word_end(
     }
     Ok(text.len())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::classify::scan::punctuation::quotation_boundaries;
+
+    #[test]
+    fn comma_free_inputs_never_admit_a_catalog_group() {
+        let rules = Resources::shared().unwrap();
+        let control = WorkControl::default();
+        for text in [
+            "ordinary prose",
+            "GitHub Copilot",
+            "Visual Studio Code'ye",
+            "Claude; GitHub Copilot; UNKNOWN",
+            "‘GitHub Copilot’",
+            "\"GitHub Copilot\"@ornek.com",
+            "https://ornek.com/Claude?x=2",
+            "adres No:5 Kat:3",
+            "AB12(Claude)",
+        ] {
+            assert!(
+                groups(text, &rules, &quotation_boundaries(text), &control)
+                    .unwrap()
+                    .is_empty(),
+                "{text}"
+            );
+        }
+        let text = format!("AB{}", "7".repeat(crate::MAX_INPUT_BYTES - "AB".len()));
+        assert!(groups(&text, &rules, &[], &control).unwrap().is_empty());
+    }
+
+    #[test]
+    fn complete_group_metadata_preserves_late_rejection_and_invalid_suffix_admission() {
+        let rules = Resources::shared().unwrap();
+        let control = WorkControl::default();
+        for (text, approved) in [
+            ("GitHub Copilot,Claude", true),
+            ("GitHub Copilot,Claude,UNKNOWN", false),
+            ("Claude,,Hugging Face", false),
+            ("Claude,Hugging Face,AB12", false),
+            ("SGK'a,PDF'lik,TRT", true),
+        ] {
+            let groups = groups(text, &rules, &quotation_boundaries(text), &control).unwrap();
+            assert_eq!(groups.len(), 1, "{text}");
+            assert_eq!(groups[0].range, SourceRange::new(0, text.len()), "{text}");
+            assert_eq!(groups[0].approved, approved, "{text}");
+            assert!(groups[0].catalog, "{text}");
+        }
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(128))]
+        #[test]
+        fn generated_comma_free_source_has_no_groups(
+            pieces in proptest::collection::vec(
+                proptest::sample::select(vec![
+                    "GitHub", "Copilot", "Claude", "Hugging", "Face", "UNKNOWN",
+                    "AB12", "5", "No:", ";", "'", "’", "“", "”", ".", "ö", "\r\n",
+                ]),
+                1..64
+            )
+        ) {
+            let text = pieces.join(" ");
+            let rules = Resources::shared().unwrap();
+            let control = WorkControl::default();
+            proptest::prop_assert!(
+                groups(&text, &rules, &quotation_boundaries(&text), &control)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+}

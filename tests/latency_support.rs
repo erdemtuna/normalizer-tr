@@ -4,7 +4,9 @@
 #[path = "../benches/latency/support.rs"]
 mod support;
 
-use normalizer_tr::{Hint, HintKind, LimitKind, NormalizeError, NormalizeOptions, SourceRange};
+use normalizer_tr::{
+    Hint, HintKind, LimitKind, NormalizeError, NormalizeOptions, Normalizer, SourceRange,
+};
 use serde_json::json;
 
 #[test]
@@ -50,4 +52,17 @@ fn rich_rows_and_quantiles_do_not_need_timed_calls() {
     assert_eq!(row["policy"], "preserve");
     assert_eq!(row["outcome"], json!({"error":"InvalidInput"}));
     assert_eq!(support::SCALING_SAMPLES, 100);
+}
+
+#[test]
+fn explicit_input_and_hint_limits_are_checked_without_sampling() {
+    let normalizer = Normalizer::new().unwrap();
+    let cases = support::resource_cases();
+    assert_eq!(cases.len(), 6);
+    for case in cases {
+        support::check_resource(&case, &normalizer.normalize(&case.text, &case.options));
+    }
+    let inventory: serde_json::Value =
+        serde_json::from_str(include_str!("../benches/latency/workload_inventory.json")).unwrap();
+    assert_eq!(support::inventory_keys(&inventory).len(), 625);
 }

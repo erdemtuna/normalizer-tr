@@ -8,6 +8,16 @@ use serde_json::{Value, json};
 mod policy_fixtures;
 #[path = "latency/recognition_scaling.rs"]
 mod recognition_scaling;
+#[path = "latency/scanner_scaling.rs"]
+mod scanner_scaling;
+#[path = "latency/source_mapping.rs"]
+mod source_mapping;
+#[path = "latency/support.rs"]
+mod support;
+#[path = "latency/unicode_fallback_scaling.rs"]
+mod unicode_fallback_scaling;
+
+use support::{input_fingerprint, outcome, quantiles, scaling_row};
 
 fn options(case: &Value, policy: AmbiguityPolicy) -> NormalizeOptions {
     let mut options = NormalizeOptions {
@@ -20,26 +30,11 @@ fn options(case: &Value, policy: AmbiguityPolicy) -> NormalizeOptions {
     options
 }
 
-fn outcome(result: Result<normalizer_tr::NormalizeResult, normalizer_tr::NormalizeError>) -> Value {
-    match result {
-        Ok(result) => json!({"result": result}),
-        Err(normalizer_tr::NormalizeError::Unresolved(issues)) => {
-            json!({"error":"unresolved","issues":issues})
-        }
-        Err(error) => json!({"error":format!("{error:?}")}),
-    }
-}
-
-fn quantiles(values: &mut [u64]) -> Value {
-    values.sort_unstable();
-    let at = |percent: usize| values[(values.len() * percent).div_ceil(100).saturating_sub(1)];
-    json!({"count":values.len(),"p50_ns":at(50),"p95_ns":at(95),"p99_ns":at(99),"max_ns":values[values.len()-1]})
-}
-
 fn fallback_measurements(normalizer: &Normalizer, corpus: &[Value]) -> Value {
     let mut cohorts = BTreeMap::new();
     let mut classes = BTreeMap::<String, Vec<u64>>::new();
     let mut snapshots = BTreeMap::new();
+    let mut inputs = BTreeMap::new();
     for cohort in ["short", "medium"] {
         let prepared: Vec<_> = corpus
             .iter()
@@ -49,6 +44,10 @@ fn fallback_measurements(normalizer: &Normalizer, corpus: &[Value]) -> Value {
                 let options = options(case, AmbiguityPolicy::Fallback);
                 let expected = outcome(normalizer.normalize(text, &options));
                 snapshots.insert(case["id"].as_str().unwrap(), expected.clone());
+                inputs.insert(
+                    case["id"].as_str().unwrap(),
+                    input_fingerprint(text, &options),
+                );
                 (text, options, expected, case["class"].as_str().unwrap())
             })
             .collect();
@@ -84,7 +83,7 @@ fn fallback_measurements(normalizer: &Normalizer, corpus: &[Value]) -> Value {
         .into_iter()
         .map(|(class, mut samples)| (class, quantiles(&mut samples)))
         .collect();
-    json!({"cohorts":cohorts, "per_class_policy":per_class, "snapshots":snapshots,
+    json!({"cohorts":cohorts, "per_class_policy":per_class, "snapshots":snapshots,"inputs":inputs,
         "method":"fallback only; same frozen cohorts; 2000 warmup and 10000 individually timed calls per cohort; no filtering or overhead subtraction"})
 }
 
@@ -141,6 +140,8 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
     let (cases, input_bytes) = policy_fixtures::load();
     let mut cohorts = BTreeMap::new();
     let mut classes = BTreeMap::<String, Vec<u64>>::new();
+    let mut snapshots = BTreeMap::new();
+    let mut inputs = BTreeMap::new();
     for cohort in ["short", "medium"] {
         let prefix = if cohort == "medium" {
             "Bu sentetik paragraf kaynak metnin ve miktarların birlikte okunmasını kontrol eder. "
@@ -173,12 +174,11 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
                             hint.kind(),
                         );
                     }
-                    check_policy_contract(
-                        case,
-                        policy,
-                        &prefix,
-                        &normalizer.normalize(&text, &options),
-                    );
+                    let expected = normalizer.normalize(&text, &options);
+                    check_policy_contract(case, policy, &prefix, &expected);
+                    let key = format!("{cohort}:{}:{name}", case["id"].as_str().unwrap());
+                    inputs.insert(key.clone(), input_fingerprint(&text, &options));
+                    snapshots.insert(key, outcome(expected));
                     (case, text, options)
                 })
                 .collect();
@@ -206,7 +206,10 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
                     .push(elapsed);
             }
             for (case, text, options) in &prepared {
-                check_policy_contract(case, policy, &prefix, &normalizer.normalize(text, options));
+                let after = normalizer.normalize(text, options);
+                check_policy_contract(case, policy, &prefix, &after);
+                let key = format!("{cohort}:{}:{name}", case["id"].as_str().unwrap());
+                assert_eq!(outcome(after), snapshots[&key]);
             }
             cohorts.insert(format!("{cohort}:{name}"), quantiles(&mut samples));
         }
@@ -260,7 +263,7 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
             text.push_str(prefix);
             text.push_str(&pattern.repeat(remaining / pattern.len()));
             text.push_str(&" ".repeat(size - text.len()));
-            for (name, policy) in [
+            for (_name, policy) in [
                 ("preserve", AmbiguityPolicy::Preserve),
                 ("reject", AmbiguityPolicy::Reject),
                 ("fallback", AmbiguityPolicy::Fallback),
@@ -277,8 +280,14 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
                     samples.push(start.elapsed().as_nanos() as u64);
                 }
                 assert_eq!(outcome(normalizer.normalize(&text, &options)), expected);
-                scaling.push(json!({"bytes":size,"class":class,"policy":name,"timing":quantiles(&mut samples),
-                    "complete":expected.get("result").map(|result| &result["complete"]),"error":expected.get("error")}));
+                scaling.push(scaling_row(
+                    "expanded",
+                    class,
+                    &text,
+                    &options,
+                    quantiles(&mut samples),
+                    expected,
+                ));
             }
         }
     }
@@ -288,10 +297,12 @@ fn policy_contract_measurements(normalizer: &Normalizer) -> Value {
         .collect();
     json!({"input_source":"tests/fixtures/policy-contract.json","input_bytes":input_bytes,"input_cases":cases,
         "method":"separate policy cohorts; reviewed goldens before/after; 2000 warmups and 10000 calls including disposal; all outliers retained",
-        "cohorts":cohorts,"per_class_policy":per_class,"scaling":scaling})
+        "cohorts":cohorts,"per_class_policy":per_class,"scaling":scaling,
+        "inputs":inputs,"snapshots":snapshots})
 }
 
 fn main() {
+    let source_sha = source_revision();
     // Cargo supplies --bench even when the target uses its own timing harness.
     let args: Vec<_> = std::env::args().filter(|arg| arg != "--bench").collect();
     let output = match args.as_slice() {
@@ -311,6 +322,7 @@ fn main() {
     }
     let normalizer = Normalizer::new().unwrap();
     let mut snapshots = BTreeMap::new();
+    let mut inputs = BTreeMap::new();
     let mut cohorts = BTreeMap::new();
     let mut classes = BTreeMap::<String, Vec<u64>>::new();
     let mut distributions = Vec::new();
@@ -344,6 +356,7 @@ fn main() {
                         if reject { "reject" } else { "preserve" }
                     );
                     snapshots.insert(key.clone(), expected.clone());
+                    inputs.insert(key.clone(), input_fingerprint(text, &options));
                     distributions.push(
                         json!({"id":key,"bytes":text.len(),"cohort":cohort,"class":case["class"]}),
                     );
@@ -416,7 +429,18 @@ fn main() {
                 ));
                 times.push(start.elapsed().as_nanos() as u64);
             }
-            large.push(json!({"bytes":size,"class":class,"timing":quantiles(&mut times),"outcome":expected}));
+            assert_eq!(
+                outcome(normalizer.normalize(&text, &NormalizeOptions::default())),
+                expected
+            );
+            large.push(scaling_row(
+                "large",
+                class,
+                &text,
+                &NormalizeOptions::default(),
+                quantiles(&mut times),
+                expected,
+            ));
         }
     }
     let mut controls = Vec::new();
@@ -457,11 +481,46 @@ fn main() {
             times.push(start.elapsed().as_nanos() as u64);
         }
         assert_eq!(expected, outcome(normalizer.normalize(&text, &options)));
-        controls.push(json!({"name":name,"bytes":text.len(),"hints":options.hints.len(),"timing":quantiles(&mut times),
-                    "outcome_complete":expected.get("result").map(|r|r["complete"].clone()),"error":expected.get("error")}));
+        controls.push(scaling_row(
+            "limits",
+            name,
+            &text,
+            &options,
+            quantiles(&mut times),
+            expected,
+        ));
     }
+    let fallback = fallback_measurements(&normalizer, &corpus);
+    let expanded = policy_contract_measurements(&normalizer);
+    let reviewed = recognition_scaling::measure(&normalizer);
+    let mut supplementary = support::measure_cases(
+        &normalizer,
+        "scanner",
+        scanner_scaling::cases(),
+        scanner_scaling::check,
+    );
+    supplementary.extend(support::measure_cases(
+        &normalizer,
+        "source-map",
+        source_mapping::cases(),
+        source_mapping::check,
+    ));
+    supplementary.extend(support::measure_cases(
+        &normalizer,
+        "unicode-fallback",
+        unicode_fallback_scaling::cases(),
+        unicode_fallback_scaling::check,
+    ));
+    supplementary.extend(support::measure_cases(
+        &normalizer,
+        "resources",
+        support::resource_cases(),
+        support::check_resource,
+    ));
     let report = json!({
-        "schema_version":1,"normalizer_id":normalizer.normalizer_id(),"package_version":env!("CARGO_PKG_VERSION"),
+        "schema_version":2,"report_kind":"native","method_id":"instant-frozen-cohorts-v1",
+        "workload_inventory":serde_json::from_str::<Value>(include_str!("latency/workload_inventory.json")).unwrap(),
+        "source_sha":source_sha,"normalizer_id":normalizer.normalizer_id(),"package_version":env!("CARGO_PKG_VERSION"),
         "method":{"samples_per_cohort":10000,"warmup_per_cohort":2000,
                   "timing":"Instant per call; validation mapping recognition rendering owned result disposal included",
                   "order":"deterministic corpus order alternating preserve/reject","outliers":"all retained; no overhead subtraction"},
@@ -470,11 +529,18 @@ fn main() {
         "constructor_method":"first process init separately; distribution is subsequent same-process constructor calls, not cold starts",
         "cohorts":cohorts,"per_class_policy":per_class,
         "distribution":distributions,"clock_overhead":quantiles(&mut clock),"large":large,"limit_diagnostics":controls,
-        "snapshots":snapshots,
-        "fallback_measurement":fallback_measurements(&normalizer, &corpus),
-        "expanded_coverage_measurement":policy_contract_measurements(&normalizer),
-        "reviewed_recognition_scaling":recognition_scaling::measure(&normalizer),
+        "snapshots":snapshots,"inputs":inputs,
+        "fallback_measurement":fallback,
+        "expanded_coverage_measurement":expanded,
+        "reviewed_recognition_scaling":reviewed,
+        "supplementary_scaling":supplementary,
     });
+    support::validate_inventory(&report);
+    assert_eq!(
+        source_revision(),
+        source_sha,
+        "source changed during sampling"
+    );
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -484,4 +550,21 @@ fn main() {
     file.write_all(serde_json::to_string_pretty(&report).unwrap().as_bytes())
         .unwrap();
     println!("Saved checked per-call measurements to {output}");
+}
+
+fn source_revision() -> String {
+    let run = |args: &[&str]| {
+        let result = std::process::Command::new("git")
+            .args(args)
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("git source provenance is required");
+        assert!(result.status.success(), "git provenance failed");
+        String::from_utf8(result.stdout).unwrap().trim().to_owned()
+    };
+    assert!(
+        run(&["status", "--porcelain=v1", "--untracked-files=no"]).is_empty(),
+        "sampler requires clean committed tracked sources"
+    );
+    run(&["rev-parse", "HEAD"])
 }

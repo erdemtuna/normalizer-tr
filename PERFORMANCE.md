@@ -31,6 +31,35 @@ against both cores; changed work is labelled non-comparable, not an optimization
 Build/tool/report failures remain failures. No hosted one-millisecond gate or
 new heap-allocation claim is made.
 
+Both native and installed-Python raw reports now require **schema version 2**
+and an explicit report kind. Version-one, missing-version and unsupported
+reports are rejected with regeneration guidance, not read through a legacy
+adapter. The library API is unchanged. Use a clean instrumentation-only
+reference containing the same checked workload inventory as head before
+measuring a candidate. The initial migration against an old reference fails
+actionably in the non-required performance workflow; it is not a green skip.
+
+`benches/latency/workload_inventory.json` is ordered coverage/method metadata,
+not another input or golden catalog. Native reports retain all 316 original
+long-input rows plus 123 scanner, 132 source-map, 48 Unicode fallback and six
+Input/Hints over-limit rows. The resulting 625 rows are declared coverage,
+not a sampling quota or an excuse to drop unfavorable work. Module generators
+and independent checks remain in Rust; the comparator and verifier reject
+duplicates, missing rows (including shared omissions), changed inventories,
+partial outcomes and malformed timings. Exact text/options and full outcomes
+are captured outside timed calls. Only identical validated work receives
+a ratio; changed valid inputs/outcomes retain both timings and an explicit
+non-comparability reason. Genuine limit kinds remain recorded outcomes.
+
+Three serial base/head pairs retain their alternating order. The Markdown
+summary lists coverage/non-comparability by long-input suite; detailed row
+identities, timings, digests and reasons are in `comparison.json`, and full
+text/options/outcomes remain in the raw reports. Deadline observations remain
+separate, without ratios or a hard wall-clock assertion.
+The summary also shows the five largest comparable p95 ratios per suite and
+repetition; that display bound is not an adoption threshold or evidence of
+repeatable gains.
+
 Both comparison CLIs require clean tracked sources and check source/revision
 drift before emitting a successful comparison. Reports capture base, head and
 probe-tooling revisions before building. Unrelated untracked files and ignored
@@ -134,7 +163,7 @@ parentheses. Each policy retains its text/diagnostic or genuine limit outcome
 and 100 individually timed calls, plus three 10 ms electronic deadline probes.
 Scaling rows also retain exact input/options snapshots outside the timed loop;
 the comparison hashes these snapshots and requires equal identities and outcomes.
-Older scaling reports without snapshots remain readable but have no timing ratio.
+Older scaling reports must be regenerated; missing snapshots are a format error.
 These address measured pre-existing quadratic paths, not regressions introduced
 by the new notation grammar. Indexed phone traversal and linear parenthesis
 trimming retain admission and ownership; the deadline probes record completion
@@ -146,6 +175,45 @@ existing 279 policy scaling cases are unchanged.
 Installed Python measurements include public argument validation, native Rust
 work, marshaling and result/error disposal. Eight-thread public-call timings
 are separate from the Rust target and from model/worker/audio costs.
+The sequential sections retain 2,000 warmups and 10,000 calls per cohort,
+separate Preserve/Reject and Fallback distributions, and the six policy-contract
+cohorts. The eight-thread sections retain 1,000 calls per cohort and measure
+public invocation/GIL wait, not executor queueing, equality checks or result
+disposal. Do not mix those worker samples with disposal-inclusive sequential
+samples. Constructor observations in each section concern that invocation;
+a Fallback-section first constructor is not the first core initialization
+in the process.
+
+The installed-Python version-two report retains exact prepared text/options,
+order and complete facade result/error snapshots, including original byte
+ranges, error messages/limit kinds and the derived `fallback_used` field.
+Full snapshot capture and serialization remain outside timed calls. Native
+Serde labels/ranges and Python facade labels/ranges remain distinct; neither
+parser reimplements language or grapheme rules. Python coverage/counts are
+checked against the frozen corpus and ordered policy fixtures, not expanded
+to the native long-workload matrix. There is no Python one-millisecond gate
+or cross-language timing ratio.
+
+Run the installed sampler from the repository root with the same designated
+Python environment used to build/reinstall and test the wheel:
+
+```powershell
+<absolute-installed-python> -m benches.python_latency --output <new-absolute-python-report.json>
+```
+
+It requires clean committed source and records source/tooling revision,
+interpreter, facade/native paths, build/normalizer identity and loaded-native,
+corpus and policy-fixture hashes. Final verification matches the report to
+the authoritative installed consumer/wheel; a same-version stale module is
+not acceptable. The full packaging verifier retains its existing fresh
+external consumer role and uses that same consumer interpreter for installed
+tests, consumer checks and Python sampling.
+
+Regenerate both formats into new paths after an approved reference/catalog
+change; never rewrite historical reports or combine evidence across inventories.
+Inspect artifact sizes, serialization/write cost and whole serial workflow
+duration under an exclusive measurement slot before changing timeout or scope.
+No such cost or speedup is established merely by adding instrumentation.
 Native allocation/peak instrumentation is unavailable; no inferred allocation
 counts or peak-memory claims are made.
 

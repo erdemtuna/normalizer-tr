@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "native_long_method": "instant-full-call-disposal-100-no-warmup-v1",
+  "native_method": "instant-frozen-cohorts-v1",
+  "python_method": "perf-counter-installed-frozen-v1",
+  "native": [
+    {
+      "suite": "expanded",
+      "ids": ["ungrouped-run", "grouped-money", "quoted-list", "unmatched-quotes", "invalid-group", "decomposed", "pronunciation-name", "pronunciation-phrase", "pronunciation-prefix-miss", "pronunciation-list", "pronunciation-possessive", "pronunciation-plural-possessive", "pronunciation-syncretic", "pronunciation-nominal-phrase", "pronunciation-invalid-harmony", "pronunciation-long-tail", "malformed-comma-token", "malformed-dot-token", "mixed-quantity-list", "rejected-phrase-list", "number-tail", "quantity-possession", "rate-tail", "clock-range", "date-source-tail", "account-period", "account-malformed-continuation", "address-fields", "address-invalid-field", "multiplication-chain", "multiplication-invalid-chain"],
+      "bytes": [4096, 16384, 32768],
+      "policies": ["preserve", "reject", "fallback"]
+    },
+    {"suite": "large", "ids": ["verbatim", "candidates", "amplification"], "bytes": [4096, 16384, 32768], "policies": ["preserve"]},
+    {"suite": "limits", "ids": ["maximum-hints"], "bytes": [512], "policies": ["preserve"]},
+    {"suite": "limits", "ids": ["candidate-limit"], "bytes": [8194], "policies": ["preserve"]},
+    {"suite": "limits", "ids": ["long-identifier"], "bytes": [16017], "policies": ["preserve"]},
+    {"suite": "limits", "ids": ["invalid-compounds"], "bytes": [13600], "policies": ["preserve"]},
+    {"suite": "recognition", "ids": ["failed-telephone"], "bytes": [1024, 4096, 8192, 32768], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "recognition", "ids": ["electronic-trailing-parentheses"], "bytes": [4096, 8192, 16384, 32768], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "scanner", "ids": ["list-no-comma-prose", "list-no-comma-single-identifier", "list-no-comma-many-identifiers", "list-approved-multiword", "list-late-unknown", "list-comma-prose", "address-period-prose", "address-decimal-negative", "address-url-negative", "address-explicit", "address-inferred", "address-postal-unpunctuated", "address-malformed-field"], "bytes": [4096, 16384, 32768], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "scanner", "ids": ["list-candidate-limit", "address-candidate-limit"], "bytes": [32768], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "source-map", "ids": ["ascii-single-word", "ascii-many-words", "ascii-crlf-sparse", "ascii-crlf-dense", "unicode-nfc", "unicode-decomposed", "unicode-nfc-late"], "bytes": [256, 1024, 4096, 16384, 32768], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "source-map", "ids": ["hints-zero", "hints-one", "hints-255", "hints-256", "hints-reversed-valid", "hints-invalid-early", "hints-invalid-bounds", "hints-invalid-owner", "policy-unresolved"], "bytes": [1024], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "unicode-fallback", "ids": ["unnamed-single", "named-symbol"], "bytes": [512, 2048, 8192, 16384], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "unicode-fallback", "ids": ["unnamed-family", "unnamed-variation"], "bytes": [512, 2048, 8192], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "unicode-fallback", "ids": ["result-limit-8000-scalars"], "bytes": [32000], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "unicode-fallback", "ids": ["result-limit-8192-scalars"], "bytes": [32768], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "resources", "ids": ["input-over-limit"], "bytes": [32769], "policies": ["preserve", "reject", "fallback"]},
+    {"suite": "resources", "ids": ["hints-over-limit"], "bytes": [514], "policies": ["preserve", "reject", "fallback"]}
+  ],
+  "python": {
+    "sequential_samples": 10000,
+    "warmup_calls": 2000,
+    "constructor_samples": 100,
+    "concurrent_samples": 1000,
+    "workers": 8,
+    "sequential_method": "public-invoke-error-conversion-disposal",
+    "concurrent_method": "public-invoke-gil-wait-no-executor-queue-no-disposal"
+  }
+}

@@ -69,4 +69,15 @@ mod tests {
         control.cancel();
         assert_eq!(output.word("iki"), Err(NormalizeError::Cancelled));
     }
+
+    #[test]
+    fn cancelled_append_and_separator_win_over_result_limit() {
+        let control = WorkControl::default();
+        let mut output = Output::new("üç".len(), &control);
+        output.word("üç").unwrap();
+        control.cancel();
+        assert_eq!(output.append("x"), Err(NormalizeError::Cancelled));
+        assert_eq!(output.word("dört"), Err(NormalizeError::Cancelled));
+        assert_eq!(output.finish(), "üç");
+    }
 }

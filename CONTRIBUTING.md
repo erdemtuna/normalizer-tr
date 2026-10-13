@@ -171,6 +171,20 @@ library. Run its CLI modules from the repository root with
 probes/consumers in `scripts/rust/`. `scripts/verify.ps1` remains the full local
 verification entry point.
 
+Native and installed-Python performance artifacts use the strict version-two
+formats described in [performance](PERFORMANCE.md#pr-evidence). Regenerate both
+old formats rather than repairing reports. Shared report admission lives in
+`scripts/performance_report.py`; native workload registration/evidence lives
+in `benches/latency.rs` and `benches/latency/support.rs`. Disjoint workload
+modules expose ordinary private `cases()`/`check()` functions; the ordered
+`workload_inventory.json` declares coverage metadata, not duplicated goldens.
+Keep preparation, independent checks and serialization outside call timers.
+Run installed-Python sampling as `python -m benches.python_latency` from the
+repository root, after rebuilding/reinstalling and testing that exact wheel
+with the same designated interpreter. Actual timings require an uncontended
+measurement slot; compile-only benchmark checks and untimed instrumentation
+tests do not establish performance gains.
+
 `tests/reader_interactions.rs` generates combinations around the reviewed
 clock/range, arithmetic/address and electronic-boundary failures. It uses the
 existing proptest framework, not a separate fuzz toolchain. Reproduce and expand
