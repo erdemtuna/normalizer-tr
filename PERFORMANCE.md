@@ -86,6 +86,40 @@ observations, not gains or regressions. Later adoption needs repeatable full-cal
 evidence beyond observed variation and no meaningful counter-path regression;
 do not remove noisy or slow cases to improve an aggregate.
 
+### Bounded optimization investigations
+
+Four isolated candidates were compared against the clean instrumented
+`233c099` reference, using `c9e4b85` comparison tooling. Each retained three
+fresh alternating base/head pairs, all 625 long workloads, full-call disposal,
+all outliers and the original frozen cohorts. All 7,500 long-input pairs had
+equal original inputs/options and full semantic outcomes; each public contract
+comparison reported zero changes across 237 inputs.
+
+Independent evidence review deferred all four production changes:
+
+| Investigation | Candidate | Decision and material evidence |
+|---|---|---|
+| #25, whole-input list gate | `2327de2` | Defer. Comma-free gains overlapped matched same-source variation; positive list and other counter-path costs were not cleared. |
+| #26, address possibility gate | `69d819f` | Defer. Simple URL-negative gains were persuasive, but inferred/positive address counter-path warnings prevented a no-regression conclusion. |
+| #28, ASCII source mapping | `92a4728` | Defer. Borrowed ASCII really eliminated per-input boundary storage, but repeated small-Unicode median and p95 warnings remained despite that permitted structural benefit. |
+| #29, direct code-point formatting | `ed57bf7` | Defer. Successful scalar-fallback p95 improved narrowly, but family medians and named/Preserve/Reject controls did not establish the required full-call benefit and counter-path clearance. |
+
+These are evidence-backed non-adoption decisions, not proofs that every
+measured slowdown was caused by the candidate. In particular, unusually fast
+baseline repetitions account for some large ratios. Review matched workload,
+size and policy distributions, medians and tails rather than dismissing all
+counterevidence using the global noise extrema. Faster genuine Result errors
+are not successful-output throughput gains. The source-map storage exception
+did not waive behavior or regression checks, and storage representation was
+not used to infer allocator-event counts or peak memory.
+
+Production recognition, source mapping and rendering remain unchanged.
+The instrumentation, characterization tests, candidate commits and complete
+reports are retained for future investigation. The checked reports and
+per-family p50/p95 evidence are local development artifacts, not published
+release evidence or hosted runtime guarantees. No candidate inputs, policies,
+samples or unfavorable rows were removed to obtain these decisions.
+
 Both comparison CLIs require clean tracked sources and check source/revision
 drift before emitting a successful comparison. Reports capture base, head and
 probe-tooling revisions before building. Unrelated untracked files and ignored

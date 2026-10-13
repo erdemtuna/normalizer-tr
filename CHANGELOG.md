@@ -7,6 +7,15 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Require version-two native and installed-Python performance reports with
+  complete input/options, outcome, coverage and source/binary identity evidence.
+  Regenerate older reports; no legacy report adapter is provided. Public library
+  APIs, normalization behavior and limits are unchanged.
+- Compare all 625 declared native long-input workloads, preflight their prepared
+  identities before timing, and retain genuine failures and non-comparable
+  outcomes. Keep hosted timing informational; see [PERFORMANCE.md](PERFORMANCE.md)
+  for the measurement methodology and bounded optimization decisions.
+
 ## 0.7.0 - 2026-10-11
 
 - Add bounded plural, six-person possession, case, locative-plus-ki and copular
