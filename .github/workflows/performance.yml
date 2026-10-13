@@ -35,7 +35,7 @@ concurrency:
 jobs:
   compare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: head
@@ -61,6 +61,7 @@ jobs:
         if: always()
         with:
           name: paired-native-performance
+          compression-level: 6
           path: |
             ${{ runner.temp }}/performance/*.json
             ${{ runner.temp }}/performance/*.md

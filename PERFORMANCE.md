@@ -66,6 +66,26 @@ The summary also shows the five largest comparable p95 ratios per suite and
 repetition; that display bound is not an adoption threshold or evidence of
 repeatable gains.
 
+The informational workflow has a **90-minute execution ceiling**, an operational
+policy rather than a hosted runtime estimate or latency SLA. A full same-source
+Windows reference smoke at `233c099` took 2,306,680.9043 ms (about 38.4 minutes),
+exceeding the previous 30-minute ceiling while retaining all three serial pairs,
+625 rows, samples and outliers. Its six native raw reports totaled 994,166,187
+uncompressed bytes; the installed-Python artifact is separate. Artifact upload
+uses explicit deflate compression level 6, preserving the existing default.
+An actual local level-6 ZIP of those six unchanged raw reports was 24,721,010
+bytes and took about 10.54 seconds to produce; all entries passed CRC validation.
+That compressed-size observation is not hosted upload duration or peak memory.
+Hosted upload duration, separate serializer CPU/write costs and peak/allocator
+measurements were not available. Filesystem timestamp intervals are not those
+measurements.
+
+Identical-source p95 ratios in that shared-host smoke ranged from approximately
+0.336 to 9.413, including a 5.15 failed-phone row. These are baseline variability
+observations, not gains or regressions. Later adoption needs repeatable full-call
+evidence beyond observed variation and no meaningful counter-path regression;
+do not remove noisy or slow cases to improve an aggregate.
+
 Both comparison CLIs require clean tracked sources and check source/revision
 drift before emitting a successful comparison. Reports capture base, head and
 probe-tooling revisions before building. Unrelated untracked files and ignored
