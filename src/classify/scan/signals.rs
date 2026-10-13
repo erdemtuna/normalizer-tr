@@ -97,8 +97,10 @@ pub(in crate::classify) fn identifier(text: &str) -> bool {
 }
 
 pub(super) fn telephone_group(text: &str) -> bool {
-    (!text.is_empty()
-        && text
+    // A suffixed group such as 67'den is still a phone group; the suffix is judged later.
+    let base = text.split(['\'', '’']).next().unwrap_or(text);
+    (!base.is_empty()
+        && base
             .chars()
             .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | '-' | '(' | ')')))
         || (text.len() <= 4

@@ -7,6 +7,10 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Keep a suffixed phone-like group (for example `0532 123 45 67'den`) as one
+  unsupported expression over its whole span, instead of reading its digits as a
+  separate quantity. Reject and Preserve now report one issue covering the span.
+
 ## 0.7.0 - 2026-10-11
 
 - Add bounded plural, six-person possession, case, locative-plus-ki and copular
