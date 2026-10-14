@@ -2,23 +2,7 @@ name: Performance evidence
 
 on:
   pull_request:
-    paths:
-      - "src/**"
-      - "benches/**"
-      - "tests/fixtures/**"
-      - "tests/support/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "scripts/compare_*.py"
-      - "scripts/common.py"
-      - "scripts/ci_checks.py"
-      - "scripts/performance_report.py"
-      - "scripts/verification.py"
-      - "scripts/verify.ps1"
-      - "scripts/tests/**"
-      - "scripts/rust/contract_probe.rs"
-      - ".github/workflows/performance.yml"
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
     inputs:
       base:
@@ -29,14 +13,44 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: performance-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  scope:
+    name: Select performance changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: head
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: head
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: github.event_name == 'pull_request'
+        with:
+          path: scope-base
+          repository: ${{ github.event.action == 'synchronize' && github.event.pull_request.head.repo.full_name || github.event.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.before || github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
+      - name: Check the event's changed inputs and code
+        id: scope
+        run: python -m scripts.ci_checks performance-scope --base-checkout ../scope-base
   compare:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    concurrency:
+      group: performance-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: head

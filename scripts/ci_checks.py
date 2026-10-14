@@ -7,6 +7,7 @@ import re
 import subprocess
 import tomllib
 from importlib import metadata
+from pathlib import Path
 
 from .common import ROOT
 
@@ -28,6 +29,27 @@ PORTABILITY_PACKAGES = {
     "importlib-metadata",
     "backports-tarfile",
 }
+PERFORMANCE_FILES = {
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    "benches/latency.rs",
+    "benches/corpus.json",
+    "benches/intent-corpus.json",
+    "scripts/common.py",
+    "scripts/ci_checks.py",
+    "scripts/performance_report.py",
+    "scripts/verification.py",
+    "scripts/verify.ps1",
+    "scripts/rust/contract_probe.rs",
+    ".github/workflows/performance.yml",
+}
+PERFORMANCE_PREFIXES = (
+    "src/",
+    "benches/latency/",
+    "tests/fixtures/",
+    "tests/support/",
+)
 
 
 def package_name(name):
@@ -119,6 +141,89 @@ def dependency_changes(paths):
     )
 
 
+def performance_changes(paths):
+    return any(
+        not path.endswith(".md")
+        and (
+            path in PERFORMANCE_FILES
+            or path.startswith(PERFORMANCE_PREFIXES)
+            or (path.startswith("scripts/compare_") and path.endswith(".py"))
+        )
+        for path in paths
+    )
+
+
+def performance_scope_base(event_name, action, before, pr_base):
+    if event_name == "workflow_dispatch":
+        return None
+    if event_name != "pull_request" or action not in (
+        "opened",
+        "reopened",
+        "synchronize",
+    ):
+        raise RuntimeError("unsupported performance-scope event")
+    base = before if action == "synchronize" else pr_base
+    if not isinstance(base, str) or re.fullmatch(r"[0-9a-f]{40}", base) is None:
+        raise RuntimeError("performance scope requires the exact event base commit")
+    return base
+
+
+def select_performance_changes(base_checkout):
+    event_name = os.environ["GITHUB_EVENT_NAME"]
+    event = {}
+    if event_name == "pull_request":
+        event = json.loads(
+            Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
+        )
+    base = performance_scope_base(
+        event_name,
+        event.get("action"),
+        event.get("before"),
+        event.get("pull_request", {}).get("base", {}).get("sha"),
+    )
+    if base is None:
+        run = True
+        reason = "Manual dispatch requests a complete measurement."
+    else:
+        if base_checkout is None:
+            raise RuntimeError("performance scope requires the event-base checkout")
+        base_checkout = base_checkout.resolve()
+        actual = subprocess.check_output(
+            ["git", "-C", str(base_checkout), "rev-parse", "HEAD"], text=True
+        ).strip()
+        if actual != base:
+            raise RuntimeError("performance-scope checkout differs from event base")
+        subprocess.run(
+            [
+                "git",
+                "fetch",
+                "--no-tags",
+                "--update-shallow",
+                str(base_checkout),
+                "HEAD",
+            ],
+            cwd=ROOT,
+            check=True,
+        )
+        paths = subprocess.check_output(
+            ["git", "diff", "--no-renames", "--name-only", "-z", base, "HEAD", "--"],
+            cwd=ROOT,
+            text=True,
+        ).split("\0")
+        paths = [path for path in paths if path]
+        run = performance_changes(paths)
+        kind = "latest push" if event["action"] == "synchronize" else "full PR"
+        reason = f"Checked {kind} changes from {base}: " + (
+            "measurement inputs/code changed."
+            if run
+            else "no measurement inputs/code changed."
+        )
+    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
+        stream.write(f"run={str(run).lower()}\n")
+    with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
+        stream.write(f"## Performance scope\n\n{reason}\n")
+
+
 def require_success(jobs):
     if not jobs or any(job["result"] != "success" for job in jobs.values()):
         raise RuntimeError(f"required CI jobs did not all succeed: {jobs}")
@@ -176,11 +281,13 @@ def main():
             "tool-version",
             "installed",
             "performance-reference",
+            "performance-scope",
         ),
     )
     parser.add_argument("--base")
     parser.add_argument("--tool")
     parser.add_argument("--tools", nargs="+")
+    parser.add_argument("--base-checkout", type=Path)
     args = parser.parse_args()
     if args.action == "gate":
         require_success(json.loads(os.environ["CI_NEEDS"]))
@@ -201,6 +308,8 @@ def main():
         )
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
             stream.write(f"reference={reference}\n")
+    elif args.action == "performance-scope":
+        select_performance_changes(args.base_checkout)
     else:
         changed = True
         if args.base:

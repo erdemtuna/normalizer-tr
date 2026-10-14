@@ -1,5 +1,7 @@
 import unittest
 import tempfile
+import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -9,10 +11,13 @@ from scripts.ci_checks import (
     check_tool_pins,
     dependency_changes,
     main,
+    performance_changes,
+    performance_scope_base,
     read_requirements,
     require_success,
     tool_version,
 )
+from scripts.common import ROOT
 
 
 class CiTests(unittest.TestCase):
@@ -90,6 +95,298 @@ class CiTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(dependency_changes([path]))
         self.assertFalse(dependency_changes(["README.md", "src/pipeline.rs"]))
+
+
+class PerformanceScopeTests(unittest.TestCase):
+    before = "a" * 40
+    pr_base = "b" * 40
+
+    def test_measurement_code_data_and_tooling_are_selected(self):
+        for path in (
+            "src/lib.rs",
+            "src/data/resources.json",
+            "benches/latency.rs",
+            "benches/latency/source_mapping.rs",
+            "benches/latency/workload_inventory.json",
+            "benches/corpus.json",
+            "benches/intent-corpus.json",
+            "tests/fixtures/policy-contract/money.json",
+            "tests/support/policy_contract.rs",
+            "Cargo.toml",
+            "Cargo.lock",
+            "rust-toolchain.toml",
+            "scripts/compare_performance.py",
+            "scripts/compare_contracts.py",
+            "scripts/common.py",
+            "scripts/ci_checks.py",
+            "scripts/performance_report.py",
+            "scripts/verification.py",
+            "scripts/verify.ps1",
+            "scripts/rust/contract_probe.rs",
+            ".github/workflows/performance.yml",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(performance_changes([path]))
+
+    def test_docs_media_and_unrelated_checks_are_not_selected(self):
+        paths = [
+            "README.md",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+            "PERFORMANCE.md",
+            "docs/fallback.md",
+            "assets/social-preview.png",
+            "bindings/python/README.md",
+            "bindings/python/python/normalizer_tr/__init__.py",
+            "benches/python_latency.py",
+            "benches/latency/README.md",
+            "src/data/provenance.md",
+            "tests/fallback.rs",
+            "scripts/tests/test_ci_checks.py",
+            ".github/workflows/ci.yml",
+        ]
+        self.assertFalse(performance_changes(paths))
+        self.assertFalse(performance_changes([]))
+        self.assertTrue(performance_changes(paths + ["src/pipeline.rs"]))
+
+    def test_synchronize_uses_previous_head_not_the_accumulated_pr_base(self):
+        self.assertEqual(
+            performance_scope_base(
+                "pull_request", "synchronize", self.before, self.pr_base
+            ),
+            self.before,
+        )
+        for action in ("opened", "reopened"):
+            self.assertEqual(
+                performance_scope_base(
+                    "pull_request", action, self.before, self.pr_base
+                ),
+                self.pr_base,
+            )
+        self.assertIsNone(performance_scope_base("workflow_dispatch", None, None, None))
+
+    def test_missing_malformed_and_unsupported_events_fail(self):
+        for value in (None, "", "HEAD", "a" * 39, True):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(RuntimeError, "exact event base"),
+            ):
+                performance_scope_base(
+                    "pull_request", "synchronize", value, self.pr_base
+                )
+        for event_name, action in (("push", None), ("pull_request", "closed")):
+            with self.assertRaisesRegex(RuntimeError, "unsupported"):
+                performance_scope_base(event_name, action, self.before, self.pr_base)
+
+    def run_scope(
+        self, directory, paths, *, actual=None, failure=None, diff_failure=None
+    ):
+        root = Path(directory)
+        event_path = root / "event.json"
+        event_path.write_text(
+            json.dumps(
+                {
+                    "action": "synchronize",
+                    "before": self.before,
+                    "pull_request": {"base": {"sha": self.pr_base}},
+                }
+            )
+        )
+        output, summary = root / "outputs", root / "summary"
+        checkout = (root / "base").resolve()
+        commands = patch(
+            "scripts.ci_checks.subprocess.check_output",
+            side_effect=[
+                (actual or self.before) + "\n",
+                diff_failure or "\0".join(paths) + "\0",
+            ],
+        )
+        with (
+            patch(
+                "sys.argv",
+                ["ci-checks", "performance-scope", "--base-checkout", str(checkout)],
+            ),
+            patch.dict(
+                "os.environ",
+                {
+                    "GITHUB_EVENT_NAME": "pull_request",
+                    "GITHUB_EVENT_PATH": str(event_path),
+                    "GITHUB_OUTPUT": str(output),
+                    "GITHUB_STEP_SUMMARY": str(summary),
+                },
+            ),
+            commands as reads,
+            patch("scripts.ci_checks.subprocess.run", side_effect=failure) as fetch,
+        ):
+            main()
+        fetch.assert_called_once_with(
+            ["git", "fetch", "--no-tags", "--update-shallow", str(checkout), "HEAD"],
+            cwd=ROOT,
+            check=True,
+        )
+        self.assertEqual(
+            reads.call_args_list[-1].args[0],
+            [
+                "git",
+                "diff",
+                "--no-renames",
+                "--name-only",
+                "-z",
+                self.before,
+                "HEAD",
+                "--",
+            ],
+        )
+        return output.read_text(), summary.read_text()
+
+    def test_actual_cli_skips_docs_and_preserves_deleted_or_renamed_source_paths(self):
+        for paths, expected in (
+            (["README.md", "CHANGELOG.md"], "false"),
+            (["src/pipeline.rs", "README.md"], "true"),
+            (["src/renamed\nsource.rs"], "true"),
+        ):
+            with self.subTest(paths=paths), tempfile.TemporaryDirectory() as directory:
+                output, summary = self.run_scope(directory, paths)
+                self.assertEqual(output, f"run={expected}\n")
+                self.assertIn("latest push", summary)
+                self.assertIn(self.before, summary)
+
+    def test_checkout_mismatch_or_git_failure_cannot_emit_a_skip(self):
+        for actual, failure, diff_failure, error in (
+            (self.pr_base, None, None, RuntimeError),
+            (
+                None,
+                subprocess.CalledProcessError(1, ["git", "fetch"]),
+                None,
+                subprocess.CalledProcessError,
+            ),
+            (
+                None,
+                None,
+                subprocess.CalledProcessError(1, ["git", "diff"]),
+                subprocess.CalledProcessError,
+            ),
+        ):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                with self.assertRaises(error):
+                    self.run_scope(
+                        directory,
+                        ["README.md"],
+                        actual=actual,
+                        failure=failure,
+                        diff_failure=diff_failure,
+                    )
+                self.assertFalse((root / "outputs").exists())
+                self.assertFalse((root / "summary").exists())
+
+    def test_manual_dispatch_requests_measurement_without_diffing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with (
+                patch("sys.argv", ["ci-checks", "performance-scope"]),
+                patch.dict(
+                    "os.environ",
+                    {
+                        "GITHUB_EVENT_NAME": "workflow_dispatch",
+                        "GITHUB_OUTPUT": str(root / "outputs"),
+                        "GITHUB_STEP_SUMMARY": str(root / "summary"),
+                    },
+                ),
+                patch("scripts.ci_checks.subprocess.run") as fetch,
+                patch("scripts.ci_checks.subprocess.check_output") as reads,
+            ):
+                main()
+            fetch.assert_not_called()
+            reads.assert_not_called()
+            self.assertEqual((root / "outputs").read_text(), "run=true\n")
+            self.assertIn("Manual dispatch", (root / "summary").read_text())
+
+    def test_only_the_conditionally_run_heavy_job_owns_concurrency(self):
+        workflow = (ROOT / ".github/workflows/performance.yml").read_text()
+        self.assertNotIn("\nconcurrency:", workflow)
+        compare = workflow.split("\n  compare:", 1)[1]
+        self.assertIn("needs: scope", compare)
+        self.assertIn("if: needs.scope.outputs.run == 'true'", compare)
+        self.assertIn("    concurrency:", compare)
+        self.assertIn("      cancel-in-progress: true", compare)
+
+    def test_real_shallow_force_push_snapshots_use_endpoint_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, head, base = root / "source", root / "head", root / "base"
+            source.mkdir()
+
+            def git(*args, cwd=source):
+                return subprocess.check_output(
+                    ["git", *args], cwd=cwd, text=True, stderr=subprocess.PIPE
+                ).strip()
+
+            git("init", "--quiet")
+            git("config", "user.name", "Scope fixture")
+            git("config", "user.email", "scope@example.invalid")
+            (source / "src").mkdir()
+            code = source / "src" / "pipeline.rs"
+            code.write_text("old\n")
+            (source / "README.md").write_text("old\n")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "initial")
+            initial = git("rev-parse", "HEAD")
+            code.write_text("new\n")
+            git("commit", "--quiet", "-am", "code")
+            previous = git("rev-parse", "HEAD")
+            git("branch", "previous")
+            git("switch", "--detach", initial)
+            code.write_text("new\n")
+            (source / "README.md").write_text("new docs\n")
+            git("commit", "--quiet", "-am", "rewritten docs")
+            git("branch", "current")
+            for branch, target in (("current", head), ("previous", base)):
+                git(
+                    "clone",
+                    "--quiet",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    branch,
+                    source.as_uri(),
+                    str(target),
+                    cwd=root,
+                )
+            event_path = root / "event.json"
+            event_path.write_text(
+                json.dumps(
+                    {
+                        "action": "synchronize",
+                        "before": previous,
+                        "pull_request": {"base": {"sha": initial}},
+                    }
+                )
+            )
+            output = root / "outputs"
+            with (
+                patch("scripts.ci_checks.ROOT", head),
+                patch(
+                    "sys.argv",
+                    [
+                        "ci-checks",
+                        "performance-scope",
+                        "--base-checkout",
+                        str(base),
+                    ],
+                ),
+                patch.dict(
+                    "os.environ",
+                    {
+                        "GITHUB_EVENT_NAME": "pull_request",
+                        "GITHUB_EVENT_PATH": str(event_path),
+                        "GITHUB_OUTPUT": str(output),
+                        "GITHUB_STEP_SUMMARY": str(root / "summary"),
+                    },
+                ),
+            ):
+                main()
+            self.assertEqual(output.read_text(), "run=false\n")
 
 
 class ToolPinTests(unittest.TestCase):
