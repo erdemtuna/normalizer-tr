@@ -168,6 +168,9 @@ fn original_prefixes_quotes_and_following_quantities_keep_exact_segments() {
             "phone-suffixed-noncomposing-mark",
             "phone-suffixed-marked-closer-before-tail",
             "phone-suffixed-marked-closer-after-tail",
+            "phone-suffixed-repeated-after-closer",
+            "phone-suffixed-empty-after-closer",
+            "phone-suffixed-digit-after-closer",
         ]
         .contains(&case["id"].as_str().unwrap())
     }) {
@@ -677,6 +680,168 @@ fn a_marked_closing_delimiter_does_not_glue_the_following_number() {
     assert_eq!(result.segments()[1].range(), SourceRange::new(3, 5));
     assert_eq!(result.segments()[1].kind(), SegmentKind::Cardinal);
     partition(")\u{301}12", &result);
+}
+
+#[test]
+fn repeated_post_closer_tails_cannot_quote_away_a_later_phone_failure() {
+    let normalizer = Normalizer::new().unwrap();
+    let second = "0532 123 45 67'";
+    for (tail, literal) in [
+        ("'de", "kesme de e"),
+        ("'d2", "kesme de iki"),
+        ("'den'de", "kesme de e ne kesme de e"),
+        ("'", "kesme"),
+    ] {
+        let first = format!("0532 123 45 (67'den){tail}");
+        for prefix in ["", "O\u{308}nce "] {
+            let source = format!("{prefix}{first} ; {second}; 5 kg");
+            let first_range = SourceRange::new(prefix.len(), prefix.len() + first.len());
+            let second_start = first_range.end() + " ; ".len();
+            let second_range = SourceRange::new(second_start, second_start + second.len());
+            let preserved = normalizer.normalize(&source, &Default::default()).unwrap();
+            assert_eq!(
+                preserved.normalized_text(),
+                format!("{prefix}{first} ; {second}; beş kilogram")
+            );
+            assert_eq!(
+                preserved
+                    .issues()
+                    .iter()
+                    .map(|i| i.range())
+                    .collect::<Vec<_>>(),
+                [first_range, second_range]
+            );
+            assert!(
+                preserved
+                    .segments()
+                    .iter()
+                    .all(|s| s.kind() != SegmentKind::Telephone)
+            );
+            partition(&source, &preserved);
+            assert_eq!(
+                normalizer.normalize(&source, &options(AmbiguityPolicy::Reject)),
+                Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+            );
+            let fallback = normalizer
+                .normalize(&source, &options(AmbiguityPolicy::Fallback))
+                .unwrap();
+            assert!(fallback.complete() && fallback.issues().is_empty());
+            assert_eq!(
+                fallback
+                    .fallbacks()
+                    .iter()
+                    .map(|f| f.range())
+                    .collect::<Vec<_>>(),
+                [first_range, second_range]
+            );
+            assert_eq!(
+                fallback.normalized_text(),
+                format!(
+                    "{prefix}sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi kesme de e ne kapat parantez {literal} ; sıfır beş üç iki bir iki üç dört beş altı yedi kesme; beş kilogram"
+                )
+            );
+            partition(&source, &fallback);
+            for policy in POLICIES {
+                assert_eq!(
+                    normalizer.normalize(
+                        &source,
+                        &NormalizeOptions {
+                            ambiguity_policy: policy,
+                            hints: vec![Hint::new(
+                                SourceRange::new(second_start, second_range.end() - 1),
+                                HintKind::Telephone
+                            )],
+                        }
+                    ),
+                    Err(NormalizeError::InvalidHint)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn empty_parenthesis_tails_keep_external_separators_and_neighbors_independent() {
+    let normalizer = Normalizer::new().unwrap();
+    let phone = "0532 123 45(67')'";
+    for (separator, neighbor, spoken) in [
+        ("; ", "5 kg", "beş kilogram"),
+        (";", "5kg", "beş kilogram"),
+        (";", "5", "beş"),
+    ] {
+        let source = format!("{phone}{separator}{neighbor}");
+        let (preserved, fallback) = failure(&normalizer, &source, SourceRange::new(0, phone.len()));
+        assert_eq!(
+            preserved.normalized_text(),
+            format!("{phone}{separator}{spoken}")
+        );
+        assert!(
+            fallback
+                .normalized_text()
+                .ends_with(&format!("{separator}{spoken}"))
+        );
+        assert_eq!(
+            preserved.segments().last().unwrap().range(),
+            SourceRange::new(phone.len() + separator.len(), source.len())
+        );
+    }
+    let source = "2(3');5";
+    let preserved = normalizer.normalize(source, &Default::default()).unwrap();
+    assert_eq!(preserved.normalized_text(), "2(3');beş");
+    assert_eq!(preserved.issues().len(), 1);
+    assert_eq!(preserved.issues()[0].range(), SourceRange::new(0, 5));
+    partition(source, &preserved);
+}
+
+#[test]
+fn alternating_closers_and_tails_remain_one_bounded_owner() {
+    let normalizer = Normalizer::new().unwrap();
+    for count in [1, 16, 128, 512] {
+        let source = format!(
+            "0532 123 {}67'den{}",
+            "(".repeat(count),
+            ")'de".repeat(count)
+        );
+        let (preserved, fallback) =
+            failure(&normalizer, &source, SourceRange::new(0, source.len()));
+        assert_eq!(preserved.normalized_text(), source);
+        assert_eq!(fallback.fallbacks().len(), 1);
+    }
+}
+
+#[test]
+fn maximal_alternating_tail_chain_keeps_its_owner_or_reports_a_real_result_limit() {
+    let normalizer = Normalizer::new().unwrap();
+    let prefix = "0532 123 ";
+    let middle = "67'den";
+    let opening = "(";
+    let closing_tail = ")'de";
+    let count =
+        (MAX_INPUT_BYTES - prefix.len() - middle.len()) / (opening.len() + closing_tail.len());
+    let source = format!(
+        "{prefix}{}{middle}{}",
+        opening.repeat(count),
+        closing_tail.repeat(count)
+    );
+    let owner = SourceRange::new(0, source.len());
+    let preserved = normalizer.normalize(&source, &Default::default()).unwrap();
+    assert_eq!(preserved.normalized_text(), source);
+    assert_eq!(preserved.issues().len(), 1);
+    assert_eq!(preserved.issues()[0].range(), owner);
+    assert_eq!(
+        normalizer.normalize(&source, &options(AmbiguityPolicy::Reject)),
+        Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+    );
+    match normalizer.normalize(&source, &options(AmbiguityPolicy::Fallback)) {
+        Ok(result) => {
+            partition(&source, &result);
+            assert!(result.complete() && result.issues().is_empty());
+            assert_eq!(result.fallbacks().len(), 1);
+            assert_eq!(result.fallbacks()[0].range(), owner);
+        }
+        Err(NormalizeError::LimitExceeded(LimitKind::Result)) => {}
+        other => panic!("unexpected maximal tail-chain outcome: {other:?}"),
+    }
 }
 
 #[test]

@@ -16,6 +16,9 @@ pub(super) fn quotation_boundaries(text: &str) -> Vec<usize> {
     let mut boundaries = Vec::new();
     let mut open = None;
     let mut previous = None;
+    let mut numeric_base = true;
+    let mut has_digit = false;
+    let mut numeric_tail = false;
     let mut chars = text.char_indices().peekable();
     while let Some((offset, ch)) = chars.next() {
         let next = chars.peek().map(|(_, ch)| *ch);
@@ -34,13 +37,27 @@ pub(super) fn quotation_boundaries(text: &str) -> Vec<usize> {
             // A tail after a numeric closing parenthesis is not a prose quote opener.
             && !(ch == '\''
                 && previous == Some(')')
-                && text[..offset]
+                && ((numeric_base && has_digit) || text[..offset]
                     .chars()
                     .rev()
                     .find(|ch| *ch != ')')
-                    .is_some_and(|ch| ch.is_ascii_digit()))
+                    .is_some_and(|ch| ch.is_ascii_digit())))
         {
             open = Some((offset, if ch == '‘' { '’' } else { '\'' }));
+        }
+        if ch.is_whitespace() || ch == ',' || (delimiter(ch) && !matches!(ch, '(' | ')')) {
+            numeric_base = true;
+            has_digit = false;
+            numeric_tail = false;
+        } else if !numeric_tail {
+            if matches!(ch, '\'' | '’') && numeric_base && has_digit {
+                numeric_tail = true;
+            } else {
+                has_digit |= ch.is_ascii_digit();
+                numeric_base &= ch.is_ascii_digit()
+                    || matches!(ch, '+' | '-' | '(' | ')')
+                    || unicode_normalization::char::is_combining_mark(ch);
+            }
         }
         previous = Some(ch);
     }
@@ -56,15 +73,30 @@ pub(in crate::classify) fn trimmed_range(
     offset: usize,
     quotes: &[usize],
 ) -> Option<SourceRange> {
+    trim_range(text, offset, quotes, false)
+}
+
+pub(super) fn compound_range(text: &str, offset: usize, quotes: &[usize]) -> Option<SourceRange> {
+    trim_range(text, offset, quotes, numeric_parenthesis_compound(text))
+}
+
+fn trim_range(
+    text: &str,
+    offset: usize,
+    quotes: &[usize],
+    keep_parentheses: bool,
+) -> Option<SourceRange> {
+    let prose_boundary =
+        |ch, offset| boundary(ch, offset, quotes) && !(keep_parentheses && matches!(ch, '(' | ')'));
     let first = text
         .char_indices()
-        .find(|(i, ch)| !boundary(*ch, offset + i, quotes) && !matches!(ch, ',' | '…'))?
+        .find(|(i, ch)| !prose_boundary(*ch, offset + i) && !matches!(ch, ',' | '…'))?
         .0;
     let leading = &text[first..];
     let start = offset + first;
     let mut body = leading;
     while let Some((i, ch)) = body.char_indices().next_back() {
-        if !boundary(ch, start + i, quotes) && ch != '…' {
+        if !prose_boundary(ch, start + i) && ch != '…' {
             break;
         }
         body = &body[..i];
@@ -91,7 +123,7 @@ pub(in crate::classify) fn trimmed_range(
         body = &body[..body.len() - 1];
     }
     while let Some((i, ch)) = body.char_indices().next_back() {
-        if !boundary(ch, start + i, quotes) {
+        if !prose_boundary(ch, start + i) {
             break;
         }
         body = &body[..i];

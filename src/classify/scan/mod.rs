@@ -77,11 +77,14 @@ pub(super) fn tokens<'a>(
             continue;
         }
         if numeric_parenthesis_compound(raw) {
-            append_token(
+            append_parenthesis_compound(
                 &mut tokens,
                 source,
-                SourceRange::new(matched.start(), matched.end()),
-            );
+                raw,
+                matched.start(),
+                &quotes,
+                control,
+            )?;
             continue;
         }
         let Some(range) = expression_range(raw, matched.start(), &quotes, control)? else {
@@ -194,6 +197,38 @@ pub(super) fn tokens<'a>(
         tokens,
         catalog_groups,
     })
+}
+
+fn append_parenthesis_compound<'a>(
+    tokens: &mut Vec<Token<'a>>,
+    source: &'a SourceMap,
+    raw: &str,
+    offset: usize,
+    quotes: &[usize],
+    control: &WorkControl,
+) -> Result<(), NormalizeError> {
+    let mut start = 0;
+    let mut depth = 0_usize;
+    for (index, ch) in raw.char_indices() {
+        control.check()?;
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            ';' if depth == 0 => {
+                if let Some(range) =
+                    punctuation::compound_range(&raw[start..index], offset + start, quotes)
+                {
+                    append_token(tokens, source, range);
+                }
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if let Some(range) = punctuation::compound_range(&raw[start..], offset + start, quotes) {
+        append_token(tokens, source, range);
+    }
+    Ok(())
 }
 
 fn account_periods(

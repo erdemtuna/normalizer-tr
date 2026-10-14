@@ -170,24 +170,24 @@ fn telephone_suffix_end(
     } else {
         next.range.start
     };
-    let (start, base) =
+    let (start, surface) =
         match notation::telephone_suffix_surface(&ctx.text[start..next.range.end], control)? {
-            Some((base, _)) => (start, base),
+            Some(surface) => (start, surface),
             None if start != ctx.tokens[end].range.start
                 && !gap.chars().any(char::is_whitespace) =>
             {
                 let start = ctx.tokens[end].range.start;
-                let Some((base, _)) =
+                let Some(surface) =
                     notation::telephone_suffix_surface(&ctx.text[start..next.range.end], control)?
                 else {
                     return Ok(None);
                 };
-                (start, base)
+                (start, surface)
             }
             None => return Ok(None),
         };
     let mut depth = 0_usize;
-    for ch in ctx.text[ctx.tokens[index].range.start..start + base.len()].chars() {
+    for ch in ctx.text[ctx.tokens[index].range.start..start + surface.base.len()].chars() {
         control.check()?;
         match ch {
             '(' => depth += 1,
@@ -195,20 +195,38 @@ fn telephone_suffix_end(
             _ => {}
         }
     }
+    depth = depth.saturating_sub(surface.closing_parentheses);
     let mut source_end = next.range.end;
-    for grapheme in ctx.text[source_end..].graphemes(true) {
-        if depth == 0 {
-            break;
-        }
+    let mut closed = surface.closing_parentheses > 0;
+    loop {
         control.check()?;
-        let mut scalars = grapheme.chars();
-        if scalars.next() != Some(')')
-            || !scalars.all(unicode_normalization::char::is_combining_mark)
+        if depth > 0
+            && let Some(grapheme) = ctx.text[source_end..].graphemes(true).next()
+            && marked_closer(grapheme, control)?
         {
-            break;
+            source_end += grapheme.len();
+            depth -= 1;
+            closed = true;
+            continue;
         }
-        source_end += grapheme.len();
-        depth -= 1;
+        while ctx
+            .tokens
+            .get(terminal + 1)
+            .is_some_and(|token| token.range.end <= source_end)
+        {
+            terminal += 1;
+        }
+        if closed
+            && let Some(token) = ctx.tokens.get(terminal + 1)
+            && token.range.start == source_end
+            && let Some(closers) = notation::telephone_tail_surface(token.text, control)?
+        {
+            source_end = token.range.end;
+            terminal += 1;
+            depth = depth.saturating_sub(closers);
+            continue;
+        }
+        break;
     }
     Ok(Some((terminal, source_end)))
 }

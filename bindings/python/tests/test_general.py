@@ -92,6 +92,7 @@ PHONE_CASES = json.loads(
             "phone-suffixed-noncomposing-mark",
             "phone-suffixed-marked-closer-before-tail",
             "phone-suffixed-marked-closer-after-tail",
+            "phone-suffixed-empty-parenthesis-chain",
         )
     ],
 )
@@ -305,3 +306,44 @@ def test_marked_phone_closer_keeps_the_following_owner(policy, neighbor, kind, s
     assert "".join(s.text for s in result.segments) == result.normalized_text
     assert result.segments[-1].kind == "unit"
     assert result.segments[-1].text == "beş kilogram"
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+@pytest.mark.parametrize("tail", ("'de", "'d2", "'den'de", "'"))
+def test_repeated_tail_after_phone_closer_cannot_hide_the_next_empty_tail(policy, tail):
+    prefix = "O\u0308nce "
+    first = "0532 123 45 (67'den)" + tail
+    second = "0532 123 45 67'"
+    source = prefix + first + " ; " + second + "; 5 kg"
+    first_start = len(prefix.encode("utf-8"))
+    first_end = first_start + len(first)
+    second_start = first_end + 3
+    second_end = second_start + len(second)
+    normalizer = Normalizer()
+    if policy == "reject":
+        with pytest.raises(NormalizationError) as raised:
+            normalizer.normalize(source, ambiguity_policy=policy)
+        assert raised.value.code == "unresolved"
+        records = raised.value.issues
+    else:
+        result = normalizer.normalize(source, ambiguity_policy=policy)
+        assert result.complete == (policy == "fallback")
+        records = result.fallbacks if policy == "fallback" else result.issues
+        assert all(segment.kind != "telephone" for segment in result.segments)
+        if policy == "preserve":
+            assert (
+                result.normalized_text
+                == prefix + first + " ; " + second + "; beş kilogram"
+            )
+        assert "".join(s.text for s in result.segments) == result.normalized_text
+    assert [(record.start_byte, record.end_byte) for record in records] == [
+        (first_start, first_end),
+        (second_start, second_end),
+    ]
+    with pytest.raises(NormalizationError) as raised:
+        normalizer.normalize(
+            source,
+            ambiguity_policy=policy,
+            hints=(Hint(second_start, second_end - 1, "telephone"),),
+        )
+    assert raised.value.code == "invalid_hint"

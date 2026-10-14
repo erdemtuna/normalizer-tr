@@ -26,6 +26,8 @@ Platform requirements are in the [README](README.md) and
   or cause an extended claim to skip it. Adjacent identifiers/quantities/names
   retain their own owners; standalone `)\u030112` now retains the closer and
   reads the independent number. Marked semicolon/comma compounds are unchanged.
+  Repeated/empty tails after owned closers stay atomic and cannot quote away
+  the suffix of a later independent phone.
 - Validate native comparison reports against their respective source fixture
   catalogs, allowing append-only regression coverage without misvalidating
   an older baseline against newer inputs. Changed cohorts remain non-comparable.
