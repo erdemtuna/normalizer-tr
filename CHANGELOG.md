@@ -7,6 +7,19 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Name supported standalone uppercase letters as primary Symbol segments in every
+  policy, using the existing Turkish names and `letter.name` rule. Lowercase,
+  uppercase words, punctuation-derived fragments and protected compound owners
+  are not newly spelled. Confirmed isolated straight/smart single/double quote
+  pairs may be transparent; source quotes and whitespace remain exact.
+  This deliberately includes unmarked initials and ordinary standalone capitals.
+  Eligible bare Roman singles now resolve under Preserve/Reject and lose their
+  Roman literal-fallback diagnostics; multi-letter Romans, contextual numeral
+  readings and explicit hints retain precedence. Public fields, enum labels,
+  defaults and limits are unchanged, but Symbol now also denotes primary letter
+  names. Long singleton runs may reach candidate/result budgets. Update text,
+  segment-kind/rule and diagnostic snapshots as appropriate; no speech-model
+  validation is claimed. See [source boundaries](docs/normalization.md#standalone-uppercase-letters).
 - Include long-input and failed work in performance comparisons, with exact
   input/options, full outcomes and explicit non-comparability. Native and
   installed-Python reports require version two; regenerate older artifacts

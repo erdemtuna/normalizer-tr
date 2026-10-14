@@ -1,5 +1,23 @@
 //! Small explicit name inventory, adapted from compatible PR #1 data.
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct LetterName(&'static str);
+
+impl LetterName {
+    pub(crate) fn parse(source: &str) -> Option<Self> {
+        let mut scalars = source.chars();
+        let letter = scalars.next()?;
+        if scalars.next().is_some() || !letter.is_uppercase() {
+            return None;
+        }
+        letter_name(letter).map(Self)
+    }
+
+    pub(crate) fn text(self) -> &'static str {
+        self.0
+    }
+}
+
 pub(crate) fn letter_name(letter: char) -> Option<&'static str> {
     Some(match letter {
         'a' | 'A' => "a",

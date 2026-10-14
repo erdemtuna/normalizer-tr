@@ -92,6 +92,16 @@ Identifier `AB12` and uncued Roman `IV` use their protected/literal
 readings. Bare or invalid slash-date notation remains literal, without a
 PreferredDate or SurfaceDate assumption.
 
+Eligible standalone uppercase letters are primary Symbol readings in all three
+policies, with rule `letter.name`, not handled-source fallback. Bare `V` now
+names `ve` without a Roman/MissingIntent/Literal diagnostic; multi-letter `IV`,
+punctuation-derived letters and failed compound owners keep existing behavior.
+Names do not imply `FallbackClass::Symbol` or create a fallback record.
+Only the eligible single-letter Roman finding is replaced; unrelated
+issues, cancellation and resource errors remain. See
+[standalone letters](normalization.md#standalone-uppercase-letters) for exact
+source/quote boundaries and the deliberate effects on unmarked initials.
+
 In failed quantity expressions, approved labels are recognized in numeric
 context before symbol/letter splitting: `01 °C` reads
 `sıfır bir derece Santigrat` with an InvalidForm diagnostic, not a validated

@@ -39,7 +39,8 @@ pub enum SegmentKind {
     Roman,
     /// Supported email or web address.
     Electronic,
-    /// Approved prose symbol, multiplication operator, or contextual separator.
+    /// Approved prose symbol, standalone uppercase letter name, multiplication operator,
+    /// or contextual separator. A primary kind, not a fallback diagnostic.
     Symbol,
     /// Source-faithful fallback, not certification of the source value.
     Fallback,

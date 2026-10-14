@@ -90,6 +90,35 @@ pub(super) fn read(
     bounds: &Boundaries<'_>,
     control: &WorkControl,
 ) -> Result<Option<(super::Reading, usize)>, NormalizeError> {
+    let reading = existing(ctx, index, bounds, control)?;
+    let eligible = match &reading {
+        None => true,
+        Some((super::Reading::Unresolved(finding), end)) => {
+            *end == index
+                && finding.class() == FallbackClass::Roman
+                && finding.category() == Some(IssueCategory::Ambiguous)
+                && finding.reason() == crate::FallbackReason::MissingIntent
+        }
+        _ => false,
+    };
+    if eligible
+        && ctx.tokens[index].standalone
+        && let Some(letter) = numbers::LetterName::parse(ctx.tokens[index].text)
+    {
+        return Ok(Some((
+            super::Reading::Resolved(Value::Letter(letter)),
+            index,
+        )));
+    }
+    Ok(reading)
+}
+
+fn existing(
+    ctx: &Context<'_>,
+    index: usize,
+    bounds: &Boundaries<'_>,
+    control: &WorkControl,
+) -> Result<Option<(super::Reading, usize)>, NormalizeError> {
     if let Some(attempt) = products::read(ctx, index, control)? {
         return Ok(Some(attempt));
     }

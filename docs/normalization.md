@@ -363,6 +363,54 @@ explicit hint; there is no general proper-name detector.
 
 ## Electronic text and symbols
 
+### Standalone uppercase letters
+
+A supported uppercase letter occupying a complete whitespace-delimited source
+atom receives its Turkish letter name as a primary Symbol segment in every
+policy, with rule `letter.name`. For example, `P ve S dalgaları` becomes
+`pe ve se dalgaları`; `N tipi` becomes `ne tipi`; `V yakalı` becomes `ve yakalı`.
+No following noun, suffix, coordination or technical context is required.
+Unmarked initials (`S Yılmaz`), ordinary capitals (`O geldi`) and longer
+space-separated letter lists deliberately follow the same rule.
+
+The inventory is the Turkish uppercase alphabet plus `Q`, `W` and `X`, named
+`kü`, `çift ve` and `iks`. `I` names `ı`, while `İ` names `i`. Lowercase letters,
+unknown uppercase words and unsupported alphabets are not automatically spelled.
+Approved initialisms keep their established readings and Abbreviation segments.
+
+Every scanner whitespace separator, including tabs and line breaks, establishes
+independent atoms and stays exact. Zero-width characters are not separators.
+Confirmed straight single/double or smart single/double quote pairs may wrap
+one letter or a phrase: `“P” ve ‘S’` becomes `“pe” ve ‘se’`, and
+`"P ve S dalgaları"` becomes `"pe ve se dalgaları"`. Wrappers must be externally
+isolated by whitespace or input boundaries. Unambiguous different-style nested
+pairs work; unmatched, mismatched or ambiguous pairs and other quote styles do
+not provide transparency. Quotes remain outside the letter's original-source owner.
+
+Punctuation trimming alone never establishes this intent: `S.`, `S)`, `(S)`,
+`P,S`, `S/P`, `S’nin` and `"S"X` do not gain letter readings. In `P, S`, only
+the independently isolated `S` gains a name. This is source recognition, not
+a pass over emitted text or arbitrary identifier interiors.
+
+Existing primary readings and failed whole-expression owners retain precedence:
+`5 V` stays `beş volt`; invalid `01 V` stays one unresolved quantity, and a
+failed product or address field never releases a letter to this rule.
+Only an eligible bare single Roman letter's missing-intent finding is replaced.
+`V` now names `ve` without issues or fallbacks, but `IV`, `C.` and list-marker
+forms keep existing intent/policy behavior. `V. yüzyıl` and valid explicit Roman
+hints retain numeral readings. `V 5` names V independently of the following
+cardinal; it does not acquire a new prefix-unit interpretation.
+
+Recognition uses one supported NFC scalar on its whole original grapheme:
+decomposed `I` + U+0307 names `i` with the full original three-byte range.
+Other combining marks are not discarded to expose a supported base.
+Names, including already word-shaped `A`/`O`, have non-Verbatim Symbol segments;
+completion remains a statement about recognized work, not audio quality.
+Repeated singleton input can now reach candidate/result budgets rather than
+remaining one cheap Verbatim span.
+
+### Electronic source
+
 The bounded grammar supports ASCII unquoted email, HTTP/HTTPS (scheme case
 insensitive), `www`, and a bare domain with a `web` / `site` cue or Electronic
 hint. Final TLDs are `com`, `net`, `org`, `tr`, `gov`, `edu`, `app`.

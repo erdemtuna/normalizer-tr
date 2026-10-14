@@ -9,7 +9,7 @@ pub(crate) use quantities::{
     unsupported_label,
 };
 pub(crate) use suffix::{split_suffix, suffix_parts};
-pub(crate) use symbols::{emoticon_length, letter_name, needs_reading, symbol_name};
+pub(crate) use symbols::{LetterName, emoticon_length, letter_name, needs_reading, symbol_name};
 pub(crate) use temporal::{DateSurface, TimeSurface};
 
 pub(crate) fn digits_hint(text: &str) -> Option<String> {

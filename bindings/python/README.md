@@ -103,6 +103,13 @@ redaction or a voice-quality promise. See the [fallback contract](../../docs/fal
 for readings and Rust Serde versus Python record naming, and the
 [normalization reference](../../docs/normalization.md) for supported formats.
 
+Eligible standalone uppercase letters use primary `kind="symbol"` and
+`rule_id="letter.name"` in every policy, without letter fallback records.
+For example, `P ve S dalgaları` becomes `pe ve se dalgaları`. Existing
+abbreviations remain `"abbreviation"`; supported Roman hints still win.
+See [source boundaries](../../docs/normalization.md#standalone-uppercase-letters)
+before updating text, segment or diagnostic snapshots.
+
 `normalize(text, *, ambiguity_policy="preserve", hints=(), cancellation=None,
 deadline_ms=None)` takes Python str, typed Hint objects, optional
 CancellationToken, and an integer deadline of 1–60000 ms. Booleans do not count as

@@ -3,6 +3,7 @@ mod lists;
 mod piece;
 mod punctuation;
 mod signals;
+mod standalone;
 
 use super::context;
 use crate::{
@@ -26,6 +27,7 @@ pub(super) struct Token<'a> {
     pub(super) number_run_end: usize,
     pub(super) phone_run_end: usize,
     pub(super) digit_end: usize,
+    pub(super) standalone: bool,
 }
 
 pub(super) struct Scanned<'a> {
@@ -165,6 +167,7 @@ pub(super) fn tokens<'a>(
         }
     }
     account_periods(text, &mut tokens, control)?;
+    standalone::mark(text, &mut tokens, control)?;
     let mut digits = 0;
     for token in &mut tokens {
         control.check()?;
@@ -251,6 +254,7 @@ fn append_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: S
         number_run_end: 0,
         phone_run_end: 0,
         digit_end: 0,
+        standalone: false,
     });
 }
 
