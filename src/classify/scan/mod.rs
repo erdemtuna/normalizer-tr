@@ -1,4 +1,5 @@
 //! Tokenization and indexed source traversal.
+mod compounds;
 mod lists;
 mod piece;
 mod punctuation;
@@ -79,7 +80,7 @@ pub(super) fn tokens<'a>(
         }
         if numeric_parenthesis_compound(raw) {
             if raw.contains(['\'', '’']) {
-                append_parenthesis_compound(
+                compounds::append(
                     &mut tokens,
                     source,
                     raw,
@@ -207,82 +208,6 @@ pub(super) fn tokens<'a>(
         tokens,
         catalog_groups,
     })
-}
-
-fn append_parenthesis_compound<'a>(
-    tokens: &mut Vec<Token<'a>>,
-    source: &'a SourceMap,
-    raw: &str,
-    offset: usize,
-    quotes: &[usize],
-    parentheses: &mut Option<Vec<punctuation::ParenthesisPair>>,
-    control: &WorkControl,
-) -> Result<(), NormalizeError> {
-    let mut start = 0;
-    let mut depth = 0_usize;
-    for (index, ch) in raw.char_indices() {
-        control.check()?;
-        match ch {
-            '(' => depth += 1,
-            ')' if depth == 0
-                && external_closer(
-                    tokens,
-                    source,
-                    offset,
-                    offset + index,
-                    quotes,
-                    parentheses,
-                    control,
-                )? =>
-            {
-                if let Some(range) =
-                    punctuation::compound_range(&raw[start..index], offset + start, quotes)
-                {
-                    append_token(tokens, source, range);
-                }
-                start = index + ch.len_utf8();
-            }
-            ')' => depth = depth.saturating_sub(1),
-            ';' if depth == 0 => {
-                if let Some(range) =
-                    punctuation::compound_range(&raw[start..index], offset + start, quotes)
-                {
-                    append_token(tokens, source, range);
-                }
-                start = index + ch.len_utf8();
-            }
-            _ => {}
-        }
-    }
-    if let Some(range) = punctuation::compound_range(&raw[start..], offset + start, quotes) {
-        append_token(tokens, source, range);
-    }
-    Ok(())
-}
-
-fn external_closer(
-    tokens: &[Token<'_>],
-    source: &SourceMap<'_>,
-    raw_start: usize,
-    close: usize,
-    quotes: &[usize],
-    parentheses: &mut Option<Vec<punctuation::ParenthesisPair>>,
-    control: &WorkControl,
-) -> Result<bool, NormalizeError> {
-    if parentheses.is_none() {
-        *parentheses = Some(punctuation::parenthesis_pairs(
-            source.text(),
-            quotes,
-            control,
-        )?);
-    }
-    let pairs = parentheses.as_ref().ok_or(NormalizeError::Internal)?;
-    let Ok(index) = pairs.binary_search_by_key(&close, |pair| pair.close) else {
-        return Ok(false);
-    };
-    let open = pairs[index].open;
-    let token = tokens.get(tokens.partition_point(|token| token.range.end <= open));
-    Ok(open < raw_start && token.is_none_or(|token| token.range.start > open))
 }
 
 fn account_periods(

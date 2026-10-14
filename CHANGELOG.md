@@ -30,6 +30,10 @@ Platform requirements are in the [README](README.md) and
   the suffix of a later independent phone.
   Empty-tail numeric compounds preserve confirmed outer parentheses without
   stripping unmatched invalid local closers; pairing is indexed lazily per call.
+- Separate telephone source ownership from IBAN coordination and compound
+  scanning from the common token/index pass. Group telephone acceptance tests
+  by their contract purpose; inputs, reading/policy behavior and public APIs
+  are unchanged by this extraction.
 - Validate native comparison reports against their respective source fixture
   catalogs, allowing append-only regression coverage without misvalidating
   an older baseline against newer inputs. Changed cohorts remain non-comparable.

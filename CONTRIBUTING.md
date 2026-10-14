@@ -35,6 +35,8 @@ Core/binding development needs no Torch, model files or credentials.
 |---|---|
 | `src/api` | Public contract behind crate-root re-exports |
 | `src/classify` | Fixed reader priority, validation and whole-span claims; `scan` separates tokenization/indexing, punctuation and signals |
+| `src/classify/readers/identifiers.rs`, `src/classify/readers/identifiers/telephone.rs` | IBAN-first identifier coordination and bounded telephone intent/source ownership, separate from strict domain validation |
+| `src/classify/scan/compounds.rs` | Atomic numeric parenthesis source pieces and lazy external-wrapper certification; common token construction/indexing remains in `scan/mod.rs` |
 | `src/domain` | Validated numeric, quantity, temporal, electronic and identifier values |
 | `src/domain/quantities.rs`, `src/domain/quantities/percentage.rs`, `src/domain/quantities/range.rs` | Quantity parsing/source-target realization, percentage grammar, and contextual numeric ranges behind stable private re-exports |
 | `src/domain/lexicon` | Approved abbreviation/name catalogs and shared compile-time lookup indexes; typed spoken tails remain in the domain |
@@ -126,6 +128,13 @@ same catalog. Add cross-feature cases and exercise Preserve, Reject and Fallback
 independently. Do not alter the frozen benchmark inputs/order to improve an aggregate.
 Append new groups and retain existing case IDs and order. Change expected
 outputs only for intentional behavior changes documented in the changelog.
+
+`tests/telephone_ownership.rs` is one integration target with focused ownership,
+neighbor, hint, punctuation and scaling modules under `tests/telephone_ownership/`.
+Its support assertions add complete provenance/rule/source-partition checks
+beyond the shared whole-case loader. Installed phone regressions live in
+`bindings/python/tests/test_telephone_ownership.py`; shared inputs remain in
+the append-only policy catalog, not in a second expectation schema.
 
 Whole-source validation is separate from constituent primary emission.
 Components retain original grapheme-safe ranges and must partition their owner.
