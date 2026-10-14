@@ -41,8 +41,23 @@ The public library API is unaffected by this development-artifact format change.
 
 ### Hosted PR evidence
 
-The non-required **Performance evidence** workflow checks out the exact PR head
-and measures three fresh serial base/head pairs with alternating order.
+The non-required **Performance evidence** workflow first checks whether native
+measurement is relevant. On PR open/reopen it examines the full PR diff; on
+subsequent pushes it compares the previous and current heads, not the accumulated
+PR diff. Documentation, media, ordinary test-only and Python-facade or
+installed-sampler changes skip the expensive native comparison. Rust sources/data,
+native workloads/fixtures, dependencies/toolchain or measurement tooling changes
+still run it. The small
+scope job records the decision; unavailable or mismatched source evidence fails
+rather than pretending the change is irrelevant.
+
+Manual dispatch always requests measurement. Documentation-only updates do not
+cancel a relevant comparison already running; a newer relevant update supersedes
+an older measurement. Retained artifacts identify the revisions actually
+measured, not a later documentation-only head.
+
+When selected, the workflow checks out the exact PR head and measures three
+fresh serial base/head pairs with alternating order.
 Ordinary PRs use their actual base; manual dispatch uses the requested commit
 or tag. Build, source, inventory and report failures fail the job. Slower valid
 timings alone do not.
