@@ -28,6 +28,8 @@ Platform requirements are in the [README](README.md) and
   reads the independent number. Marked semicolon/comma compounds are unchanged.
   Repeated/empty tails after owned closers stay atomic and cannot quote away
   the suffix of a later independent phone.
+  Empty-tail numeric compounds preserve confirmed outer parentheses without
+  stripping unmatched invalid local closers; pairing is indexed lazily per call.
 - Validate native comparison reports against their respective source fixture
   catalogs, allowing append-only regression coverage without misvalidating
   an older baseline against newer inputs. Changed cohorts remain non-comparable.

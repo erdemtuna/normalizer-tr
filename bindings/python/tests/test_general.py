@@ -347,3 +347,42 @@ def test_repeated_tail_after_phone_closer_cannot_hide_the_next_empty_tail(policy
             hints=(Hint(second_start, second_end - 1, "telephone"),),
         )
     assert raised.value.code == "invalid_hint"
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+@pytest.mark.parametrize(
+    "prefix,closing",
+    [("(", ")"), ("((", "))"), ("O\u0308nce (", ")"), ("‘", "’"), ('"', '"')],
+)
+def test_empty_tail_phone_compound_keeps_its_confirmed_outer_wrapper(
+    policy, prefix, closing
+):
+    phone = "0532 123 45(67')'"
+    source = prefix + phone + closing + "; 5 kg"
+    start = len(prefix.encode("utf-8"))
+    end = start + len(phone)
+    normalizer = Normalizer()
+    if policy == "reject":
+        with pytest.raises(NormalizationError) as raised:
+            normalizer.normalize(source, ambiguity_policy=policy)
+        assert raised.value.code == "unresolved"
+        assert [(i.start_byte, i.end_byte) for i in raised.value.issues] == [
+            (start, end)
+        ]
+        return
+    result = normalizer.normalize(source, ambiguity_policy=policy)
+    records = result.fallbacks if policy == "fallback" else result.issues
+    assert len(records) == 1 and (records[0].start_byte, records[0].end_byte) == (
+        start,
+        end,
+    )
+    expected_phone = (
+        "sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi kesme kapat parantez kesme"
+        if policy == "fallback"
+        else phone
+    )
+    assert (
+        result.normalized_text == prefix + expected_phone + closing + "; beş kilogram"
+    )
+    assert result.complete == (policy == "fallback")
+    assert "".join(s.text for s in result.segments) == result.normalized_text

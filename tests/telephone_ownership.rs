@@ -810,6 +810,69 @@ fn alternating_closers_and_tails_remain_one_bounded_owner() {
 }
 
 #[test]
+fn empty_tail_compounds_preserve_confirmed_wrappers_not_invalid_local_closers() {
+    let normalizer = Normalizer::new().unwrap();
+    let phone = "0532 123 45(67')'";
+    let literal =
+        "sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi kesme kapat parantez kesme";
+    for (prefix, closing) in [
+        ("(", ")"),
+        ("((", "))"),
+        ("O\u{308}nce (", ")"),
+        ("‘", "’"),
+        ("\"", "\""),
+    ] {
+        for tail in ["; 5 kg", ";5kg", ";AB12"] {
+            let source = format!("{prefix}{phone}{closing}{tail}");
+            let owner = SourceRange::new(prefix.len(), prefix.len() + phone.len());
+            let preserved = normalizer.normalize(&source, &Default::default()).unwrap();
+            assert_eq!(preserved.issues()[0].range(), owner, "{source}");
+            partition(&source, &preserved);
+            assert_eq!(
+                normalizer.normalize(&source, &options(AmbiguityPolicy::Reject)),
+                Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+            );
+            let fallback = normalizer
+                .normalize(&source, &options(AmbiguityPolicy::Fallback))
+                .unwrap();
+            assert_eq!(fallback.fallbacks()[0].range(), owner);
+            let phone_segment = fallback
+                .segments()
+                .iter()
+                .find(|s| s.range() == owner)
+                .unwrap();
+            assert_eq!(phone_segment.text(), literal);
+            assert!(
+                fallback
+                    .normalized_text()
+                    .starts_with(&format!("{prefix}{literal}{closing}"))
+            );
+            partition(&source, &fallback);
+        }
+    }
+    for source in ["0532 123 45(67')')", "0532 (123 45(67')')'"] {
+        let (preserved, _) = failure(&normalizer, source, SourceRange::new(0, source.len()));
+        assert_eq!(preserved.normalized_text(), source);
+    }
+    for (prefix, closing) in [
+        ("AB12(foo ; ", ""),
+        ("'(' ; ", ""),
+        ("\"(\" ; ", ""),
+        ("“(” ; ", ""),
+        ("‘\"(\" ; ", "’"),
+        ("\"'(' ; ", "\""),
+    ] {
+        let source = format!("{prefix}{phone}){closing}");
+        let preserved = normalizer.normalize(&source, &Default::default()).unwrap();
+        assert_eq!(
+            preserved.issues().last().unwrap().range(),
+            SourceRange::new(prefix.len(), source.len() - closing.len())
+        );
+        partition(&source, &preserved);
+    }
+}
+
+#[test]
 fn maximal_alternating_tail_chain_keeps_its_owner_or_reports_a_real_result_limit() {
     let normalizer = Normalizer::new().unwrap();
     let prefix = "0532 123 ";

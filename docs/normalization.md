@@ -365,9 +365,13 @@ remain outside it.
 Repeated or empty tails attached after an owned closer remain in that same
 invalid owner, for example `0532 123 45 (67'den)'de`. Such suffix apostrophes
 do not open prose quotes across another phone or field.
-Numeric parenthesis compounds retain their internal syntax while respecting
-external semicolons and sentence punctuation; an invalid phone does not absorb
-that separator or its independently readable neighbor.
+Numeric parenthesis compounds with apostrophe tails retain their internal
+syntax while respecting external semicolons and sentence punctuation; an
+invalid phone does not absorb that separator or its independently readable
+neighbor. Unsuffixed numeric-parenthesis admission retains its existing path.
+For empty-tail parenthesis compounds, a confirmed outer wrapper stays outside
+the phone owner too. Unmatched invalid local closers are not stripped to make
+that distinction; source pairing is checked only when the raw compound needs it.
 The scanner keeps a marked closing-parenthesis grapheme separate from its
 following token, so a phone claim cannot skip an adjacent identifier, quantity,
 name or number. This also makes standalone `)\u030112` retain its closing
