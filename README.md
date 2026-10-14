@@ -29,7 +29,7 @@ assert result.complete
 
 Wheels support CPython 3.11 to 3.14 on Windows and Linux x64, and macOS
 x64 and arm64. Compatible wheels need no Rust compiler.
-[Platform requirements and source builds](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/bindings/python/README.md#install).
+[Platform requirements and source builds](https://github.com/erdemtuna/normalizer-tr/blob/main/bindings/python/README.md#install).
 
 ## Rust
 
@@ -85,22 +85,22 @@ UTF-8 byte offsets, not character positions.
 
 | Guide | Contents |
 |---|---|
-| [Rust API](https://docs.rs/normalizer-tr/0.7.0) | Types, methods and examples |
-| [Python API](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/bindings/python/README.md) | Hints, errors, cancellation and building |
-| [Normalization reference](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/docs/normalization.md) | Supported formats and boundaries |
-| [Fallback](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/docs/fallback.md) | Reading strategies and diagnostics |
-| [Contributing (main)](https://github.com/erdemtuna/normalizer-tr/blob/main/CONTRIBUTING.md) | Repository setup, architecture and verification |
-| [Performance (main)](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) | Running and interpreting development measurements |
+| [Rust API (latest release)](https://docs.rs/normalizer-tr) | Published types, methods and examples |
+| [Python API](https://github.com/erdemtuna/normalizer-tr/blob/main/bindings/python/README.md) | Hints, errors, cancellation and building |
+| [Normalization reference](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/normalization.md) | Supported formats and boundaries |
+| [Fallback](https://github.com/erdemtuna/normalizer-tr/blob/main/docs/fallback.md) | Reading strategies and diagnostics |
+| [Contributing](https://github.com/erdemtuna/normalizer-tr/blob/main/CONTRIBUTING.md) | Repository setup, architecture and verification |
+| [Performance](https://github.com/erdemtuna/normalizer-tr/blob/main/PERFORMANCE.md) | Running and interpreting development measurements |
 
 This is a pre 1.0 library with bounded coverage, not a universal pronunciation
-engine. Library guides above describe the published **0.7.0** API; guides marked
-main describe repository development. Before upgrading, read the
-[release migration notes](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/CHANGELOG.md)
+engine. Repository guides follow `main`; the Rust API link documents the latest
+published crate. Before upgrading, read the
+[changelog](https://github.com/erdemtuna/normalizer-tr/blob/main/CHANGELOG.md)
 for changed readings, diagnostics and exhaustive Rust enum matches.
 
 ## License
 
-[Apache-2.0](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/LICENSE),
-with [third party notices](https://github.com/erdemtuna/normalizer-tr/blob/v0.7.0/THIRD_PARTY_NOTICES.md).
+[Apache-2.0](https://github.com/erdemtuna/normalizer-tr/blob/main/LICENSE),
+with [third party notices](https://github.com/erdemtuna/normalizer-tr/blob/main/THIRD_PARTY_NOTICES.md).
 
 Thanks to [@canberk7](https://github.com/canberk7) for his contribution to fallback support.

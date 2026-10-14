@@ -21,8 +21,9 @@ Platform requirements are in the [README](README.md) and
 - Label successful and failed long-input work in checked comparisons and stream
   native report serialization through a checked buffered writer. Frozen call
   timing boundaries and full evidence remain unchanged.
-- Clarify fallback diagnostic strategies, pin published-library guide links and
-  make the measurement guide focus on running and interpreting comparisons.
+- Clarify fallback diagnostic strategies and make the measurement guide focus
+  on running and interpreting comparisons. General README navigation follows
+  main; release-specific references are explicitly labeled.
 
 ## 0.7.0 - 2026-10-11
 
