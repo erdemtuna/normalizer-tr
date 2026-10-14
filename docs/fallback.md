@@ -66,6 +66,10 @@ The trailing group is not a successful Cardinal, and this does not add telephone
 suffix pronunciation. Preserve keeps the whole source with one issue; Reject
 reports that same range without a result. Whole-owner hint checks and genuine
 cancellation/resource errors still apply before policy completion.
+Owned phone parentheses and mixed hyphen groups are rendered in the same
+fallback record. A non-composing mark in the attached tail may require the
+existing UnicodeCodePoint strategy, still with one complete original-source
+owner rather than a second numeric fallback.
 
 Primary coverage is shared by all three policies. Valid compact quantities,
 space-grouped money and supported units receive primary readings under Fallback

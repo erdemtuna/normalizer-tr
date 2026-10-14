@@ -357,6 +357,11 @@ Malformed group widths, incomplete runs, empty/repeated apostrophe tails and
 digit-bearing tails do not release numeric fragments. Existing phone-shaped
 ownership also includes invalid whitespace separators such as tabs/newlines
 or nonbreaking spaces; this does not make those separators valid telephones.
+Mixed-space/hyphen groups and adjoining phone parentheses retain their attached
+tails too, for example `0532 123 45-67'den` and `0532 123 45(67)'den`.
+Non-composing combining marks in an invalid tail stay in that same owner.
+Phone-local closing parentheses are included; surrounding prose wrappers
+remain outside it.
 
 A successful unsuffixed phone keeps a following independent number:
 `0532 123 45 67 5'ten` retains the Telephone plus `beşten`. Protected identifier,

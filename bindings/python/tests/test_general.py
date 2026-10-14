@@ -1,5 +1,7 @@
 import dataclasses
+import json
 from importlib.metadata import version
+from pathlib import Path
 
 import pytest
 from normalizer_tr import (
@@ -64,15 +66,41 @@ def test_all_new_intent_literals_and_original_ranges(text, kind, expected):
 
 
 PHONE = "0532 123 45 67'den"
-PHONE_LITERAL = "sıfır beş üç iki bir iki üç dört beş altı yedi kesme de e ne"
+PHONE_CASES = json.loads(
+    (
+        Path(__file__).resolve().parents[3]
+        / "tests"
+        / "fixtures"
+        / "policy-contract"
+        / "telephone-ownership.json"
+    ).read_text(encoding="utf-8")
+)
 
 
+@pytest.mark.parametrize(
+    "phone,literal,strategy",
+    [
+        (case["text"], case["fallback"], case["strategy"])
+        for case in PHONE_CASES
+        if case["id"]
+        in (
+            "phone-suffixed-national-owner",
+            "phone-suffixed-mixed-hyphen",
+            "phone-suffixed-adjoining-parentheses",
+            "phone-suffixed-parenthesized-final-group",
+            "phone-suffixed-parenthesized-tail",
+            "phone-suffixed-noncomposing-mark",
+        )
+    ],
+)
 @pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
 @pytest.mark.parametrize("prefix", ("", "O\u0308nce ", "ö\r\n", "tel "))
-def test_failed_phone_has_one_original_owner_and_independent_unit(policy, prefix):
-    source = f"{prefix}{PHONE}; 5 kg"
+def test_failed_phone_has_one_original_owner_and_independent_unit(
+    policy, prefix, phone, literal, strategy
+):
+    source = f"{prefix}{phone}; 5 kg"
     start = len(prefix.encode("utf-8"))
-    end = start + len(PHONE)
+    end = start + len(phone.encode("utf-8"))
     normalizer = Normalizer()
     if policy == "reject":
         with pytest.raises(NormalizationError) as raised:
@@ -83,7 +111,7 @@ def test_failed_phone_has_one_original_owner_and_independent_unit(policy, prefix
         assert not hasattr(error, "normalized_text")
         return
     result = normalizer.normalize(source, ambiguity_policy=policy)
-    expected_phone = PHONE_LITERAL if policy == "fallback" else PHONE
+    expected_phone = literal if policy == "fallback" else phone
     assert result.normalized_text == f"{prefix}{expected_phone}; beş kilogram"
     assert result.complete == (policy == "fallback")
     assert result.fallback_used == (policy == "fallback")
@@ -107,7 +135,14 @@ def test_failed_phone_has_one_original_owner_and_independent_unit(policy, prefix
     if policy == "fallback":
         assert result.issues == ()
         assert [dataclasses.astuple(record) for record in result.fallbacks] == [
-            (start, end, "identifier", "invalid_form", "invalid_expression", "literal")
+            (
+                start,
+                end,
+                "identifier",
+                "invalid_form",
+                "invalid_expression",
+                "unicode_code_point" if strategy == "UnicodeCodePoint" else "literal",
+            )
         ]
     else:
         assert result.fallbacks == ()
@@ -150,6 +185,29 @@ def test_failed_phone_cannot_be_cut_or_legalized_by_a_hint(
 
 
 @pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+@pytest.mark.parametrize(
+    "phone,end",
+    [
+        ("0532 123 45-67'den", 8),
+        ("0532 123 45(67)'den", 14),
+        ("0532 123 45 (67'den)", 19),
+        ("0532 123 45 67'd\u0308en", 11),
+    ],
+)
+def test_phone_punctuation_and_marks_do_not_allow_shortened_hints(policy, phone, end):
+    prefix = "O\u0308nce "
+    start = len(prefix.encode("utf-8"))
+    with pytest.raises(NormalizationError) as raised:
+        Normalizer().normalize(
+            prefix + phone,
+            ambiguity_policy=policy,
+            hints=(Hint(start, start + end, "digits"),),
+        )
+    assert raised.value.code == "invalid_hint"
+    assert raised.value.issues == () and raised.value.limit_kind is None
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
 def test_valid_phone_keeps_following_suffixed_cardinal_and_whole_hint(policy):
     source = "0532 123 45 67 5'ten"
     result = Normalizer().normalize(
@@ -167,3 +225,31 @@ def test_valid_phone_keeps_following_suffixed_cardinal_and_whole_hint(policy):
         (14, 15, "verbatim", " ", "source.verbatim"),
         (15, 20, "cardinal", "beşten", "number"),
     ]
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+def test_parenthesis_suffix_does_not_pair_with_a_later_telephone_apostrophe(policy):
+    first = "0532 123 45(67)'den"
+    second = "0532 123 45 67'"
+    source = first + " ; " + second
+    expected_ranges = [(0, len(first)), (len(first) + 3, len(source))]
+    if policy == "reject":
+        with pytest.raises(NormalizationError) as raised:
+            Normalizer().normalize(source, ambiguity_policy=policy)
+        assert raised.value.code == "unresolved"
+        records = raised.value.issues
+    else:
+        result = Normalizer().normalize(source, ambiguity_policy=policy)
+        records = result.fallbacks if policy == "fallback" else result.issues
+        assert result.complete == (policy == "fallback")
+        if policy == "preserve":
+            assert result.normalized_text == source
+        else:
+            assert result.normalized_text == (
+                "sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi "
+                "kapat parantez kesme de e ne ; sıfır beş üç iki bir iki üç "
+                "dört beş altı yedi kesme"
+            )
+    assert [
+        (record.start_byte, record.end_byte) for record in records
+    ] == expected_ranges

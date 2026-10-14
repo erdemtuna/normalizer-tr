@@ -31,6 +31,14 @@ pub(super) fn quotation_boundaries(text: &str) -> Vec<usize> {
         } else if matches!(ch, '\'' | '‘')
             && previous.is_none_or(|ch: char| ch.is_whitespace() || delimiter(ch) || ch == ',')
             && next.is_some_and(|ch: char| !ch.is_whitespace())
+            // A tail after a numeric closing parenthesis is not a prose quote opener.
+            && !(ch == '\''
+                && previous == Some(')')
+                && text[..offset]
+                    .chars()
+                    .rev()
+                    .find(|ch| *ch != ')')
+                    .is_some_and(|ch| ch.is_ascii_digit()))
         {
             open = Some((offset, if ch == '‘' { '’' } else { '\'' }));
         }

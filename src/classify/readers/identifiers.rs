@@ -11,11 +11,18 @@ use crate::{
     interpretation::Value,
     notation,
 };
+use unicode_segmentation::UnicodeSegmentation;
+
+pub(super) struct IdentifierMatch {
+    pub(super) attempt: Attempt,
+    pub(super) source_end: usize,
+}
+
 pub(super) fn read(
     ctx: &Context<'_>,
     index: usize,
     control: &WorkControl,
-) -> Result<Option<Attempt>, NormalizeError> {
+) -> Result<Option<IdentifierMatch>, NormalizeError> {
     let text = ctx.text;
     let tokens = ctx.tokens;
     let token = tokens[index];
@@ -45,12 +52,15 @@ pub(super) fn read(
     if iban_like {
         let end = iban_end(text, tokens, index, control)?;
         let whole = &text[token.range.start..tokens[end].range.end];
-        return Ok(Some((
-            Iban::parse(whole)
-                .map(Value::Iban)
-                .ok_or(IssueCategory::ProtectedIdentifier),
-            end,
-        )));
+        return Ok(Some(IdentifierMatch {
+            attempt: (
+                Iban::parse(whole)
+                    .map(Value::Iban)
+                    .ok_or(IssueCategory::ProtectedIdentifier),
+                end,
+            ),
+            source_end: tokens[end].range.end,
+        }));
     }
     let zero_group_signal = source == "0"
         && tokens.get(index + 1).is_some_and(|next| {
@@ -106,25 +116,75 @@ pub(super) fn read(
             if phone.is_none() && ctx.money_end(index).is_some() {
                 return Ok(None);
             }
-            let end = if phone.is_none()
-                && let Some(next) = tokens.get(end + 1)
-                && telephone_gap(&text[tokens[end].range.end..next.range.start])
-                && notation::numeric_suffix_surface(next.text, control)?.is_some()
-            {
-                end + 1
+            let (end, source_end) = if phone.is_none() {
+                telephone_suffix_end(ctx, index, end, control)?
+                    .unwrap_or((end, tokens[end].range.end))
             } else {
-                end
+                (end, tokens[end].range.end)
             };
-            return Ok(Some((
-                phone
-                    .map(Value::Telephone)
-                    .ok_or(IssueCategory::InvalidExpression),
-                end,
-            )));
+            return Ok(Some(IdentifierMatch {
+                attempt: (
+                    phone
+                        .map(Value::Telephone)
+                        .ok_or(IssueCategory::InvalidExpression),
+                    end,
+                ),
+                source_end,
+            }));
         }
     }
 
     Ok(None)
+}
+
+fn telephone_suffix_end(
+    ctx: &Context<'_>,
+    index: usize,
+    end: usize,
+    control: &WorkControl,
+) -> Result<Option<(usize, usize)>, NormalizeError> {
+    let Some(next) = ctx.tokens.get(end + 1) else {
+        return Ok(None);
+    };
+    let gap = &ctx.text[ctx.tokens[end].range.end..next.range.start];
+    if !telephone_gap(gap) {
+        return Ok(None);
+    }
+    let start = if next.text.starts_with(['\'', '’']) && !gap.chars().any(char::is_whitespace) {
+        ctx.tokens[end].range.start
+    } else {
+        next.range.start
+    };
+    let Some((base, _)) =
+        notation::telephone_suffix_surface(&ctx.text[start..next.range.end], control)?
+    else {
+        return Ok(None);
+    };
+    let mut depth = 0_usize;
+    for ch in ctx.text[ctx.tokens[index].range.start..start + base.len()].chars() {
+        control.check()?;
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    let mut source_end = next.range.end;
+    for grapheme in ctx.text[source_end..].graphemes(true) {
+        if depth == 0 {
+            break;
+        }
+        control.check()?;
+        let mut scalars = grapheme.chars();
+        if scalars.next() != Some(')')
+            || !scalars.all(unicode_normalization::char::is_combining_mark)
+        {
+            break;
+        }
+        source_end += grapheme.len();
+        depth -= 1;
+    }
+    Ok(Some((end + 1, source_end)))
 }
 
 fn iban_end(

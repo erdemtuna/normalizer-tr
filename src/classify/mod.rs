@@ -75,8 +75,11 @@ pub(crate) fn collect(
         if end <= index {
             return Err(NormalizeError::Internal);
         }
+        let source_end = tokens
+            .get(end)
+            .map_or(text.len(), |token| token.range.start);
         let ctx = Context {
-            text,
+            text: &text[..source_end],
             tokens: &tokens[..end],
         };
         let detected = address.as_ref().map(|field| Claim {
@@ -89,9 +92,7 @@ pub(crate) fn collect(
         {
             let detected = match detected {
                 Some(claim) => Some(claim),
-                None => readers::read(&ctx, index, &bounds, control)?
-                    .map(|(_, end)| bounds.claim(index, end))
-                    .transpose()?,
+                None => readers::read(&ctx, index, &bounds, control)?.map(|(_, claim)| claim),
             };
             let claim = bounds.hint_claim(*hint, detected.as_ref())?;
             let text = &text[claim.range.start..claim.range.end];
@@ -125,8 +126,7 @@ pub(crate) fn collect(
                 },
                 field.reading,
             )?;
-        } else if let Some((reading, end)) = readers::read(&ctx, index, &bounds, control)? {
-            let claim = bounds.claim(index, end)?;
+        } else if let Some((reading, claim)) = readers::read(&ctx, index, &bounds, control)? {
             if overlaps_hint(hints, claim.range) {
                 return Err(NormalizeError::InvalidHint);
             }

@@ -48,6 +48,22 @@ impl<'a> Boundaries<'a> {
             next: end + 1,
         })
     }
+    pub(super) fn claim_through(
+        &self,
+        start: usize,
+        end: usize,
+        source_end: usize,
+    ) -> Result<Claim, NormalizeError> {
+        let mut claim = self.claim(start, end)?;
+        if source_end < claim.range.end {
+            return Err(NormalizeError::Internal);
+        }
+        if source_end > claim.range.end {
+            claim.range.end = source_end;
+            claim.next = self.next_at(source_end);
+        }
+        Ok(claim)
+    }
     pub(super) fn hint_claim(
         &self,
         hint: Hint,

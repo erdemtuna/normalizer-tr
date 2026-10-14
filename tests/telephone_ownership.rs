@@ -62,6 +62,15 @@ fn failure(
     source: &str,
     range: SourceRange,
 ) -> (NormalizeResult, NormalizeResult) {
+    failure_with_strategy(normalizer, source, range, FallbackStrategy::Literal)
+}
+
+fn failure_with_strategy(
+    normalizer: &Normalizer,
+    source: &str,
+    range: SourceRange,
+    strategy: FallbackStrategy,
+) -> (NormalizeResult, NormalizeResult) {
     let preserved = normalizer.normalize(source, &Default::default()).unwrap();
     assert!(!preserved.complete());
     assert!(preserved.fallbacks().is_empty() && !preserved.fallback_used());
@@ -87,7 +96,7 @@ fn failure(
     assert_eq!(diagnostic.attempted_class(), FallbackClass::Identifier);
     assert_eq!(diagnostic.reason(), FallbackReason::InvalidForm);
     assert_eq!(diagnostic.original_category(), Some(issue.category()));
-    assert_eq!(diagnostic.strategy(), FallbackStrategy::Literal);
+    assert_eq!(diagnostic.strategy(), strategy);
     for (result, kind, rule) in [
         (&preserved, SegmentKind::Unresolved, "source.unresolved"),
         (&fallback, SegmentKind::Fallback, "source.fallback"),
@@ -121,7 +130,17 @@ fn isolated_failed_owners_have_full_policy_provenance() {
             continue;
         }
         let source = case["text"].as_str().unwrap();
-        let (preserved, fallback) = failure(&normalizer, source, SourceRange::new(0, source.len()));
+        let strategy = if case["strategy"] == "UnicodeCodePoint" {
+            FallbackStrategy::UnicodeCodePoint
+        } else {
+            FallbackStrategy::Literal
+        };
+        let (preserved, fallback) = failure_with_strategy(
+            &normalizer,
+            source,
+            SourceRange::new(0, source.len()),
+            strategy,
+        );
         assert_eq!(preserved.normalized_text(), source);
         assert_eq!(
             fallback.normalized_text(),
@@ -135,77 +154,103 @@ fn isolated_failed_owners_have_full_policy_provenance() {
 #[test]
 fn original_prefixes_quotes_and_following_quantities_keep_exact_segments() {
     let normalizer = Normalizer::new().unwrap();
-    for (prefix, closing) in [
-        ("", ""),
-        ("O\u{308}nce ", ""),
-        ("ö\r\n", ""),
-        ("tel ", ""),
-        ("telefon ", ""),
-        ("'", "'"),
-        ("‘", "’"),
-    ] {
-        let source = format!("{prefix}{PHONE}{closing}; 5 kg");
-        let owner = SourceRange::new(prefix.len(), prefix.len() + PHONE.len());
-        let (preserved, fallback) = failure(&normalizer, &source, owner);
-        assert_eq!(
-            preserved.normalized_text(),
-            format!("{prefix}{PHONE}{closing}; beş kilogram")
-        );
-        assert_eq!(
-            fallback.normalized_text(),
-            format!("{prefix}{LITERAL}{closing}; beş kilogram")
-        );
-        for (result, kind, rule, text) in [
-            (
-                &preserved,
-                SegmentKind::Unresolved,
-                "source.unresolved",
-                PHONE,
-            ),
-            (&fallback, SegmentKind::Fallback, "source.fallback", LITERAL),
+    let cases: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+        "fixtures/policy-contract/telephone-ownership.json"
+    ))
+    .unwrap();
+    for case in cases.iter().filter(|case| {
+        [
+            "phone-suffixed-national-owner",
+            "phone-suffixed-mixed-hyphen",
+            "phone-suffixed-adjoining-parentheses",
+            "phone-suffixed-parenthesized-final-group",
+            "phone-suffixed-parenthesized-tail",
+            "phone-suffixed-noncomposing-mark",
+        ]
+        .contains(&case["id"].as_str().unwrap())
+    }) {
+        let phone = case["text"].as_str().unwrap();
+        let literal = case["fallback"].as_str().unwrap();
+        let strategy = if case["strategy"] == "UnicodeCodePoint" {
+            FallbackStrategy::UnicodeCodePoint
+        } else {
+            FallbackStrategy::Literal
+        };
+        for (prefix, closing) in [
+            ("", ""),
+            ("O\u{308}nce ", ""),
+            ("ö\r\n", ""),
+            ("tel ", ""),
+            ("telefon ", ""),
+            ("'", "'"),
+            ("‘", "’"),
+            ("(", ")"),
+            ("O\u{308}nce (", ")"),
         ] {
-            let mut expected = Vec::new();
-            if !prefix.is_empty() {
-                expected.push((
-                    0,
-                    prefix.len(),
-                    SegmentKind::Verbatim,
-                    prefix,
-                    "source.verbatim",
-                ));
-            }
-            let quantity = owner.end() + closing.len() + "; ".len();
-            expected.extend([
-                (owner.start(), owner.end(), kind, text, rule),
+            let source = format!("{prefix}{phone}{closing}; 5 kg");
+            let owner = SourceRange::new(prefix.len(), prefix.len() + phone.len());
+            let (preserved, fallback) =
+                failure_with_strategy(&normalizer, &source, owner, strategy);
+            assert_eq!(
+                preserved.normalized_text(),
+                format!("{prefix}{phone}{closing}; beş kilogram")
+            );
+            assert_eq!(
+                fallback.normalized_text(),
+                format!("{prefix}{literal}{closing}; beş kilogram")
+            );
+            for (result, kind, rule, text) in [
                 (
-                    owner.end(),
-                    quantity,
-                    SegmentKind::Verbatim,
-                    &source[owner.end()..quantity],
-                    "source.verbatim",
+                    &preserved,
+                    SegmentKind::Unresolved,
+                    "source.unresolved",
+                    phone,
                 ),
-                (
-                    quantity,
-                    source.len(),
-                    SegmentKind::Unit,
-                    "beş kilogram",
-                    "quantity",
-                ),
-            ]);
-            let actual: Vec<_> = result
-                .segments()
-                .iter()
-                .map(|s| {
+                (&fallback, SegmentKind::Fallback, "source.fallback", literal),
+            ] {
+                let mut expected = Vec::new();
+                if !prefix.is_empty() {
+                    expected.push((
+                        0,
+                        prefix.len(),
+                        SegmentKind::Verbatim,
+                        prefix,
+                        "source.verbatim",
+                    ));
+                }
+                let quantity = owner.end() + closing.len() + "; ".len();
+                expected.extend([
+                    (owner.start(), owner.end(), kind, text, rule),
                     (
-                        s.range().start(),
-                        s.range().end(),
-                        s.kind(),
-                        s.text(),
-                        s.rule_id(),
-                    )
-                })
-                .collect();
-            assert_eq!(actual, expected);
+                        owner.end(),
+                        quantity,
+                        SegmentKind::Verbatim,
+                        &source[owner.end()..quantity],
+                        "source.verbatim",
+                    ),
+                    (
+                        quantity,
+                        source.len(),
+                        SegmentKind::Unit,
+                        "beş kilogram",
+                        "quantity",
+                    ),
+                ]);
+                let actual: Vec<_> = result
+                    .segments()
+                    .iter()
+                    .map(|s| {
+                        (
+                            s.range().start(),
+                            s.range().end(),
+                            s.kind(),
+                            s.text(),
+                            s.rule_id(),
+                        )
+                    })
+                    .collect();
+                assert_eq!(actual, expected);
+            }
         }
     }
     let source = "tel 532 123 45 67'den";
@@ -349,6 +394,30 @@ fn identifier_electronic_and_list_interiors_are_not_telephone_tails() {
 fn corrected_owner_rejects_component_hints_but_keeps_independent_hints() {
     let normalizer = Normalizer::new().unwrap();
     for policy in POLICIES {
+        for (phone, end) in [
+            ("0532 123 45-67'den", 8),
+            ("0532 123 45(67)'den", 14),
+            ("0532 123 45 (67'den)", 19),
+            ("0532 123 45 67'd\u{308}en", 11),
+        ] {
+            for prefix in ["", "O\u{308}nce "] {
+                let source = format!("{prefix}{phone}");
+                assert_eq!(
+                    normalizer.normalize(
+                        &source,
+                        &NormalizeOptions {
+                            ambiguity_policy: policy,
+                            hints: vec![Hint::new(
+                                SourceRange::new(prefix.len(), prefix.len() + end),
+                                HintKind::Digits
+                            )],
+                        }
+                    ),
+                    Err(NormalizeError::InvalidHint),
+                    "{source} {policy:?}"
+                );
+            }
+        }
         for prefix in ["", "O\u{308}nce "] {
             let source = format!("{prefix}{PHONE}");
             for (start, end, kind) in [
@@ -402,6 +471,76 @@ fn corrected_owner_rejects_component_hints_but_keeps_independent_hints() {
             .unwrap();
         assert_eq!(result.normalized_text(), format!("{SPOKEN} beşten"));
         assert!(result.complete() && result.fallbacks().is_empty());
+    }
+}
+
+#[test]
+fn owned_closing_parenthesis_keeps_its_grapheme_and_following_identifier_separate() {
+    let normalizer = Normalizer::new().unwrap();
+    let source = "0532 123 45 (67'den)\u{301}; 5 kg";
+    let owner_end = source.find(';').unwrap();
+    let (preserved, fallback) = failure_with_strategy(
+        &normalizer,
+        source,
+        SourceRange::new(0, owner_end),
+        FallbackStrategy::UnicodeCodePoint,
+    );
+    assert!(preserved.normalized_text().ends_with("; beş kilogram"));
+    assert!(fallback.normalized_text().ends_with("; beş kilogram"));
+    let source = "0532 123 45 (67'den)AB12";
+    let preserved = normalizer.normalize(source, &Default::default()).unwrap();
+    assert_eq!(preserved.issues().len(), 2);
+    assert_eq!(preserved.issues()[0].range(), SourceRange::new(0, 20));
+    assert_eq!(
+        preserved.issues()[1].range(),
+        SourceRange::new(20, source.len())
+    );
+    assert_eq!(
+        preserved.issues()[1].category(),
+        IssueCategory::ProtectedIdentifier
+    );
+    partition(source, &preserved);
+}
+
+#[test]
+fn suffix_after_numeric_parenthesis_does_not_open_quotes_across_another_owner() {
+    let normalizer = Normalizer::new().unwrap();
+    let first = "0532 123 45(67)'den";
+    let second = "0532 123 45 67'";
+    let source = format!("{first} ; {second}");
+    for policy in POLICIES {
+        let result = normalizer.normalize(&source, &options(policy));
+        let ranges = if policy == AmbiguityPolicy::Reject {
+            let Err(NormalizeError::Unresolved(issues)) = result else {
+                panic!("expected two unresolved owners");
+            };
+            issues.iter().map(|issue| issue.range()).collect::<Vec<_>>()
+        } else {
+            let result = result.unwrap();
+            partition(&source, &result);
+            if policy == AmbiguityPolicy::Fallback {
+                assert!(result.complete() && result.issues().is_empty());
+                assert_eq!(
+                    result.normalized_text(),
+                    "sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi kapat parantez kesme de e ne ; sıfır beş üç iki bir iki üç dört beş altı yedi kesme"
+                );
+                result
+                    .fallbacks()
+                    .iter()
+                    .map(|record| record.range())
+                    .collect()
+            } else {
+                assert_eq!(result.normalized_text(), source);
+                result.issues().iter().map(|issue| issue.range()).collect()
+            }
+        };
+        assert_eq!(
+            ranges,
+            vec![
+                SourceRange::new(0, first.len()),
+                SourceRange::new(first.len() + " ; ".len(), source.len()),
+            ]
+        );
     }
 }
 

@@ -19,26 +19,28 @@ pub(crate) fn split_suffix(text: &str) -> Option<(&str, Option<&str>)> {
     Some((base, suffix))
 }
 
-/// Borrowed source ownership, including malformed tails, not suffix validation.
-pub(crate) fn numeric_suffix_surface<'a>(
+/// Borrowed telephone source ownership, not value or suffix validation.
+pub(crate) fn telephone_suffix_surface<'a>(
     text: &'a str,
     control: &crate::WorkControl,
 ) -> Result<Option<(&'a str, &'a str)>, crate::NormalizeError> {
     let mut apostrophe = None;
+    let mut has_digit = false;
     for (offset, ch) in text.char_indices() {
         control.check()?;
         if matches!(ch, '\'' | '’') {
             apostrophe.get_or_insert(offset);
         } else if apostrophe.is_none() {
-            if !ch.is_ascii_digit() {
+            has_digit |= ch.is_ascii_digit();
+            if !ch.is_ascii_digit() && !matches!(ch, '+' | '-' | '(' | ')') {
                 return Ok(None);
             }
-        } else if !ch.is_alphanumeric() {
+        } else if !ch.is_alphanumeric() && !unicode_normalization::char::is_combining_mark(ch) {
             return Ok(None);
         }
     }
     Ok(apostrophe
-        .filter(|offset| *offset > 0)
+        .filter(|_| has_digit)
         .map(|offset| (&text[..offset], &text[offset..])))
 }
 
@@ -48,11 +50,15 @@ mod tests {
     use crate::{NormalizeError, WorkControl};
 
     #[test]
-    fn numeric_source_tails_do_not_certify_grammar_or_extract_other_owners() {
+    fn telephone_source_tails_do_not_certify_grammar_or_extract_other_owners() {
         let control = WorkControl::default();
         for source in ["67'den", "67’den", "67'", "67'den'de", "67'd2"] {
-            let (base, tail) = numeric_suffix_surface(source, &control).unwrap().unwrap();
+            let (base, tail) = telephone_suffix_surface(source, &control).unwrap().unwrap();
             assert_eq!(base, "67");
+            assert_eq!(source, format!("{base}{tail}"));
+        }
+        for source in ["45-67'den", "45(67)'den", "67)'den", "67'd\u{308}en"] {
+            let (base, tail) = telephone_suffix_surface(source, &control).unwrap().unwrap();
             assert_eq!(source, format!("{base}{tail}"));
         }
         for source in [
@@ -69,7 +75,7 @@ mod tests {
             "67'den 5",
         ] {
             assert_eq!(
-                numeric_suffix_surface(source, &control),
+                telephone_suffix_surface(source, &control),
                 Ok(None),
                 "{source}"
             );
@@ -79,11 +85,11 @@ mod tests {
     }
 
     #[test]
-    fn numeric_source_tails_propagate_cancellation() {
+    fn telephone_source_tails_propagate_cancellation() {
         let control = WorkControl::default();
         control.cancel();
         assert_eq!(
-            numeric_suffix_surface("67'den", &control),
+            telephone_suffix_surface("67'den", &control),
             Err(NormalizeError::Cancelled)
         );
     }

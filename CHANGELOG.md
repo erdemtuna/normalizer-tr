@@ -19,6 +19,9 @@ Platform requirements are in the [README](README.md) and
   `Hint(12,18,"cardinal")` now fail with `invalid_hint`, as required by whole-owner
   validation. Public types, serialized labels, policy defaults and limits are
   unchanged. No audio validation was performed.
+  Mixed hyphen groups, adjoining phone parentheses and non-composing tail
+  marks also retain one owner; phone-local closers do not escape as raw text,
+  and outer prose wrappers remain independent.
 - Validate native comparison reports against their respective source fixture
   catalogs, allowing append-only regression coverage without misvalidating
   an older baseline against newer inputs. Changed cohorts remain non-comparable.
