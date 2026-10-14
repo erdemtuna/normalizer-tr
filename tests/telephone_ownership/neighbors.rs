@@ -1,8 +1,75 @@
-use super::support::{LITERAL, PHONE, failure, failure_with_strategy, options, partition};
-use normalizer_tr::{
-    AmbiguityPolicy, FallbackClass, FallbackReason, FallbackStrategy, IssueCategory,
-    NormalizeError, Normalizer, SegmentKind, SourceRange,
+use super::support::{
+    LITERAL, PHONE, POLICIES, failure, failure_with_strategy, options, partition,
 };
+use normalizer_tr::{
+    AmbiguityPolicy, FallbackClass, FallbackReason, FallbackStrategy, Hint, HintKind,
+    IssueCategory, NormalizeError, Normalizer, SegmentKind, SourceRange,
+};
+
+#[test]
+fn terminal_singletons_keep_exact_claims_before_queued_address_fields() {
+    let normalizer = Normalizer::new().unwrap();
+    for prefix in ["", "O\u{308}nce "] {
+        let before = format!("{prefix}adres No:5 I ");
+        let source = format!("{before}{PHONE} Kat:3 S");
+        let owner = SourceRange::new(before.len(), before.len() + PHONE.len());
+        let (preserved, fallback) = failure(&normalizer, &source, owner);
+        for (result, phone) in [(&preserved, PHONE), (&fallback, LITERAL)] {
+            assert_eq!(
+                result.normalized_text(),
+                format!("{prefix}adres numara beş ı {phone} kat üç se")
+            );
+            let letters: Vec<_> = result
+                .segments()
+                .iter()
+                .filter(|s| s.rule_id() == "letter.name")
+                .collect();
+            assert_eq!(letters.len(), 2);
+            assert_eq!(letters[0].kind(), SegmentKind::Symbol);
+            assert_eq!(
+                letters[0].range(),
+                SourceRange::new(before.len() - 2, before.len() - 1)
+            );
+            assert_eq!(
+                letters[1].range(),
+                SourceRange::new(source.len() - 1, source.len())
+            );
+        }
+        for policy in POLICIES {
+            let mut opts = options(policy);
+            opts.hints = vec![Hint::new(
+                SourceRange::new(before.len() - 2, before.len() - 1),
+                HintKind::Roman,
+            )];
+            if policy == AmbiguityPolicy::Reject {
+                assert_eq!(
+                    normalizer.normalize(&source, &opts),
+                    Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+                );
+            } else {
+                let hinted = normalizer.normalize(&source, &opts).unwrap();
+                let phone = if policy == AmbiguityPolicy::Fallback {
+                    LITERAL
+                } else {
+                    PHONE
+                };
+                assert_eq!(
+                    hinted.normalized_text(),
+                    format!("{prefix}adres numara beş bir {phone} kat üç se")
+                );
+                partition(&source, &hinted);
+            }
+            opts.hints = vec![Hint::new(
+                SourceRange::new(owner.start(), owner.end() - 1),
+                HintKind::Digits,
+            )];
+            assert_eq!(
+                normalizer.normalize(&source, &opts),
+                Err(NormalizeError::InvalidHint)
+            );
+        }
+    }
+}
 
 #[test]
 fn terminal_ownership_does_not_continue_into_independent_fields() {

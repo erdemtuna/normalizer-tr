@@ -31,6 +31,7 @@ pub(crate) enum Value {
     Roman(Numeric),
     Electronic(Electronic),
     Symbol(String),
+    Letter(crate::notation::LetterName),
 }
 
 pub(crate) enum TemporalPreference {

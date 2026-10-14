@@ -4,8 +4,9 @@
 
 Turkish text normalization for speech, with a Rust core and a typed Python API.
 Convert numbers, money, dates, measurements and other supported notation into
-spoken Turkish while preserving ordinary prose. Runs offline, without a speech
-model or service. Decimal and money arithmetic is exact.
+spoken Turkish, with original-source ranges and structured diagnostics.
+Runs offline, without a speech model or service. Decimal and money arithmetic
+is exact.
 
 ```text
 saat 09:30'da 5 kg malzeme ve %12,5'lik fark

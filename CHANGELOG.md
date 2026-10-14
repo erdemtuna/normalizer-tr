@@ -7,6 +7,10 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+### Behavior and migration
+
+These changes are not included in published 0.7.0.
+
 - Keep unsupported suffixed telephone runs atomic under Preserve, Reject and
   Fallback, including established malformed/incomplete runs and invalid
   separators. `0532 123 45 67'den` now has one invalid owner over `[0,18)`,
@@ -30,10 +34,52 @@ Platform requirements are in the [README](README.md) and
   the suffix of a later independent phone.
   Empty-tail numeric compounds preserve confirmed outer parentheses without
   stripping unmatched invalid local closers; pairing is indexed lazily per call.
+Supported standalone uppercase letters now receive primary Turkish letter names.
+This applies to ordinary capitals and unmarked initials, not just technical
+phrases. Default Preserve does not disable these primary readings.
+
+| Input / policy | Previously | Now |
+|---|---|---|
+| `P ve S dalgaları`, every policy | Unchanged prose | `pe ve se dalgaları` |
+| `C vitamini`, Preserve | Unchanged, incomplete, with an issue | Primary `ce vitamini`, complete without issues |
+| `C vitamini`, Reject | Unresolved error | Primary `ce vitamini` |
+| `C vitamini`, Fallback | `ce vitamini` with a Roman literal-fallback record | Same text, but primary Symbol / `letter.name`, without fallback records |
+| `S Yılmaz`, every policy | Initial unchanged | `se Yılmaz` |
+
+Public call shapes, fields, enum labels, hints, defaults and limits are unchanged,
+but reading and diagnostic semantics change. Consumers must not assume that
+Symbol excludes letters, or that a formerly literal Roman reading still appears
+in `fallbacks`. Even A/O receive primary Symbol segments rather than Verbatim
+provenance. Long singleton runs can now reach existing candidate/result budgets.
+Lowercase, unknown uppercase words, arbitrary punctuation fragments and protected
+compound owners are not newly spelled. Multi-letter Romans, contextual numeral
+readings and valid explicit hints retain precedence. See
+[standalone-letter boundaries](docs/normalization.md#standalone-uppercase-letters).
+
+Isolated paired quotes now also support interior edge whitespace and unambiguous
+nesting, while preserving wrappers and original UTF-8 ranges. This corrects more
+than letter readings: `' SGK'ya'` becomes `' se ge kaya'`, and `' 25 TL'` becomes
+`' yirmi beş Türk lirası'`, rather than leaving their contents unresolved or
+speaking a closing quote as `kesme` under Fallback. Truly invalid contents remain
+atomic, but diagnostic ranges/categories and literal output can change when the
+wrapper is excluded. In `' 01 V'`, the quantity remains invalid at `[2,6)`.
+Review stored source ranges as well as output text. See
+[quote boundaries](docs/normalization.md#quotation-and-list-boundaries).
+
+These changes concern normalized text and public result semantics; no
+speech-model or audio-quality improvement is claimed.
+
+### Development tooling and maintenance
+
 - Separate telephone source ownership from IBAN coordination and compound
   scanning from the common token/index pass. Group telephone acceptance tests
   by their contract purpose; inputs, reading/policy behavior and public APIs
   are unchanged by this extraction.
+- Separate serial performance orchestration, validated comparisons and Markdown
+  presentation into focused modules. Register the extracted modules for
+  latest-push performance evidence selection.
+- Separate generic quote framing from raw atom admission with typed quote kinds.
+  This refactor preserves the behavior described above.
 - Validate native comparison reports against their respective source fixture
   catalogs, allowing append-only regression coverage without misvalidating
   an older baseline against newer inputs. Changed cohorts remain non-comparable.

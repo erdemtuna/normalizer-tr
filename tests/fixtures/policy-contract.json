@@ -23,5 +23,6 @@
   "policy-contract/temporal-notation.json",
   "policy-contract/composite-notation.json",
   "policy-contract/review-notation-admission.json",
+  "policy-contract/standalone-letters.json",
   "policy-contract/telephone-ownership.json"
 ]

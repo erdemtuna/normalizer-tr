@@ -328,3 +328,92 @@ def test_empty_tail_phone_compound_keeps_its_confirmed_outer_wrapper(
     )
     assert result.complete == (policy == "fallback")
     assert "".join(s.text for s in result.segments) == result.normalized_text
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+@pytest.mark.parametrize("prefix", ("'‘(’' ", "O\u0308nce '‘(’' "))
+def test_nested_quote_membership_does_not_repair_an_invalid_phone_closer(
+    policy, prefix
+):
+    phone = "0532 123 45(67')')"
+    literal = "sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi kesme kapat parantez kesme kapat parantez"
+    source = f"{prefix}{phone}; S ; 5 kg"
+    start = len(prefix.encode("utf-8"))
+    end = start + len(phone)
+    normalizer = Normalizer()
+    if policy == "reject":
+        with pytest.raises(NormalizationError) as raised:
+            normalizer.normalize(source, ambiguity_policy=policy)
+        assert raised.value.code == "unresolved"
+        records = raised.value.issues
+    else:
+        result = normalizer.normalize(source, ambiguity_policy=policy)
+        expected_phone = literal if policy == "fallback" else phone
+        assert result.normalized_text == f"{prefix}{expected_phone}; se ; beş kilogram"
+        assert result.complete == (policy == "fallback")
+        records = result.fallbacks if policy == "fallback" else result.issues
+        letter = next(s for s in result.segments if s.rule_id == "letter.name")
+        assert dataclasses.astuple(letter) == (
+            end + 2,
+            end + 3,
+            "symbol",
+            "se",
+            "letter.name",
+        )
+        assert "".join(s.text for s in result.segments) == result.normalized_text
+        if policy == "fallback":
+            assert records[0].attempted_class == "identifier"
+            assert records[0].original_category == "invalid_expression"
+            assert records[0].strategy == "literal"
+    assert [(record.start_byte, record.end_byte) for record in records] == [
+        (start, end)
+    ]
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+@pytest.mark.parametrize("prefix", ("", "O\u0308nce "))
+def test_terminal_singletons_preserve_claims_and_hints_before_address_fields(
+    policy, prefix
+):
+    before = f"{prefix}adres No:5 I "
+    source = f"{before}{PHONE} Kat:3 S"
+    start = len(before.encode("utf-8"))
+    end = start + len(PHONE)
+    normalizer = Normalizer()
+    if policy == "reject":
+        with pytest.raises(NormalizationError) as raised:
+            normalizer.normalize(source, ambiguity_policy=policy)
+        assert raised.value.code == "unresolved"
+        assert [(i.start_byte, i.end_byte) for i in raised.value.issues] == [
+            (start, end)
+        ]
+    else:
+        result = normalizer.normalize(source, ambiguity_policy=policy)
+        phone = PHONE_CASES[0]["fallback"] if policy == "fallback" else PHONE
+        assert result.normalized_text == f"{prefix}adres numara beş ı {phone} kat üç se"
+        assert result.complete == (policy == "fallback")
+        records = result.fallbacks if policy == "fallback" else result.issues
+        assert [(record.start_byte, record.end_byte) for record in records] == [
+            (start, end)
+        ]
+        letters = [s for s in result.segments if s.rule_id == "letter.name"]
+        assert [(s.start_byte, s.end_byte) for s in letters] == [
+            (start - 2, start - 1),
+            (len(source.encode("utf-8")) - 1, len(source.encode("utf-8"))),
+        ]
+        hinted = normalizer.normalize(
+            source,
+            ambiguity_policy=policy,
+            hints=(Hint(start - 2, start - 1, "roman"),),
+        )
+        assert (
+            hinted.normalized_text == f"{prefix}adres numara beş bir {phone} kat üç se"
+        )
+        assert "".join(s.text for s in hinted.segments) == hinted.normalized_text
+    with pytest.raises(NormalizationError) as raised:
+        normalizer.normalize(
+            source,
+            ambiguity_policy=policy,
+            hints=(Hint(start, end - 1, "digits"),),
+        )
+    assert raised.value.code == "invalid_hint"

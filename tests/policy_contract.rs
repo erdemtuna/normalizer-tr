@@ -213,7 +213,7 @@ proptest::proptest! {
     #[test]
     fn independent_cases_keep_policy_boundaries(indices in proptest::collection::vec(proptest::prelude::any::<usize>(), 1..8)) {
         let cases: Vec<Value> = policy_fixtures::load().0;
-        let selected: Vec<_> = indices.iter().map(|index| &cases[index % cases.len()]).filter(|case| case.get("hint").is_none()).collect();
+        let selected: Vec<_> = indices.iter().map(|index| &cases[index % cases.len()]).filter(|case| case.get("hint").is_none() && policy_fixtures::composable(case)).collect();
         proptest::prop_assume!(!selected.is_empty());
         let source = selected.iter().map(|case| case["text"].as_str().unwrap()).collect::<Vec<_>>().join(" ; ");
         let normalizer = Normalizer::new().unwrap();

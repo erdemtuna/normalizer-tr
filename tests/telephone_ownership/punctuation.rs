@@ -213,6 +213,7 @@ fn empty_tail_compounds_preserve_confirmed_wrappers_not_invalid_local_closers() 
             partition(&source, &fallback);
         }
     }
+
     for source in ["0532 123 45(67')')", "0532 (123 45(67')')'"] {
         let (preserved, _) = failure(&normalizer, source, SourceRange::new(0, source.len()));
         assert_eq!(preserved.normalized_text(), source);
@@ -232,5 +233,36 @@ fn empty_tail_compounds_preserve_confirmed_wrappers_not_invalid_local_closers() 
             SourceRange::new(prefix.len(), source.len() - closing.len())
         );
         partition(&source, &preserved);
+    }
+}
+
+#[test]
+fn nested_quote_membership_cannot_certify_an_invalid_phone_closer() {
+    let normalizer = Normalizer::new().unwrap();
+    let phone = "0532 123 45(67')')";
+    let literal = "sıfır beş üç iki bir iki üç dört beş aç parantez altı yedi kesme kapat parantez kesme kapat parantez";
+    for prefix in ["'‘(’' ", "O\u{308}nce '‘(’' "] {
+        let source = format!("{prefix}{phone}; S ; 5 kg");
+        let owner = SourceRange::new(prefix.len(), prefix.len() + phone.len());
+        let (preserved, fallback) = failure(&normalizer, &source, owner);
+        assert_eq!(
+            preserved.normalized_text(),
+            format!("{prefix}{phone}; se ; beş kilogram")
+        );
+        assert_eq!(
+            fallback.normalized_text(),
+            format!("{prefix}{literal}; se ; beş kilogram")
+        );
+        let letter = SourceRange::new(owner.end() + 2, owner.end() + 3);
+        for result in [preserved, fallback] {
+            let segment = result
+                .segments()
+                .iter()
+                .find(|s| s.range() == letter)
+                .unwrap();
+            assert_eq!(segment.kind(), SegmentKind::Symbol);
+            assert_eq!(segment.rule_id(), "letter.name");
+            assert_eq!(segment.text(), "se");
+        }
     }
 }

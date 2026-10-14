@@ -37,6 +37,7 @@ Core/binding development needs no Torch, model files or credentials.
 | `src/classify` | Fixed reader priority, validation and whole-span claims; `scan` separates tokenization/indexing, punctuation and signals |
 | `src/classify/readers/identifiers.rs`, `src/classify/readers/identifiers/telephone.rs` | IBAN-first identifier coordination and bounded telephone intent/source ownership, separate from strict domain validation |
 | `src/classify/scan/compounds.rs` | Atomic numeric parenthesis source pieces and lazy external-wrapper certification; common token construction/indexing remains in `scan/mod.rs` |
+| `src/classify/scan/quotes.rs`, `src/classify/scan/standalone.rs` | Shared quote index with separate legacy pairs, membership union and certified transparency, followed by generic raw-atom checks |
 | `src/domain` | Validated numeric, quantity, temporal, electronic and identifier values |
 | `src/domain/quantities.rs`, `src/domain/quantities/percentage.rs`, `src/domain/quantities/range.rs` | Quantity parsing/source-target realization, percentage grammar, and contextual numeric ranges behind stable private re-exports |
 | `src/domain/lexicon` | Approved abbreviation/name catalogs and shared compile-time lookup indexes; typed spoken tails remain in the domain |
@@ -93,6 +94,13 @@ Queued independent address fields bound reader lookahead. Do not discard stale
 owners to recover from a conflicting claim. Electronic trimming counts
 parentheses once and updates the count while trimming, with cooperative checks.
 
+Shared quote framing constructs one certified transparency map and merges its
+offsets with retained legacy boundaries. Tokenization uses the sorted boundary
+membership view; standalone admission uses the same certificate. The merged
+offsets are not matched opening/closing pairs. A consumer that needs pairing
+must preserve separate authoritative frame information rather than infer pairs
+from adjacent union entries.
+
 ## Change rules and tests
 
 State the purpose and acceptance examples before expanding coverage: positive
@@ -135,6 +143,11 @@ Its support assertions add complete provenance/rule/source-partition checks
 beyond the shared whole-case loader. Installed phone regressions live in
 `bindings/python/tests/test_telephone_ownership.py`; shared inputs remain in
 the append-only policy catalog, not in a second expectation schema.
+
+An intentionally open source delimiter can use `"composable": false` to opt out
+of the concatenation property, not its individual all-policy tests or benchmarks.
+Keep deterministic whole-source interaction regressions for such cases; joining
+isolated goldens with a semicolon does not itself isolate quote context.
 
 Whole-source validation is separate from constituent primary emission.
 Components retain original grapheme-safe ranges and must partition their owner.
@@ -183,7 +196,10 @@ verification entry point.
 Native and installed-Python performance artifacts use the strict version-two
 formats described in [performance](PERFORMANCE.md#run-a-comparison). Regenerate both
 old formats rather than repairing reports. Shared report admission lives in
-`scripts/performance_report.py`; native workload registration/evidence lives
+`scripts/performance_report.py`. `scripts/compare_performance.py` orchestrates
+builds and serial runs; `scripts/performance_comparison.py` compares admitted
+evidence, and `scripts/performance_summary.py` renders Markdown without invoking
+builds or samplers. Native workload registration/evidence lives
 in `benches/latency.rs` and `benches/latency/support.rs`. Disjoint workload
 modules expose ordinary private `cases()`/`check()` functions; the ordered
 `workload_inventory.json` declares coverage metadata, not duplicated goldens.

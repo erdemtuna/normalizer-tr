@@ -1,5 +1,5 @@
 //! Numeric source compounds and external-wrapper certification.
-use super::{Token, append_token, punctuation};
+use super::{Token, append_token, punctuation, quotes::QuoteBoundaries};
 use crate::{NormalizeError, WorkControl, source_map::SourceMap};
 
 pub(super) struct ParenthesisPair {
@@ -120,10 +120,11 @@ pub(super) fn append<'a>(
     source: &'a SourceMap,
     raw: &str,
     offset: usize,
-    quotes: &[usize],
+    quote_bounds: &QuoteBoundaries,
     parentheses: &mut Option<Vec<ParenthesisPair>>,
     control: &WorkControl,
 ) -> Result<(), NormalizeError> {
+    let quotes = quote_bounds.offsets();
     let mut start = 0;
     let mut depth = 0_usize;
     for (index, ch) in raw.char_indices() {
@@ -136,7 +137,7 @@ pub(super) fn append<'a>(
                     source,
                     offset,
                     offset + index,
-                    quotes,
+                    quote_bounds.legacy_pairs(),
                     parentheses,
                     control,
                 )? =>
@@ -202,6 +203,7 @@ mod tests {
             ("‘\"(\" (1(2))’", vec![(9, 11), (7, 12)]),
             ("\"'(' (1(2))\"", vec![(7, 9), (5, 10)]),
             ("( 'x)' )", vec![(0, 7)]),
+            ("'‘(’' )", vec![]),
         ] {
             let quotes = quotation_boundaries(text);
             let pairs = parenthesis_pairs(text, &quotes, &control).unwrap();

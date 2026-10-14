@@ -90,6 +90,39 @@ pub(super) fn read(
     bounds: &Boundaries<'_>,
     control: &WorkControl,
 ) -> Result<Option<(super::Reading, Claim)>, NormalizeError> {
+    let reading = existing(ctx, index, bounds, control)?;
+    let eligible = match &reading {
+        None => true,
+        Some((super::Reading::Unresolved(finding), claim)) => {
+            claim.next == index + 1
+                && finding.class() == FallbackClass::Roman
+                && finding.category() == Some(IssueCategory::Ambiguous)
+                && finding.reason() == crate::FallbackReason::MissingIntent
+        }
+        _ => false,
+    };
+    if eligible
+        && ctx.tokens[index].standalone
+        && let Some(letter) = numbers::LetterName::parse(ctx.tokens[index].text)
+    {
+        let claim = match reading {
+            Some((_, claim)) => claim,
+            None => bounds.claim(index, index)?,
+        };
+        return Ok(Some((
+            super::Reading::Resolved(Value::Letter(letter)),
+            claim,
+        )));
+    }
+    Ok(reading)
+}
+
+fn existing(
+    ctx: &Context<'_>,
+    index: usize,
+    bounds: &Boundaries<'_>,
+    control: &WorkControl,
+) -> Result<Option<(super::Reading, Claim)>, NormalizeError> {
     let claim = |(reading, end): (super::Reading, usize)| {
         bounds.claim(index, end).map(|claim| (reading, claim))
     };

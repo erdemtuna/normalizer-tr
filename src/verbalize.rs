@@ -100,6 +100,7 @@ pub(crate) fn render(value: &Value) -> Result<(SegmentKind, &'static str, String
             address.render().to_owned(),
         ),
         Value::Symbol(text) => (SegmentKind::Symbol, "symbol.prose", text.clone()),
+        Value::Letter(letter) => (SegmentKind::Symbol, "letter.name", letter.text().to_owned()),
     })
 }
 
