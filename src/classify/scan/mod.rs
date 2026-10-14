@@ -52,7 +52,8 @@ pub(super) fn tokens<'a>(
     control: &WorkControl,
 ) -> Result<Scanned<'a>, NormalizeError> {
     let text = source.text();
-    let quotes = quotation_boundaries(text);
+    let transparent = standalone::transparent_quotes(text, control)?;
+    let quotes = standalone::token_boundaries(quotation_boundaries(text), &transparent, control)?;
     let catalog_groups = lists::groups(text, rules, &quotes, control)?;
     let mut tokens = Vec::new();
     let mut skip_until = 0;
@@ -167,7 +168,7 @@ pub(super) fn tokens<'a>(
         }
     }
     account_periods(text, &mut tokens, control)?;
-    standalone::mark(text, &mut tokens, control)?;
+    standalone::mark(text, &mut tokens, &transparent, control)?;
     let mut digits = 0;
     for token in &mut tokens {
         control.check()?;

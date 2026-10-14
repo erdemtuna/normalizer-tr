@@ -102,6 +102,14 @@ issues, cancellation and resource errors remain. See
 [standalone letters](normalization.md#standalone-uppercase-letters) for exact
 source/quote boundaries and the deliberate effects on unmarked initials.
 
+Certified padded/nested quote wrappers are also punctuation boundaries for
+generic readers. Valid contents can therefore gain primary readings where a
+closing quote was formerly mistaken for a suffix. Invalid contents stay
+atomic, with the closing wrapper outside their issue/fallback range; a wrong
+real suffix is not repaired. These source-boundary corrections can change
+diagnostic ranges/categories and remove the literal spoken `kesme` for the
+wrapper itself. See [quote boundaries](normalization.md#quotation-and-list-boundaries).
+
 In failed quantity expressions, approved labels are recognized in numeric
 context before symbol/letter splitting: `01 °C` reads
 `sıfır bir derece Santigrat` with an InvalidForm diagnostic, not a validated

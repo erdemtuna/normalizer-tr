@@ -32,5 +32,12 @@
   {"id":"letter-valid-roman","class":"symbol","text":"V. yüzyıl","expected":"beşinci yüzyıl"},
   {"id":"letter-prefix-quantity-priority","class":"symbol","text":"A 5","category":"Unsupported","fallback":"A beş","fallback_class":"Quantity","strategy":"Literal"},
   {"id":"letter-valid-unit","class":"symbol","text":"5 V","expected":"beş volt"},
-  {"id":"letter-invalid-unit","class":"symbol","text":"01 V","category":"InvalidExpression","fallback":"sıfır bir volt","fallback_class":"Quantity","strategy":"Literal"}
+  {"id":"letter-invalid-unit","class":"symbol","text":"01 V","category":"InvalidExpression","fallback":"sıfır bir volt","fallback_class":"Quantity","strategy":"Literal"},
+  {"id":"letter-padded-quote-opening","class":"symbol","text":"' P ve S'","expected":"' pe ve se'"},
+  {"id":"letter-padded-quote-closing","class":"symbol","text":"'P ve S '","expected":"'pe ve se '"},
+  {"id":"letter-padded-quote-tab","class":"symbol","text":"\"P\t\"","expected":"\"pe\t\""},
+  {"id":"letter-nested-smart-single","class":"symbol","text":"‘'S'’","expected":"‘'se'’"},
+  {"id":"letter-nested-straight-single","class":"symbol","text":"'‘S’'","expected":"'‘se’'"},
+  {"id":"certified-quote-money","class":"money","text":"' 25 TL'","expected":"' yirmi beş Türk lirası'"},
+  {"id":"certified-quote-initialism","class":"abbreviation","text":"' SGK'ya'","expected":"' se ge kaya'"}
 ]

@@ -314,6 +314,19 @@ quantities stay verbatim: `‘25 TL’` -> `‘yirmi beş Türk lirası’`.
 Apostrophes in supported suffixes remain part of their whole expression.
 Ambiguous/unmatched forms are not forcibly treated as paired quotations.
 
+Confirmed, externally isolated quote pairs are shared source boundaries for
+token admission and standalone-letter recognition. Whitespace just inside
+either edge stays exact and does not invalidate a pair; unambiguous nested
+straight/smart single pairs work in either direction. Existing legacy quote
+boundaries are retained. Newly recognized padded/nested wrappers may also make
+valid generic expressions resolve: `' SGK'ya'` -> `' se ge kaya'`, and
+`' 25 TL'` -> `' yirmi beş Türk lirası'`.
+The closing wrapper is punctuation, not a failed suffix. A genuinely invalid
+contained expression still owns its whole content: in `' 01 V'` the quantity
+issue/fallback range is `[2,6)`, excluding the quote. Correcting this framing
+can change a previously swallowed quote's issue category and literal fallback;
+it does not repair the contained value or weaken queued address-field owners.
+
 Semicolon lists and clear comma boundaries after approved quantity labels are
 separated without inventing spaces: `25kg,30kg` ->
 `yirmi beş kilogram,otuz kilogram`.
@@ -386,6 +399,9 @@ one letter or a phrase: `“P” ve ‘S’` becomes `“pe” ve ‘se’`, and
 isolated by whitespace or input boundaries. Unambiguous different-style nested
 pairs work; unmatched, mismatched or ambiguous pairs and other quote styles do
 not provide transparency. Quotes remain outside the letter's original-source owner.
+Whitespace just inside a certified pair is allowed, including tabs/line breaks;
+the certificate is reused during tokenization so nested single quotes do not
+remain inside a nominally one-letter token.
 
 Punctuation trimming alone never establishes this intent: `S.`, `S)`, `(S)`,
 `P,S`, `S/P`, `S’nin` and `"S"X` do not gain letter readings. In `P, S`, only

@@ -19,7 +19,10 @@ fn opening(ch: char) -> Option<(usize, char)> {
     }
 }
 
-fn transparent_quotes(text: &str, control: &WorkControl) -> Result<Vec<bool>, NormalizeError> {
+pub(super) fn transparent_quotes(
+    text: &str,
+    control: &WorkControl,
+) -> Result<Vec<bool>, NormalizeError> {
     if !text.contains(['\'', '"', '‘', '’', '“', '”']) {
         return Ok(Vec::new());
     }
@@ -38,10 +41,7 @@ fn transparent_quotes(text: &str, control: &WorkControl) -> Result<Vec<bool>, No
         let suffix_apostrophe = matches!(ch, '\'' | '’')
             && previous.is_some_and(char::is_alphanumeric)
             && next.is_some_and(char::is_alphanumeric);
-        if stack.last().is_some_and(|quote| quote.closing == ch)
-            && previous.is_some_and(|ch| !ch.is_whitespace())
-            && !suffix_apostrophe
-        {
+        if stack.last().is_some_and(|quote| quote.closing == ch) && !suffix_apostrophe {
             ambiguous |= !closing_boundary;
             let quote = stack.pop().ok_or(NormalizeError::Internal)?;
             active[quote.kind] -= 1;
@@ -65,7 +65,7 @@ fn transparent_quotes(text: &str, control: &WorkControl) -> Result<Vec<bool>, No
                 || stack
                     .last()
                     .is_some_and(|quote| quote.start + quote.width == offset))
-            && next.is_some_and(|ch| !ch.is_whitespace())
+            && next.is_some()
         {
             ambiguous |= active[kind] != 0;
             active[kind] += 1;
@@ -82,6 +82,38 @@ fn transparent_quotes(text: &str, control: &WorkControl) -> Result<Vec<bool>, No
         previous = Some(ch);
     }
     Ok(transparent)
+}
+
+pub(super) fn token_boundaries(
+    legacy: Vec<usize>,
+    certified: &[bool],
+    control: &WorkControl,
+) -> Result<Vec<usize>, NormalizeError> {
+    if certified.is_empty() {
+        return Ok(legacy);
+    }
+    // Preserve existing quote grammar, adding only certified source boundaries.
+    let mut legacy = legacy.into_iter().peekable();
+    let mut merged = Vec::new();
+    for (offset, transparent) in certified.iter().enumerate() {
+        control.check()?;
+        if !transparent {
+            continue;
+        }
+        while legacy.peek().is_some_and(|previous| *previous < offset) {
+            control.check()?;
+            merged.push(legacy.next().ok_or(NormalizeError::Internal)?);
+        }
+        if legacy.peek() == Some(&offset) {
+            legacy.next();
+        }
+        merged.push(offset);
+    }
+    for offset in legacy {
+        control.check()?;
+        merged.push(offset);
+    }
+    Ok(merged)
 }
 
 fn left_boundary(
@@ -124,16 +156,16 @@ fn right_boundary(
 pub(super) fn mark(
     text: &str,
     tokens: &mut [Token<'_>],
+    quotes: &[bool],
     control: &WorkControl,
 ) -> Result<(), NormalizeError> {
-    let quotes = transparent_quotes(text, control)?;
     for token in tokens {
         control.check()?;
         let mut scalars = token.text.chars();
         token.standalone = scalars.next().is_some()
             && scalars.next().is_none()
-            && left_boundary(text, token.range.start, &quotes, control)?
-            && right_boundary(text, token.range.end, &quotes, control)?;
+            && left_boundary(text, token.range.start, quotes, control)?
+            && right_boundary(text, token.range.end, quotes, control)?;
     }
     Ok(())
 }
@@ -173,5 +205,33 @@ mod tests {
         let quotes = transparent_quotes(text, &WorkControl::default()).unwrap();
         assert!(!quotes[0] && !quotes[2]);
         assert!(quotes[5] && quotes[7]);
+    }
+
+    #[test]
+    fn certification_preserves_interior_whitespace_and_legacy_boundaries() {
+        for text in ["' P'", "'P '", "\"P\t\"", "‘'S'’", "'‘S’'"] {
+            let quotes = transparent_quotes(text, &WorkControl::default()).unwrap();
+            for (offset, ch) in text.char_indices() {
+                assert_eq!(
+                    quotes[offset],
+                    matches!(ch, '\'' | '"' | '‘' | '’' | '“' | '”'),
+                    "{text:?}"
+                );
+            }
+        }
+        let mut certified = vec![false; 14];
+        for index in [0, 7, 10] {
+            certified[index] = true;
+        }
+        assert_eq!(
+            token_boundaries(vec![1, 7, 12], &certified, &WorkControl::default()).unwrap(),
+            [0, 1, 7, 10, 12]
+        );
+        let cancelled = WorkControl::default();
+        cancelled.cancel();
+        assert_eq!(
+            token_boundaries(vec![], &certified, &cancelled),
+            Err(NormalizeError::Cancelled)
+        );
     }
 }

@@ -178,6 +178,10 @@ fn trimming_never_exposes_a_new_letter_reading() {
         "“S’",
         "‘S”",
         "''S''",
+        "‘'S’'",
+        "'‘S'’",
+        "‘'S'’P",
+        "'‘S’'P",
         "“S”P",
         "P“S”",
         "«S»",
@@ -381,6 +385,174 @@ fn primary_letter_serializes_as_existing_symbol_without_fallback_provenance() {
     assert_eq!(record["fallbacks"], serde_json::json!([]));
     assert_eq!(record["complete"], true);
     assert_eq!(record["fallback_used"], false);
+}
+
+#[test]
+fn paired_phrase_quotes_allow_preserved_interior_edge_whitespace() {
+    let n = Normalizer::new().unwrap();
+    for (open, close) in [("'", "'"), ("\"", "\""), ("‘", "’"), ("“", "”")] {
+        for leading in ["", " ", "\t", "\r\n"] {
+            for trailing in ["", " ", "\t", "\r\n"] {
+                let source = format!("{open}{leading}P ve S{trailing}{close}");
+                let expected = format!("{open}{leading}pe ve se{trailing}{close}");
+                for policy in POLICIES {
+                    let r = n.normalize(&source, &options(policy)).unwrap();
+                    assert_eq!(r.normalized_text(), expected, "{source:?} {policy:?}");
+                    assert!(r.complete() && r.issues().is_empty() && r.fallbacks().is_empty());
+                    let named: Vec<_> = r
+                        .segments()
+                        .iter()
+                        .filter(|segment| segment.rule_id() == "letter.name")
+                        .collect();
+                    assert_eq!(named.len(), 2);
+                    for (segment, letter) in named.iter().zip(['P', 'S']) {
+                        let start = source.find(letter).unwrap();
+                        assert_eq!(segment.range(), SourceRange::new(start, start + 1));
+                        assert_eq!(segment.kind(), SegmentKind::Symbol);
+                    }
+                    partition(&source, &r);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn every_distinct_quote_nesting_exposes_only_the_original_letter() {
+    let n = Normalizer::new().unwrap();
+    let wrappers = [("'", "'"), ("\"", "\""), ("‘", "’"), ("“", "”")];
+    for (outer_index, (outer_open, outer_close)) in wrappers.iter().enumerate() {
+        for (inner_index, (inner_open, inner_close)) in wrappers.iter().enumerate() {
+            if outer_index == inner_index {
+                continue;
+            }
+            for (content, expected) in [("S", "se"), ("P ve S", "pe ve se"), ("I\u{307}", "i")] {
+                let source = format!("{outer_open}{inner_open}{content}{inner_close}{outer_close}");
+                let expected =
+                    format!("{outer_open}{inner_open}{expected}{inner_close}{outer_close}");
+                for policy in POLICIES {
+                    let r = n.normalize(&source, &options(policy)).unwrap();
+                    assert_eq!(r.normalized_text(), expected, "{source:?} {policy:?}");
+                    assert!(r.complete() && r.issues().is_empty() && r.fallbacks().is_empty());
+                    let named: Vec<_> = r
+                        .segments()
+                        .iter()
+                        .filter(|segment| segment.rule_id() == "letter.name")
+                        .collect();
+                    let start = outer_open.len() + inner_open.len();
+                    let first_length = if content.starts_with('I') { 3 } else { 1 };
+                    assert_eq!(
+                        named[0].range(),
+                        SourceRange::new(start, start + first_length)
+                    );
+                    assert_eq!(named.len(), if content.contains(" ve ") { 2 } else { 1 });
+                    partition(&source, &r);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn certified_wrappers_bound_other_readers_without_repairing_their_contents() {
+    let n = Normalizer::new().unwrap();
+    for policy in POLICIES {
+        for (source, expected, kind, range) in [
+            (
+                "' SGK'ya'",
+                "' se ge kaya'",
+                SegmentKind::Abbreviation,
+                SourceRange::new(2, 8),
+            ),
+            (
+                "' 25 TL'",
+                "' yirmi beş Türk lirası'",
+                SegmentKind::Money,
+                SourceRange::new(2, 7),
+            ),
+            (
+                "' V. yüzyıl'",
+                "' beşinci yüzyıl'",
+                SegmentKind::Roman,
+                SourceRange::new(2, 4),
+            ),
+            (
+                "‘'S@ornek.com'’",
+                "‘'S et ornek nokta kom'’",
+                SegmentKind::Electronic,
+                SourceRange::new(4, 15),
+            ),
+        ] {
+            let r = n.normalize(source, &options(policy)).unwrap();
+            assert_eq!(r.normalized_text(), expected, "{source:?} {policy:?}");
+            assert!(r.complete() && r.issues().is_empty() && r.fallbacks().is_empty());
+            assert_eq!(r.segments()[1].kind(), kind);
+            assert_eq!(r.segments()[1].range(), range);
+            assert!(r.segments().iter().all(|s| s.rule_id() != "letter.name"));
+            partition(source, &r);
+        }
+        let mut hinted = options(policy);
+        hinted.hints = vec![Hint::new(SourceRange::new(4, 5), HintKind::Roman)];
+        let r = n.normalize("‘'V'’", &hinted).unwrap();
+        assert_eq!(r.normalized_text(), "‘'beş'’");
+        assert_eq!(r.segments()[1].kind(), SegmentKind::Roman);
+        partition("‘'V'’", &r);
+        for (source, range) in [
+            ("' S123'", SourceRange::new(3, 6)),
+            ("' 01 V'", SourceRange::new(5, 6)),
+        ] {
+            hinted.hints = vec![Hint::new(range, HintKind::Cardinal)];
+            assert_eq!(
+                n.normalize(source, &hinted),
+                Err(NormalizeError::InvalidHint)
+            );
+        }
+    }
+    for (source, fallback_text, range, category, class) in [
+        (
+            "' S123'",
+            "' se bir iki üç'",
+            SourceRange::new(2, 6),
+            IssueCategory::ProtectedIdentifier,
+            FallbackClass::Identifier,
+        ),
+        (
+            "' 01 V'",
+            "' sıfır bir volt'",
+            SourceRange::new(2, 6),
+            IssueCategory::InvalidExpression,
+            FallbackClass::Quantity,
+        ),
+        (
+            "' SGK'a'",
+            "' se ge ke kesme a'",
+            SourceRange::new(2, 7),
+            IssueCategory::InvalidExpression,
+            FallbackClass::Abbreviation,
+        ),
+    ] {
+        let preserve = n.normalize(source, &NormalizeOptions::default()).unwrap();
+        assert_eq!(preserve.normalized_text(), source);
+        assert!(!preserve.complete() && preserve.fallbacks().is_empty());
+        assert_eq!(preserve.issues().len(), 1);
+        assert_eq!(preserve.issues()[0].range(), range);
+        assert_eq!(preserve.issues()[0].category(), category);
+        assert_eq!(
+            n.normalize(source, &options(AmbiguityPolicy::Reject)),
+            Err(NormalizeError::Unresolved(preserve.issues().to_vec()))
+        );
+        let fallback = n
+            .normalize(source, &options(AmbiguityPolicy::Fallback))
+            .unwrap();
+        assert_eq!(fallback.normalized_text(), fallback_text);
+        assert!(fallback.complete() && fallback.issues().is_empty());
+        assert_eq!(fallback.fallbacks().len(), 1);
+        assert_eq!(fallback.fallbacks()[0].range(), range);
+        assert_eq!(fallback.fallbacks()[0].attempted_class(), class);
+        assert_eq!(fallback.fallbacks()[0].original_category(), Some(category));
+        partition(source, &preserve);
+        partition(source, &fallback);
+    }
 }
 
 proptest::proptest! {

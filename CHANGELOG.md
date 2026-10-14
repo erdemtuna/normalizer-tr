@@ -7,6 +7,15 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Share certified quote boundaries between tokenization and singleton admission.
+  Valid isolated pairs allow interior edge whitespace and both nesting directions
+  of distinct straight/smart single quotes, retaining exact wrappers and UTF-8
+  glyph ranges. This also corrects generic contents of newly recognized frames:
+  `' SGK'ya'` and `' 25 TL'` gain valid primary readings rather than treating
+  the closing quote as a malformed suffix. Truly invalid contents remain whole
+  findings, but ranges/categories and literal fallback may change when the
+  wrapper is correctly excluded. Existing legacy quote boundaries and stronger
+  owners remain authoritative; no public type, label, default or limit changes.
 - Name supported standalone uppercase letters as primary Symbol segments in every
   policy, using the existing Turkish names and `letter.name` rule. Lowercase,
   uppercase words, punctuation-derived fragments and protected compound owners
