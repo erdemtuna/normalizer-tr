@@ -119,7 +119,9 @@ class PerformanceScopeTests(unittest.TestCase):
             "scripts/compare_contracts.py",
             "scripts/common.py",
             "scripts/ci_checks.py",
+            "scripts/performance_comparison.py",
             "scripts/performance_report.py",
+            "scripts/performance_summary.py",
             "scripts/verification.py",
             "scripts/verify.ps1",
             "scripts/rust/contract_probe.rs",
@@ -244,6 +246,8 @@ class PerformanceScopeTests(unittest.TestCase):
             (["README.md", "CHANGELOG.md"], "false"),
             (["src/pipeline.rs", "README.md"], "true"),
             (["src/renamed\nsource.rs"], "true"),
+            (["scripts/performance_comparison.py"], "true"),
+            (["scripts/performance_summary.py"], "true"),
         ):
             with self.subTest(paths=paths), tempfile.TemporaryDirectory() as directory:
                 output, summary = self.run_scope(directory, paths)

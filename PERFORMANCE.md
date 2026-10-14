@@ -51,6 +51,11 @@ still run it. The small
 scope job records the decision; unavailable or mismatched source evidence fails
 rather than pretending the change is irrelevant.
 
+When extracting measurement tooling, update the path selection in
+`scripts/ci_checks.py` and test a latest-push diff containing only the new
+module. An older entry point remaining in the full PR diff does not select
+that later push.
+
 Manual dispatch always requests measurement. Documentation-only updates do not
 cancel a relevant comparison already running; a newer relevant update supersedes
 an older measurement. Retained artifacts identify the revisions actually
