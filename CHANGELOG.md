@@ -20,6 +20,9 @@ Platform requirements are in the [README](README.md) and
   names. Long singleton runs may reach candidate/result budgets. Update text,
   segment-kind/rule and diagnostic snapshots as appropriate; no speech-model
   validation is claimed. See [source boundaries](docs/normalization.md#standalone-uppercase-letters).
+- Validate native comparison reports against their respective source fixture
+  catalogs, allowing append-only regression coverage without misvalidating
+  an older baseline against newer inputs. Changed cohorts remain non-comparable.
 - Include long-input and failed work in performance comparisons, with exact
   input/options, full outcomes and explicit non-comparability. Native and
   installed-Python reports require version two; regenerate older artifacts
