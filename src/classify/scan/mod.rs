@@ -2,6 +2,7 @@
 mod lists;
 mod piece;
 mod punctuation;
+mod quotes;
 mod signals;
 mod standalone;
 
@@ -14,8 +15,8 @@ use piece::Piece;
 pub(in crate::classify) use punctuation::trimmed_range;
 use punctuation::{
     boundary, expression_range, lexical_period, numeric_parenthesis_compound, quantity_separators,
-    quotation_boundaries,
 };
+use quotes::QuoteBoundaries;
 pub(super) use signals::{
     group_whitespace, identifier, math_operator, number_fragment, phones, spaced_compound,
 };
@@ -52,9 +53,9 @@ pub(super) fn tokens<'a>(
     control: &WorkControl,
 ) -> Result<Scanned<'a>, NormalizeError> {
     let text = source.text();
-    let transparent = standalone::transparent_quotes(text, control)?;
-    let quotes = standalone::token_boundaries(quotation_boundaries(text), &transparent, control)?;
-    let catalog_groups = lists::groups(text, rules, &quotes, control)?;
+    let quote_bounds = QuoteBoundaries::collect(text, control)?;
+    let quotes = quote_bounds.offsets();
+    let catalog_groups = lists::groups(text, rules, quotes, control)?;
     let mut tokens = Vec::new();
     let mut skip_until = 0;
     for matched in rules.tokens.find_iter(text) {
@@ -86,7 +87,7 @@ pub(super) fn tokens<'a>(
             );
             continue;
         }
-        let Some(range) = expression_range(raw, matched.start(), &quotes, control)? else {
+        let Some(range) = expression_range(raw, matched.start(), quotes, control)? else {
             continue;
         };
         if crate::domain::electronic::looks_like(&text[range.start..range.end])
@@ -113,7 +114,7 @@ pub(super) fn tokens<'a>(
         });
         if let Some(prefix) = prefix {
             let body_start = range.start + prefix;
-            let body_range = trimmed_range(&text[body_start..matched.end()], body_start, &quotes)
+            let body_range = trimmed_range(&text[body_start..matched.end()], body_start, quotes)
                 .ok_or(NormalizeError::Internal)?;
             append_token(
                 &mut tokens,
@@ -127,7 +128,7 @@ pub(super) fn tokens<'a>(
         let protected = identifier(&text[range.start..range.end]);
         let mut approved_list = approved(&catalog_groups, range.start);
         let list =
-            protected && quantity_separators(&text[range.start..range.end], range.start, &quotes);
+            protected && quantity_separators(&text[range.start..range.end], range.start, quotes);
         if protected && !list {
             append_token(&mut tokens, source, range);
             continue;
@@ -137,7 +138,7 @@ pub(super) fn tokens<'a>(
         for (offset, ch) in raw.char_indices() {
             control.check()?;
             let preceding = &raw[start..offset];
-            let delimiter = boundary(ch, matched.start() + offset, &quotes);
+            let delimiter = boundary(ch, matched.start() + offset, quotes);
             let quantity = (delimiter || ch == ',') && piece.quantity(preceding);
             let comma = ch == ','
                 && (approved_list
@@ -152,8 +153,7 @@ pub(super) fn tokens<'a>(
                 piece.advance(preceding, ch);
                 continue;
             }
-            if let Some(range) =
-                trimmed_range(&raw[start..offset], matched.start() + start, &quotes)
+            if let Some(range) = trimmed_range(&raw[start..offset], matched.start() + start, quotes)
             {
                 append_token(&mut tokens, source, range);
             }
@@ -163,12 +163,12 @@ pub(super) fn tokens<'a>(
                 approved_list = approved(&catalog_groups, matched.start() + start);
             }
         }
-        if let Some(range) = trimmed_range(&raw[start..], matched.start() + start, &quotes) {
+        if let Some(range) = trimmed_range(&raw[start..], matched.start() + start, quotes) {
             append_token(&mut tokens, source, range);
         }
     }
     account_periods(text, &mut tokens, control)?;
-    standalone::mark(text, &mut tokens, &transparent, control)?;
+    standalone::mark(text, &mut tokens, quote_bounds.transparent(), control)?;
     let mut digits = 0;
     for token in &mut tokens {
         control.check()?;

@@ -7,6 +7,10 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+- Separate serial performance orchestration, validated comparisons and Markdown
+  presentation into focused development modules. Split generic quote framing
+  from raw atom admission and use typed quote kinds without changing the
+  accepted source grammar, public results or frozen measurement methods.
 - Share certified quote boundaries between tokenization and singleton admission.
   Valid isolated pairs allow interior edge whitespace and both nesting directions
   of distinct straight/smart single quotes, retaining exact wrappers and UTF-8

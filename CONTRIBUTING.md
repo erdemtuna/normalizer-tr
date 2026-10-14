@@ -35,6 +35,7 @@ Core/binding development needs no Torch, model files or credentials.
 |---|---|
 | `src/api` | Public contract behind crate-root re-exports |
 | `src/classify` | Fixed reader priority, validation and whole-span claims; `scan` separates tokenization/indexing, punctuation and signals |
+| `src/classify/scan/quotes.rs`, `src/classify/scan/standalone.rs` | Shared certified/legacy quote views with typed quote styles, followed by generic raw-atom checks |
 | `src/domain` | Validated numeric, quantity, temporal, electronic and identifier values |
 | `src/domain/quantities.rs`, `src/domain/quantities/percentage.rs`, `src/domain/quantities/range.rs` | Quantity parsing/source-target realization, percentage grammar, and contextual numeric ranges behind stable private re-exports |
 | `src/domain/lexicon` | Approved abbreviation/name catalogs and shared compile-time lookup indexes; typed spoken tails remain in the domain |
@@ -179,7 +180,10 @@ verification entry point.
 Native and installed-Python performance artifacts use the strict version-two
 formats described in [performance](PERFORMANCE.md#run-a-comparison). Regenerate both
 old formats rather than repairing reports. Shared report admission lives in
-`scripts/performance_report.py`; native workload registration/evidence lives
+`scripts/performance_report.py`. `scripts/compare_performance.py` orchestrates
+builds and serial runs; `scripts/performance_comparison.py` compares admitted
+evidence, and `scripts/performance_summary.py` renders Markdown without invoking
+builds or samplers. Native workload registration/evidence lives
 in `benches/latency.rs` and `benches/latency/support.rs`. Disjoint workload
 modules expose ordinary private `cases()`/`check()` functions; the ordered
 `workload_inventory.json` declares coverage metadata, not duplicated goldens.

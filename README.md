@@ -81,10 +81,6 @@ cancellation and resource limits remain errors in every policy.
 Hints provide explicit intent. All hint and diagnostic ranges are original
 UTF-8 byte offsets, not character positions.
 
-Standalone supported uppercase letters receive primary Turkish names:
-`P ve S dalgaları` becomes `pe ve se dalgaları`. Lowercase letters and uppercase
-words are not newly spelled. See the normalization reference for source boundaries.
-
 ## Documentation
 
 | Guide | Contents |
