@@ -19,6 +19,9 @@ Platform requirements are in the [README](README.md) and
   `Hint(12,18,"cardinal")` now fail with `invalid_hint`, as required by whole-owner
   validation. Public types, serialized labels, policy defaults and limits are
   unchanged. No audio validation was performed.
+- Validate native comparison reports against their respective source fixture
+  catalogs, allowing append-only regression coverage without misvalidating
+  an older baseline against newer inputs. Changed cohorts remain non-comparable.
 - Include long-input and failed work in performance comparisons, with exact
   input/options, full outcomes and explicit non-comparability. Native and
   installed-Python reports require version two; regenerate older artifacts

@@ -98,6 +98,9 @@ Three repetitions help expose variation; a single ratio is not an adoption rule.
 Full outcome equality determines comparability; compact labels are descriptive,
 not a weaker substitute. Genuine limit failures remain measured work. Deadlines
 are separate observations without ordinary ratios or hard wall-clock assertions.
+Each native report is validated against its own source checkout's policy
+fixtures. Appending reviewed fixtures does not invalidate the older baseline
+report, but changed policy cohorts remain non-comparable.
 Shared-host noise can be large: review matched workload, size and policy medians
 and tails rather than using global extremes to dismiss counterevidence.
 

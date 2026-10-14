@@ -18,10 +18,34 @@ from scripts.compare_performance import (
     select_reference,
     validate_timing,
 )
-from scripts.tests.performance_fixtures import ReportTestCase, timing
+from scripts.tests.performance_fixtures import CONTRACT, ReportTestCase, timing
 
 
 class PerformanceTests(ReportTestCase):
+    def test_appended_policy_fixtures_are_admitted_against_their_own_source(self):
+        base_root, head_root = Path("base"), Path("head")
+        before = self.report()
+        expanded = [
+            *CONTRACT,
+            {"id": "added", "text": "new", "class": "quantity", "expected": "new"},
+        ]
+        with patch("scripts.tests.performance_fixtures.CONTRACT", expanded):
+            after = self.report()
+        with patch(
+            "scripts.performance_report.policy_contract_fixture",
+            side_effect=lambda root: (CONTRACT if root == base_root else expanded, []),
+        ):
+            compared = compare(
+                before, after, True, base_root=base_root, head_root=head_root
+            )
+            with self.assertRaisesRegex(RuntimeError, "frozen fixtures"):
+                compare(before, after, True)
+        self.assertTrue(all(row["comparable"] for row in compared["primary"]))
+        self.assertTrue(all(row["comparable"] for row in compared["scaling"]))
+        self.assertTrue(
+            all(not row["comparable"] for row in compared["policy_contract"])
+        )
+
     def test_only_the_known_pr_transition_selects_a_frozen_reference(self):
         self.assertEqual(select_reference(PRE_V2_BASE_SHA, ""), V2_REFERENCE_SHA)
         self.assertEqual(select_reference("new-base", "ignored"), "new-base")

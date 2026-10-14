@@ -101,8 +101,11 @@ def outcome_label(summary):
     return f"{label} ({summary['limit']})" if "limit" in summary else label
 
 
-def compare(base, head, same_inputs, contract_changes=()):
-    before_report, after_report = admit_native(base), admit_native(head)
+def compare(
+    base, head, same_inputs, contract_changes=(), *, base_root=ROOT, head_root=ROOT
+):
+    before_report = admit_native(base, base_root)
+    after_report = admit_native(head, head_root)
     if base["method"] != head["method"]:
         raise RuntimeError("sampler methods differ")
     for report in (base, head):
@@ -315,6 +318,8 @@ def main():
                 reports["head"],
                 corpus_hashes["base"] == corpus_hashes["head"],
                 contract_changes,
+                base_root=base,
+                head_root=head,
             )
         )
     comparison = {
