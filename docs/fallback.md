@@ -92,23 +92,26 @@ Identifier `AB12` and uncued Roman `IV` use their protected/literal
 readings. Bare or invalid slash-date notation remains literal, without a
 PreferredDate or SurfaceDate assumption.
 
-Eligible standalone uppercase letters are primary Symbol readings in all three
-policies, with rule `letter.name`, not handled-source fallback. Bare `V` now
-names `ve` without a Roman/MissingIntent/Literal diagnostic; multi-letter `IV`,
-punctuation-derived letters and failed compound owners keep existing behavior.
+**Unreleased:** eligible standalone uppercase letters are primary Symbol readings
+in all three policies, with rule `letter.name`, not handled-source fallback.
+Bare `V` now names `ve` without a Roman/MissingIntent/Literal diagnostic.
+Multi-letter `IV`, punctuation-derived letters and failed compound owners keep
+existing behavior.
 Names do not imply `FallbackClass::Symbol` or create a fallback record.
 Only the eligible single-letter Roman finding is replaced; unrelated
 issues, cancellation and resource errors remain. See
 [standalone letters](normalization.md#standalone-uppercase-letters) for exact
 source/quote boundaries and the deliberate effects on unmarked initials.
 
-Certified padded/nested quote wrappers are also punctuation boundaries for
-generic readers. Valid contents can therefore gain primary readings where a
-closing quote was formerly mistaken for a suffix. Invalid contents stay
-atomic, with the closing wrapper outside their issue/fallback range; a wrong
-real suffix is not repaired. These source-boundary corrections can change
+The Unreleased quote-boundary correction also affects generic expressions.
+Valid contents can gain primary readings where a closing quote was formerly
+mistaken for a suffix. Invalid contents stay atomic, with the closing wrapper
+outside their issue/fallback range; a wrong real suffix is not repaired.
+These source-boundary corrections can change
 diagnostic ranges/categories and remove the literal spoken `kesme` for the
-wrapper itself. See [quote boundaries](normalization.md#quotation-and-list-boundaries).
+wrapper itself. See [quote boundaries](normalization.md#quotation-and-list-boundaries)
+for the accepted frames and the
+[migration examples](../CHANGELOG.md#behavior-and-migration) for policy changes.
 
 In failed quantity expressions, approved labels are recognized in numeric
 context before symbol/letter splitting: `01 °C` reads

@@ -314,11 +314,9 @@ quantities stay verbatim: `‘25 TL’` -> `‘yirmi beş Türk lirası’`.
 Apostrophes in supported suffixes remain part of their whole expression.
 Ambiguous/unmatched forms are not forcibly treated as paired quotations.
 
-Confirmed, externally isolated quote pairs are shared source boundaries for
-token admission and standalone-letter recognition. Whitespace just inside
-either edge stays exact and does not invalidate a pair; unambiguous nested
-straight/smart single pairs work in either direction. Existing legacy quote
-boundaries are retained. Newly recognized padded/nested wrappers may also make
+**Unreleased:** additional externally isolated quote pairs allow whitespace just
+inside either edge and unambiguous nested straight/smart single pairs in either
+direction. Whitespace and wrappers stay exact. These frames may also make
 valid generic expressions resolve: `' SGK'ya'` -> `' se ge kaya'`, and
 `' 25 TL'` -> `' yirmi beş Türk lirası'`.
 The closing wrapper is punctuation, not a failed suffix. A genuinely invalid
@@ -378,6 +376,8 @@ explicit hint; there is no general proper-name detector.
 
 ### Standalone uppercase letters
 
+**Unreleased; not included in published 0.7.0.**
+
 A supported uppercase letter occupying a complete whitespace-delimited source
 atom receives its Turkish letter name as a primary Symbol segment in every
 policy, with rule `letter.name`. For example, `P ve S dalgaları` becomes
@@ -385,6 +385,11 @@ policy, with rule `letter.name`. For example, `P ve S dalgaları` becomes
 No following noun, suffix, coordination or technical context is required.
 Unmarked initials (`S Yılmaz`), ordinary capitals (`O geldi`) and longer
 space-separated letter lists deliberately follow the same rule.
+
+Default Preserve does not disable these readings: it preserves unresolved
+spans, not text that now has a primary reading. See the
+[before/after migration examples](../CHANGELOG.md#behavior-and-migration) for
+changes to strict-mode success, segment kinds and fallback diagnostics.
 
 The inventory is the Turkish uppercase alphabet plus `Q`, `W` and `X`, named
 `kü`, `çift ve` and `iks`. `I` names `ı`, while `İ` names `i`. Lowercase letters,
@@ -398,10 +403,8 @@ one letter or a phrase: `“P” ve ‘S’` becomes `“pe” ve ‘se’`, and
 `"P ve S dalgaları"` becomes `"pe ve se dalgaları"`. Wrappers must be externally
 isolated by whitespace or input boundaries. Unambiguous different-style nested
 pairs work; unmatched, mismatched or ambiguous pairs and other quote styles do
-not provide transparency. Quotes remain outside the letter's original-source owner.
-Whitespace just inside a certified pair is allowed, including tabs/line breaks;
-the certificate is reused during tokenization so nested single quotes do not
-remain inside a nominally one-letter token.
+not provide transparency. Whitespace just inside a confirmed pair is allowed,
+including tabs/line breaks. Quotes stay verbatim outside the letter's source range.
 
 Punctuation trimming alone never establishes this intent: `S.`, `S)`, `(S)`,
 `P,S`, `S/P`, `S’nin` and `"S"X` do not gain letter readings. In `P, S`, only

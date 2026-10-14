@@ -103,12 +103,26 @@ redaction or a voice-quality promise. See the [fallback contract](../../docs/fal
 for readings and Rust Serde versus Python record naming, and the
 [normalization reference](../../docs/normalization.md) for supported formats.
 
-Eligible standalone uppercase letters use primary `kind="symbol"` and
+**Unreleased; not included in published 0.7.0.** Eligible standalone uppercase
+letters use primary `kind="symbol"` and
 `rule_id="letter.name"` in every policy, without letter fallback records.
-For example, `P ve S dalgaları` becomes `pe ve se dalgaları`. Existing
-abbreviations remain `"abbreviation"`; supported Roman hints still win.
-See [source boundaries](../../docs/normalization.md#standalone-uppercase-letters)
-before updating text, segment or diagnostic snapshots.
+For example:
+
+```python
+r = n.normalize("C vitamini")
+assert r.normalized_text == "ce vitamini"
+assert r.complete and not r.fallback_used
+assert r.segments[0].kind == "symbol"
+assert r.segments[0].rule_id == "letter.name"
+```
+
+Preserve is not an opt-out: these are primary readings, including unmarked
+initials such as `S Yılmaz` -> `se Yılmaz`. A Fallback call may return the same
+text as before but no longer report a handled Roman assumption. Existing
+abbreviations remain `"abbreviation"`; valid Roman hints still win. See
+[source boundaries](../../docs/normalization.md#standalone-uppercase-letters)
+and [migration examples](../../CHANGELOG.md#behavior-and-migration) before
+updating consumers of segment kinds, diagnostics or source ranges.
 
 `normalize(text, *, ambiguity_policy="preserve", hints=(), cancellation=None,
 deadline_ms=None)` takes Python str, typed Hint objects, optional

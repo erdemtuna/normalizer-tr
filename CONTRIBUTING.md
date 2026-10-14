@@ -92,6 +92,13 @@ Queued independent address fields bound reader lookahead. Do not discard stale
 owners to recover from a conflicting claim. Electronic trimming counts
 parentheses once and updates the count while trimming, with cooperative checks.
 
+Shared quote framing constructs one certified transparency map and merges its
+offsets with retained legacy boundaries. Tokenization uses the sorted boundary
+membership view; standalone admission uses the same certificate. The merged
+offsets are not matched opening/closing pairs. A consumer that needs pairing
+must preserve separate authoritative frame information rather than infer pairs
+from adjacent union entries.
+
 ## Change rules and tests
 
 State the purpose and acceptance examples before expanding coverage: positive
