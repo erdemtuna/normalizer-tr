@@ -555,6 +555,40 @@ fn certified_wrappers_bound_other_readers_without_repairing_their_contents() {
     }
 }
 
+#[test]
+fn quote_context_is_whole_source_not_an_assumed_semicolon_frame() {
+    let n = Normalizer::new().unwrap();
+    for (source, expected, named_ranges) in [
+        (
+            "“S ; ' P ve S'",
+            "“S ; ' pe ve S'",
+            vec![SourceRange::new(9, 10)],
+        ),
+        (
+            "“P ; S”",
+            "“pe ; se”",
+            vec![SourceRange::new(3, 4), SourceRange::new(7, 8)],
+        ),
+    ] {
+        for policy in POLICIES {
+            let r = n.normalize(source, &options(policy)).unwrap();
+            assert_eq!(r.normalized_text(), expected);
+            assert!(r.complete() && r.issues().is_empty() && r.fallbacks().is_empty());
+            let named: Vec<_> = r
+                .segments()
+                .iter()
+                .filter(|segment| segment.rule_id() == "letter.name")
+                .map(|segment| {
+                    assert_eq!(segment.kind(), SegmentKind::Symbol);
+                    segment.range()
+                })
+                .collect();
+            assert_eq!(named, named_ranges);
+            partition(source, &r);
+        }
+    }
+}
+
 proptest::proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(128))]
     #[test]

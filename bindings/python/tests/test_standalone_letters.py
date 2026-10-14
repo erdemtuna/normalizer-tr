@@ -247,3 +247,25 @@ def test_certified_closing_quote_is_not_an_invalid_owner_suffix(
         assert records[0].strategy == "literal"
     else:
         assert records[0].category == category
+
+
+@pytest.mark.parametrize("policy", POLICIES)
+@pytest.mark.parametrize(
+    "source,expected,ranges",
+    [
+        ("“S ; ' P ve S'", "“S ; ' pe ve S'", [(9, 10)]),
+        ("“P ; S”", "“pe ; se”", [(3, 4), (7, 8)]),
+    ],
+)
+def test_quote_context_cannot_be_inferred_from_semicolon_concatenation(
+    policy, source, expected, ranges
+):
+    result = Normalizer().normalize(source, ambiguity_policy=policy)
+    assert result.normalized_text == expected
+    assert result.complete and result.issues == result.fallbacks == ()
+    letters = [
+        segment for segment in result.segments if segment.rule_id == "letter.name"
+    ]
+    assert [(segment.start_byte, segment.end_byte) for segment in letters] == ranges
+    assert all(segment.kind == "symbol" for segment in letters)
+    assert_partition(source, result)

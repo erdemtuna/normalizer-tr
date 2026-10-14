@@ -27,7 +27,7 @@
   {"id":"letter-no-initial-trimming","class":"symbol","text":"S. Yılmaz","expected":"S. Yılmaz"},
   {"id":"letter-no-list-trimming","class":"symbol","text":"S) dalgası","expected":"S) dalgası"},
   {"id":"letter-no-suffix","class":"symbol","text":"S’nin dalgası","expected":"S’nin dalgası"},
-  {"id":"letter-no-unmatched-wrapper","class":"symbol","text":"“S","expected":"“S"},
+  {"id":"letter-no-unmatched-wrapper","class":"symbol","text":"“S","expected":"“S","composable":false},
   {"id":"letter-multi-roman","class":"symbol","text":"IV","category":"Ambiguous","fallback":"ı ve","fallback_class":"Roman","strategy":"Literal"},
   {"id":"letter-valid-roman","class":"symbol","text":"V. yüzyıl","expected":"beşinci yüzyıl"},
   {"id":"letter-prefix-quantity-priority","class":"symbol","text":"A 5","category":"Unsupported","fallback":"A beş","fallback_class":"Quantity","strategy":"Literal"},

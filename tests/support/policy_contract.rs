@@ -26,6 +26,14 @@ pub fn hint(case: &Value) -> Option<Hint> {
     ))
 }
 
+pub fn composable(case: &Value) -> bool {
+    case.get("composable").is_none_or(|value| {
+        value
+            .as_bool()
+            .expect("policy fixture composable metadata must be boolean")
+    })
+}
+
 const CATALOG: &str = include_str!("../fixtures/policy-contract.json");
 const GROUPS: &[(&str, &str)] = &[
     (
@@ -150,6 +158,7 @@ pub fn load() -> (Vec<Value>, usize) {
     let mut ids = BTreeSet::new();
     for case in &cases {
         let _ = hint(case);
+        let _ = composable(case);
         assert!(
             ids.insert(case["id"].as_str().unwrap()),
             "duplicate policy-contract case"

@@ -127,6 +127,11 @@ independently. Do not alter the frozen benchmark inputs/order to improve an aggr
 Append new groups and retain existing case IDs and order. Change expected
 outputs only for intentional behavior changes documented in the changelog.
 
+An intentionally open source delimiter can use `"composable": false` to opt out
+of the concatenation property, not its individual all-policy tests or benchmarks.
+Keep deterministic whole-source interaction regressions for such cases; joining
+isolated goldens with a semicolon does not itself isolate quote context.
+
 Whole-source validation is separate from constituent primary emission.
 Components retain original grapheme-safe ranges and must partition their owner.
 Inserted spoken labels attach to an existing nonempty component; altered text
