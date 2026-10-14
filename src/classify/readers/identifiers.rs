@@ -1,4 +1,4 @@
-use super::super::scan::{Token, whitespace_between};
+use super::super::scan::{Token, telephone_gap, whitespace_between};
 use super::{Attempt, Context};
 use crate::{
     IssueCategory, NormalizeError, WorkControl,
@@ -106,6 +106,15 @@ pub(super) fn read(
             if phone.is_none() && ctx.money_end(index).is_some() {
                 return Ok(None);
             }
+            let end = if phone.is_none()
+                && let Some(next) = tokens.get(end + 1)
+                && telephone_gap(&text[tokens[end].range.end..next.range.start])
+                && notation::numeric_suffix_surface(next.text, control)?.is_some()
+            {
+                end + 1
+            } else {
+                end
+            };
             return Ok(Some((
                 phone
                     .map(Value::Telephone)

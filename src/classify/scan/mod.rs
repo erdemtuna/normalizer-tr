@@ -17,6 +17,7 @@ use punctuation::{
 };
 pub(super) use signals::{
     group_whitespace, identifier, math_operator, number_fragment, phones, spaced_compound,
+    telephone_gap,
 };
 
 #[derive(Clone, Copy)]
@@ -184,9 +185,7 @@ pub(super) fn tokens<'a>(
         }
         if let Some(next) = tokens.get(index + 1)
             && signals::telephone_group(next.text)
-            && text[tokens[index].range.end..next.range.start]
-                .chars()
-                .all(|ch| ch.is_whitespace() || matches!(ch, '(' | ')' | '-'))
+            && telephone_gap(&text[tokens[index].range.end..next.range.start])
         {
             tokens[index].phone_run_end = next.phone_run_end;
         }
@@ -278,9 +277,7 @@ mod tests {
                 let mut end = index;
                 while let Some(next) = tokens.get(end + 1) {
                     if !signals::telephone_group(next.text)
-                        || !text[tokens[end].range.end..next.range.start]
-                            .chars()
-                            .all(|ch| ch.is_whitespace() || matches!(ch, '(' | ')' | '-'))
+                        || !telephone_gap(&text[tokens[end].range.end..next.range.start])
                     {
                         break;
                     }

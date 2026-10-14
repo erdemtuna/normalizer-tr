@@ -350,6 +350,23 @@ zero is invented. Significant leading zeros in groups remain digitwise.
 Plain ten digits require Telephone intent or a clear phone cue. Digits hints
 remain digitwise, not telephone prosody. Subscriber assignment is not verified.
 
+Telephone suffixes are unsupported. Once telephone intent and isolated source
+membership are established, an attached tail stays with the whole invalid
+phone: `0532 123 45 67'den` remains unchanged with one issue over `[0,18)`.
+Malformed group widths, incomplete runs, empty/repeated apostrophe tails and
+digit-bearing tails do not release numeric fragments. Existing phone-shaped
+ownership also includes invalid whitespace separators such as tabs/newlines
+or nonbreaking spaces; this does not make those separators valid telephones.
+
+A successful unsuffixed phone keeps a following independent number:
+`0532 123 45 67 5'ten` retains the Telephone plus `beşten`. Protected identifier,
+electronic and tight-list interiors are not extracted as telephone tails, and
+independent quantities and address fields retain their own ranges.
+Hints cannot cut the corrected invalid owner: on the suffixed example,
+`Hint(0,11,"digits")` and `Hint(12,18,"cardinal")` now fail with `invalid_hint`,
+just like a whole invalid Telephone or Digits hint. All coordinates remain
+original UTF-8 bytes, including after decomposed-Unicode prefixes.
+
 IBANs require the full uppercase `TR` + two check digits + 22 numeric BBAN
 characters, canonical space grouping and modulo-97 validity. The public
 `TR330006100519786457841326` fixture is a checksum example, not a verified

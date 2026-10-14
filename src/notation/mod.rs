@@ -8,7 +8,7 @@ pub(crate) use quantities::{
     attached_money_tail, attached_quantity, currency_marker, label, quantity_piece,
     unsupported_label,
 };
-pub(crate) use suffix::{split_suffix, suffix_parts};
+pub(crate) use suffix::{numeric_suffix_surface, split_suffix, suffix_parts};
 pub(crate) use symbols::{emoticon_length, letter_name, needs_reading, symbol_name};
 pub(crate) use temporal::{DateSurface, TimeSurface};
 

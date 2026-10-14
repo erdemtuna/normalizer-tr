@@ -105,3 +105,8 @@ pub(super) fn telephone_group(text: &str) -> bool {
             && text.starts_with(|ch: char| ch.is_ascii_digit())
             && text.bytes().all(|byte| byte.is_ascii_alphanumeric()))
 }
+
+pub(in crate::classify) fn telephone_gap(text: &str) -> bool {
+    text.chars()
+        .all(|ch| ch.is_whitespace() || matches!(ch, '(' | ')' | '-'))
+}
