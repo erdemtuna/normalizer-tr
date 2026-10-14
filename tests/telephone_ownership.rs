@@ -166,6 +166,8 @@ fn original_prefixes_quotes_and_following_quantities_keep_exact_segments() {
             "phone-suffixed-parenthesized-final-group",
             "phone-suffixed-parenthesized-tail",
             "phone-suffixed-noncomposing-mark",
+            "phone-suffixed-marked-closer-before-tail",
+            "phone-suffixed-marked-closer-after-tail",
         ]
         .contains(&case["id"].as_str().unwrap())
     }) {
@@ -399,6 +401,7 @@ fn corrected_owner_rejects_component_hints_but_keeps_independent_hints() {
             ("0532 123 45(67)'den", 14),
             ("0532 123 45 (67'den)", 19),
             ("0532 123 45 67'd\u{308}en", 11),
+            ("0532 123 45(67)\u{301}'den", 14),
         ] {
             for prefix in ["", "O\u{308}nce "] {
                 let source = format!("{prefix}{phone}");
@@ -542,6 +545,138 @@ fn suffix_after_numeric_parenthesis_does_not_open_quotes_across_another_owner() 
             ]
         );
     }
+}
+
+#[test]
+fn marked_closer_does_not_skip_protected_or_primary_neighbors() {
+    let normalizer = Normalizer::new().unwrap();
+    let phone = "0532 123 45 (67'den)\u{301}";
+    for prefix in ["", "O\u{308}nce "] {
+        for (neighbor, kind, rule, spoken) in [
+            ("AB12", SegmentKind::Unresolved, "source.unresolved", "AB12"),
+            ("5kg", SegmentKind::Unit, "quantity", "beş kilogram"),
+            (
+                "Claude",
+                SegmentKind::Pronunciation,
+                "pronunciation.name",
+                "klod",
+            ),
+            ("12", SegmentKind::Cardinal, "number", "on iki"),
+        ] {
+            let source = format!("{prefix}{phone}{neighbor}; 5 kg");
+            let phone_range = SourceRange::new(prefix.len(), prefix.len() + phone.len());
+            let neighbor_range =
+                SourceRange::new(phone_range.end(), phone_range.end() + neighbor.len());
+            let preserved = normalizer.normalize(&source, &Default::default()).unwrap();
+            partition(&source, &preserved);
+            assert_eq!(preserved.issues()[0].range(), phone_range);
+            let segment = preserved
+                .segments()
+                .iter()
+                .find(|s| s.range() == neighbor_range)
+                .unwrap();
+            assert_eq!(
+                (segment.kind(), segment.rule_id(), segment.text()),
+                (kind, rule, spoken)
+            );
+            assert_eq!(
+                preserved.issues().len(),
+                if neighbor == "AB12" { 2 } else { 1 }
+            );
+            if neighbor == "AB12" {
+                assert_eq!(preserved.issues()[1].range(), neighbor_range);
+                assert_eq!(
+                    preserved.issues()[1].category(),
+                    IssueCategory::ProtectedIdentifier
+                );
+            }
+
+            assert_eq!(
+                normalizer.normalize(&source, &options(AmbiguityPolicy::Reject)),
+                Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+            );
+            let fallback = normalizer
+                .normalize(&source, &options(AmbiguityPolicy::Fallback))
+                .unwrap();
+            partition(&source, &fallback);
+            assert!(fallback.complete() && fallback.issues().is_empty());
+            assert_eq!(fallback.fallbacks()[0].range(), phone_range);
+            assert_eq!(
+                fallback.fallbacks()[0].strategy(),
+                FallbackStrategy::UnicodeCodePoint
+            );
+            if neighbor == "AB12" {
+                assert_eq!(fallback.fallbacks().len(), 2);
+                assert_eq!(fallback.fallbacks()[1].range(), neighbor_range);
+                assert_eq!(
+                    fallback.fallbacks()[1].reason(),
+                    FallbackReason::ProtectedIdentifier
+                );
+                assert_eq!(
+                    fallback.fallbacks()[1].attempted_class(),
+                    FallbackClass::Identifier
+                );
+            } else {
+                assert_eq!(fallback.fallbacks().len(), 1);
+                assert!(
+                    fallback
+                        .segments()
+                        .iter()
+                        .any(|s| s.range() == neighbor_range
+                            && s.kind() == kind
+                            && s.text() == spoken)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn maximal_marked_closer_remains_bounded_before_address_fields() {
+    let normalizer = Normalizer::new().unwrap();
+    for count in [64, 16000] {
+        let source = format!(
+            "adres No:5 0532 123 45 (67'den){} Kat:3",
+            "\u{308}".repeat(count)
+        );
+        assert!(source.len() <= MAX_INPUT_BYTES);
+        let preserved = normalizer.normalize(&source, &Default::default()).unwrap();
+        partition(&source, &preserved);
+        let owner = SourceRange::new("adres No:5 ".len(), source.find(" Kat:3").unwrap());
+        assert_eq!(preserved.issues().len(), 1);
+        assert_eq!(preserved.issues()[0].range(), owner);
+        assert!(preserved.normalized_text().ends_with(" kat üç"));
+        assert_eq!(
+            normalizer.normalize(&source, &options(AmbiguityPolicy::Reject)),
+            Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+        );
+        match normalizer.normalize(&source, &options(AmbiguityPolicy::Fallback)) {
+            Ok(result) => {
+                partition(&source, &result);
+                assert!(result.complete() && result.issues().is_empty());
+                assert_eq!(result.fallbacks().len(), 1);
+                assert_eq!(result.fallbacks()[0].range(), owner);
+                assert!(result.normalized_text().ends_with(" kat üç"));
+            }
+            Err(NormalizeError::LimitExceeded(LimitKind::Result)) => assert_eq!(count, 16000),
+            other => panic!("unexpected bounded marked-closer outcome: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn a_marked_closing_delimiter_does_not_glue_the_following_number() {
+    let result = Normalizer::new()
+        .unwrap()
+        .normalize(")\u{301}12", &Default::default())
+        .unwrap();
+    assert!(result.complete() && result.issues().is_empty());
+    assert_eq!(result.normalized_text(), ")\u{301}on iki");
+    assert_eq!(result.segments()[0].range(), SourceRange::new(0, 3));
+    assert_eq!(result.segments()[0].kind(), SegmentKind::Verbatim);
+    assert_eq!(result.segments()[1].range(), SourceRange::new(3, 5));
+    assert_eq!(result.segments()[1].kind(), SegmentKind::Cardinal);
+    partition(")\u{301}12", &result);
 }
 
 #[test]

@@ -90,6 +90,8 @@ PHONE_CASES = json.loads(
             "phone-suffixed-parenthesized-final-group",
             "phone-suffixed-parenthesized-tail",
             "phone-suffixed-noncomposing-mark",
+            "phone-suffixed-marked-closer-before-tail",
+            "phone-suffixed-marked-closer-after-tail",
         )
     ],
 )
@@ -192,6 +194,7 @@ def test_failed_phone_cannot_be_cut_or_legalized_by_a_hint(
         ("0532 123 45(67)'den", 14),
         ("0532 123 45 (67'den)", 19),
         ("0532 123 45 67'd\u0308en", 11),
+        ("0532 123 45(67)\u0301'den", 14),
     ],
 )
 def test_phone_punctuation_and_marks_do_not_allow_shortened_hints(policy, phone, end):
@@ -253,3 +256,52 @@ def test_parenthesis_suffix_does_not_pair_with_a_later_telephone_apostrophe(poli
     assert [
         (record.start_byte, record.end_byte) for record in records
     ] == expected_ranges
+
+
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+@pytest.mark.parametrize(
+    "neighbor,kind,spoken",
+    [
+        ("AB12", "unresolved", "AB12"),
+        ("5kg", "unit", "beş kilogram"),
+        ("Claude", "pronunciation", "klod"),
+        ("12", "cardinal", "on iki"),
+    ],
+)
+def test_marked_phone_closer_keeps_the_following_owner(policy, neighbor, kind, spoken):
+    prefix = "O\u0308nce "
+    phone = "0532 123 45 (67'den)\u0301"
+    source = prefix + phone + neighbor + "; 5 kg"
+    start = len(prefix.encode("utf-8"))
+    end = start + len(phone.encode("utf-8"))
+    tail_end = end + len(neighbor)
+    normalizer = Normalizer()
+    if policy == "reject":
+        with pytest.raises(NormalizationError) as raised:
+            normalizer.normalize(source, ambiguity_policy=policy)
+        assert raised.value.code == "unresolved"
+        assert raised.value.issues == normalizer.normalize(source).issues
+        return
+    result = normalizer.normalize(source, ambiguity_policy=policy)
+    assert result.complete == (policy == "fallback")
+    records = result.fallbacks if policy == "fallback" else result.issues
+    assert (records[0].start_byte, records[0].end_byte) == (start, end)
+    assert len(records) == (2 if neighbor == "AB12" else 1)
+    if neighbor == "AB12":
+        assert (records[1].start_byte, records[1].end_byte) == (end, tail_end)
+        if policy == "fallback":
+            assert records[1].attempted_class == "identifier"
+            assert records[1].reason == "protected_identifier"
+    else:
+        assert any(
+            (s.start_byte, s.end_byte, s.kind, s.text) == (end, tail_end, kind, spoken)
+            for s in result.segments
+        )
+    cursor = 0
+    for segment in result.segments:
+        assert segment.start_byte == cursor
+        cursor = segment.end_byte
+    assert cursor == len(source.encode("utf-8"))
+    assert "".join(s.text for s in result.segments) == result.normalized_text
+    assert result.segments[-1].kind == "unit"
+    assert result.segments[-1].text == "beş kilogram"

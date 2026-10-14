@@ -143,23 +143,49 @@ fn telephone_suffix_end(
     end: usize,
     control: &WorkControl,
 ) -> Result<Option<(usize, usize)>, NormalizeError> {
-    let Some(next) = ctx.tokens.get(end + 1) else {
+    let Some(first) = ctx.tokens.get(end + 1) else {
         return Ok(None);
     };
-    let gap = &ctx.text[ctx.tokens[end].range.end..next.range.start];
+    let gap = &ctx.text[ctx.tokens[end].range.end..first.range.start];
     if !telephone_gap(gap) {
         return Ok(None);
     }
-    let start = if next.text.starts_with(['\'', '’']) && !gap.chars().any(char::is_whitespace) {
+    let mut terminal = end + 1;
+    while marked_closer(ctx.tokens[terminal].text, control)? {
+        let Some(next) = ctx.tokens.get(terminal + 1) else {
+            break;
+        };
+        let gap = &ctx.text[ctx.tokens[terminal].range.end..next.range.start];
+        if gap.chars().any(char::is_whitespace) || !telephone_gap(gap) {
+            break;
+        }
+        terminal += 1;
+    }
+    let next = ctx.tokens[terminal];
+    let start = if terminal > end + 1 {
+        if gap.chars().any(char::is_whitespace) {
+            return Ok(None);
+        }
         ctx.tokens[end].range.start
     } else {
         next.range.start
     };
-    let Some((base, _)) =
-        notation::telephone_suffix_surface(&ctx.text[start..next.range.end], control)?
-    else {
-        return Ok(None);
-    };
+    let (start, base) =
+        match notation::telephone_suffix_surface(&ctx.text[start..next.range.end], control)? {
+            Some((base, _)) => (start, base),
+            None if start != ctx.tokens[end].range.start
+                && !gap.chars().any(char::is_whitespace) =>
+            {
+                let start = ctx.tokens[end].range.start;
+                let Some((base, _)) =
+                    notation::telephone_suffix_surface(&ctx.text[start..next.range.end], control)?
+                else {
+                    return Ok(None);
+                };
+                (start, base)
+            }
+            None => return Ok(None),
+        };
     let mut depth = 0_usize;
     for ch in ctx.text[ctx.tokens[index].range.start..start + base.len()].chars() {
         control.check()?;
@@ -184,7 +210,21 @@ fn telephone_suffix_end(
         source_end += grapheme.len();
         depth -= 1;
     }
-    Ok(Some((end + 1, source_end)))
+    Ok(Some((terminal, source_end)))
+}
+
+fn marked_closer(text: &str, control: &WorkControl) -> Result<bool, NormalizeError> {
+    let mut chars = text.chars();
+    if chars.next() != Some(')') {
+        return Ok(false);
+    }
+    for ch in chars {
+        control.check()?;
+        if !unicode_normalization::char::is_combining_mark(ch) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn iban_end(

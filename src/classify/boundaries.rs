@@ -59,8 +59,16 @@ impl<'a> Boundaries<'a> {
             return Err(NormalizeError::Internal);
         }
         if source_end > claim.range.end {
+            let next = self.next_at(source_end);
+            if next
+                .checked_sub(1)
+                .and_then(|index| self.tokens.get(index))
+                .is_some_and(|token| token.range.end > source_end)
+            {
+                return Err(NormalizeError::Internal);
+            }
             claim.range.end = source_end;
-            claim.next = self.next_at(source_end);
+            claim.next = next;
         }
         Ok(claim)
     }
@@ -123,4 +131,37 @@ pub(super) fn quantity_tail(text: &str) -> bool {
         || notation::currency_marker(base)
         || crate::domain::lexicon::unit_marker(base)
         || base == "%"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_extended_claim_cannot_discard_a_partially_touched_token() {
+        let tokens = [
+            Token {
+                range: SourceRange::new(0, 1),
+                text: "1",
+                number_run_end: 0,
+                phone_run_end: 0,
+                digit_end: 1,
+            },
+            Token {
+                range: SourceRange::new(2, 6),
+                text: "AB12",
+                number_run_end: 1,
+                phone_run_end: 1,
+                digit_end: 3,
+            },
+        ];
+        let bounds = Boundaries::new(&tokens, &[], &[]);
+        assert!(matches!(
+            bounds.claim_through(0, 0, 3),
+            Err(NormalizeError::Internal)
+        ));
+        let claim = bounds.claim_through(0, 0, 6).unwrap();
+        assert_eq!(claim.range, SourceRange::new(0, 6));
+        assert_eq!(claim.next, 2);
+    }
 }

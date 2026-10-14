@@ -22,6 +22,10 @@ Platform requirements are in the [README](README.md) and
   Mixed hyphen groups, adjoining phone parentheses and non-composing tail
   marks also retain one owner; phone-local closers do not escape as raw text,
   and outer prose wrappers remain independent.
+  Marked closing-parenthesis graphemes no longer swallow the following token
+  or cause an extended claim to skip it. Adjacent identifiers/quantities/names
+  retain their own owners; standalone `)\u030112` now retains the closer and
+  reads the independent number. Marked semicolon/comma compounds are unchanged.
 - Validate native comparison reports against their respective source fixture
   catalogs, allowing append-only regression coverage without misvalidating
   an older baseline against newer inputs. Changed cohorts remain non-comparable.

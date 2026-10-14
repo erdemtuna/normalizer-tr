@@ -29,10 +29,16 @@ pub(crate) fn telephone_suffix_surface<'a>(
     for (offset, ch) in text.char_indices() {
         control.check()?;
         if matches!(ch, '\'' | '’') {
+            if !has_digit {
+                return Ok(None);
+            }
             apostrophe.get_or_insert(offset);
         } else if apostrophe.is_none() {
             has_digit |= ch.is_ascii_digit();
-            if !ch.is_ascii_digit() && !matches!(ch, '+' | '-' | '(' | ')') {
+            if !ch.is_ascii_digit()
+                && !matches!(ch, '+' | '-' | '(' | ')')
+                && !unicode_normalization::char::is_combining_mark(ch)
+            {
                 return Ok(None);
             }
         } else if !ch.is_alphanumeric() && !unicode_normalization::char::is_combining_mark(ch) {
@@ -57,7 +63,13 @@ mod tests {
             assert_eq!(base, "67");
             assert_eq!(source, format!("{base}{tail}"));
         }
-        for source in ["45-67'den", "45(67)'den", "67)'den", "67'd\u{308}en"] {
+        for source in [
+            "45-67'den",
+            "45(67)'den",
+            "67)'den",
+            "67'd\u{308}en",
+            "67)\u{301}'den",
+        ] {
             let (base, tail) = telephone_suffix_surface(source, &control).unwrap().unwrap();
             assert_eq!(source, format!("{base}{tail}"));
         }

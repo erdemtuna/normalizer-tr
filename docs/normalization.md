@@ -362,6 +362,11 @@ tails too, for example `0532 123 45-67'den` and `0532 123 45(67)'den`.
 Non-composing combining marks in an invalid tail stay in that same owner.
 Phone-local closing parentheses are included; surrounding prose wrappers
 remain outside it.
+The scanner keeps a marked closing-parenthesis grapheme separate from its
+following token, so a phone claim cannot skip an adjacent identifier, quantity,
+name or number. This also makes standalone `)\u030112` retain its closing
+grapheme and read `12` as a Cardinal; marked semicolon/comma numeric compounds
+retain their existing atomic behavior.
 
 A successful unsuffixed phone keeps a following independent number:
 `0532 123 45 67 5'ten` retains the Telephone plus `beşten`. Protected identifier,

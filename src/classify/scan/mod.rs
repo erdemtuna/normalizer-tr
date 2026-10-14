@@ -243,7 +243,20 @@ fn approved(groups: &[CatalogGroup], offset: usize) -> bool {
 }
 
 fn append_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: SourceRange) {
-    let range = source.cover(range);
+    let covered = source.cover(range);
+    // Recover the whole marked closer without gluing its independent neighbor.
+    if covered.start < range.start && source.text()[covered.start..].starts_with(')') {
+        let first_end = source.cover(SourceRange::new(range.start, range.start)).end;
+        if first_end < covered.end {
+            push_token(tokens, source, SourceRange::new(covered.start, first_end));
+            push_token(tokens, source, SourceRange::new(first_end, covered.end));
+            return;
+        }
+    }
+    push_token(tokens, source, covered);
+}
+
+fn push_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: SourceRange) {
     tokens.push(Token {
         range,
         text: &source.text()[range.start..range.end],
@@ -256,6 +269,22 @@ fn append_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn marked_closers_and_their_neighbors_have_disjoint_grapheme_tokens() {
+        let rules = Resources::load().unwrap();
+        let control = WorkControl::default();
+        for neighbor in ["AB12", "5kg", "Claude", "12"] {
+            let text = format!(")\u{301}{neighbor}");
+            let source = SourceMap::new(&text, &control).unwrap();
+            let scanned = tokens(&source, &rules, &control).unwrap();
+            assert_eq!(scanned.tokens.len(), 2);
+            assert_eq!(scanned.tokens[0].range, SourceRange::new(0, 3));
+            assert_eq!(scanned.tokens[0].text, ")\u{301}");
+            assert_eq!(scanned.tokens[1].range, SourceRange::new(3, text.len()));
+            assert_eq!(scanned.tokens[1].text, neighbor);
+        }
+    }
 
     #[test]
     fn indexed_phone_groups_match_local_traversal_and_prefix_digit_counts() {
