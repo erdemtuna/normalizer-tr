@@ -11,8 +11,8 @@ from normalizer_tr import (
 
 def test_single_identity_current_coverage_and_frozen_records():
     n = Normalizer()
-    assert version("normalizer-tr") == "0.7.0"
-    assert n.normalizer_id == NORMALIZER_ID == "normalizer-tr/0.7.0"
+    assert version("normalizer-tr") == "0.8.0"
+    assert n.normalizer_id == NORMALIZER_ID == "normalizer-tr/0.8.0"
     for text, output, kind in [
         ("1.'nin", "birincinin", "ordinal"),
         ("25 TL'den", "yirmi beş Türk lirasından", "money"),

@@ -106,7 +106,7 @@ Identifier `AB12` and uncued Roman `IV` use their protected/literal
 readings. Bare or invalid slash-date notation remains literal, without a
 PreferredDate or SurfaceDate assumption.
 
-**Unreleased:** eligible standalone uppercase letters are primary Symbol readings
+**Since 0.8.0:** eligible standalone uppercase letters are primary Symbol readings
 in all three policies, with rule `letter.name`, not handled-source fallback.
 Bare `V` now names `ve` without a Roman/MissingIntent/Literal diagnostic.
 Multi-letter `IV`, punctuation-derived letters and failed compound owners keep
@@ -117,7 +117,7 @@ issues, cancellation and resource errors remain. See
 [standalone letters](normalization.md#standalone-uppercase-letters) for exact
 source/quote boundaries and the deliberate effects on unmarked initials.
 
-The Unreleased quote-boundary correction also affects generic expressions.
+The 0.8.0 quote-boundary correction also affects generic expressions.
 Valid contents can gain primary readings where a closing quote was formerly
 mistaken for a suffix. Invalid contents stay atomic, with the closing wrapper
 outside their issue/fallback range; a wrong real suffix is not repaired.

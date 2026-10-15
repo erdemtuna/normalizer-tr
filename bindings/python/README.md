@@ -103,7 +103,7 @@ redaction or a voice-quality promise. See the [fallback contract](../../docs/fal
 for readings and Rust Serde versus Python record naming, and the
 [normalization reference](../../docs/normalization.md) for supported formats.
 
-**Unreleased; not included in published 0.7.0.** Eligible standalone uppercase
+**Introduced in 0.8.0.** Eligible standalone uppercase
 letters use primary `kind="symbol"` and
 `rule_id="letter.name"` in every policy, without letter fallback records.
 For example:
@@ -144,8 +144,8 @@ Deadlines/cancellation are cooperative, not hard call-duration limits; see
 
 ## Development and verification
 
-Core coverage in 0.7.0 includes bounded number/quantity tails, clock ranges,
-date suffixes, multiplication and contextual address fields. These use the
+Core coverage introduced in 0.7.0 includes bounded number/quantity tails, clock
+ranges, date suffixes, multiplication and contextual address fields. These use the
 same Python call and immutable records; no Python grammar is added.
 Composite primary values may emit several segments while keeping whole-expression
 hint protection. Review [migration notes](../../CHANGELOG.md#070---2026-10-11) for

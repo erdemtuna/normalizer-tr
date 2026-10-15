@@ -7,9 +7,12 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+## 0.8.0 - 2026-10-15
+
 ### Behavior and migration
 
-These changes are not included in published 0.7.0.
+Changes since 0.7.0. Registry availability is verified separately from versioned
+source and build artifacts.
 
 - Keep unsupported suffixed telephone runs atomic under Preserve, Reject and
   Fallback, including established malformed/incomplete runs and invalid
@@ -34,6 +37,7 @@ These changes are not included in published 0.7.0.
   the suffix of a later independent phone.
   Empty-tail numeric compounds preserve confirmed outer parentheses without
   stripping unmatched invalid local closers; pairing is indexed lazily per call.
+
 Supported standalone uppercase letters now receive primary Turkish letter names.
 This applies to ordinary capitals and unmarked initials, not just technical
 phrases. Default Preserve does not disable these primary readings.
@@ -68,6 +72,15 @@ Review stored source ranges as well as output text. See
 
 These changes concern normalized text and public result semantics; no
 speech-model or audio-quality improvement is claimed.
+
+### Performance and known limits
+
+The phone-ownership fix includes an explicitly accepted measured cost on
+equivalent malformed 4-32 KiB name-suffix workloads. The
+[accepted risk and source-specific evidence](https://github.com/erdemtuna/normalizer-tr/pull/40#issuecomment-6176623522)
+retain the absolute latency deltas and failed-work distinctions. Those
+measurements are not a comparison of every 0.7.0/0.8.0 workload or a universal
+latency, hard-deadline, peak-memory or no-regression guarantee.
 
 ### Development tooling and maintenance
 

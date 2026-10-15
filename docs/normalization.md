@@ -314,7 +314,7 @@ quantities stay verbatim: `‘25 TL’` -> `‘yirmi beş Türk lirası’`.
 Apostrophes in supported suffixes remain part of their whole expression.
 Ambiguous/unmatched forms are not forcibly treated as paired quotations.
 
-**Unreleased:** additional externally isolated quote pairs allow whitespace just
+**Since 0.8.0:** additional externally isolated quote pairs allow whitespace just
 inside either edge and unambiguous nested straight/smart single pairs in either
 direction. Whitespace and wrappers stay exact. These frames may also make
 valid generic expressions resolve: `' SGK'ya'` -> `' se ge kaya'`, and
@@ -413,7 +413,7 @@ explicit hint; there is no general proper-name detector.
 
 ### Standalone uppercase letters
 
-**Unreleased; not included in published 0.7.0.**
+**Introduced in 0.8.0.**
 
 A supported uppercase letter occupying a complete whitespace-delimited source
 atom receives its Turkish letter name as a primary Symbol segment in every
