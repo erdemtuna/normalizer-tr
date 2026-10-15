@@ -1,11 +1,11 @@
 maturin==1.15.0
 pytest==9.1.1
-ruff==0.16.10
+ruff==0.17.0
 pip-audit==2.10.1
 mypy==2.4.0
 twine==7.0.0
 pip==26.2.1
-pip-tools==7.6.1
+pip-tools==7.6.2
 
 # Include conditional tool dependencies so one lock covers supported OS/Python versions.
 colorama
