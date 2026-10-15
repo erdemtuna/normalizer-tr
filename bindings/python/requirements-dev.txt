@@ -100,7 +100,7 @@ pip-audit==2.10.1
     # via -r requirements-dev.in
 pip-requirements-parser==32.0.1
     # via pip-audit
-pip-tools==7.6.1
+pip-tools==7.6.2
     # via -r requirements-dev.in
 platformdirs==4.11.12
     # via pip-audit
@@ -141,7 +141,7 @@ rich==15.0.0
     # via
     #   pip-audit
     #   twine
-ruff==0.16.10
+ruff==0.17.0
     # via -r requirements-dev.in
 secretstorage==3.5.0
     # via
