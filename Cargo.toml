@@ -30,7 +30,7 @@ resolver = "3"
 
 [dependencies]
 regex = "=1.13.1"
-unicode-normalization = "=0.1.25"
+unicode-normalization = "=0.1.26"
 unicode-segmentation = "=1.13.3"
 serde = { version = "=1.0.229", features = ["derive"], optional = true }
 
