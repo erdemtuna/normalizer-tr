@@ -153,7 +153,7 @@ struct Controls {
     active: BTreeMap<u64, WorkControl>,
 }
 
-#[pyclass(frozen, skip_from_py_object, module = "normalizer_tr._native")]
+#[pyclass(frozen, module = "normalizer_tr._native")]
 #[derive(Clone, Default)]
 struct CancellationToken {
     controls: Arc<Mutex<Controls>>,

@@ -230,6 +230,24 @@ def test_real_errors_and_control():
             n.normalize(value)
 
 
+@pytest.mark.parametrize("policy", ["preserve", "reject", "fallback"])
+def test_cancellation_token_reuse_preserves_results_and_shared_state(policy):
+    normalizer = Normalizer()
+    token = CancellationToken()
+    expected = normalizer.normalize("ö 25 TL", ambiguity_policy=policy)
+    assert expected.normalized_text == "ö yirmi beş Türk lirası"
+    assert expected.complete and not expected.issues and not expected.fallbacks
+    for _ in range(2):
+        assert (
+            normalizer.normalize("ö 25 TL", ambiguity_policy=policy, cancellation=token)
+            == expected
+        )
+    token.cancel()
+    with pytest.raises(NormalizationError) as error:
+        normalizer.normalize("ö 25 TL", ambiguity_policy=policy, cancellation=token)
+    assert error.value.code == "cancelled"
+
+
 def test_deadline_is_a_real_monotonic_core_error():
     n = Normalizer()
     errors = []
