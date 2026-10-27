@@ -307,6 +307,20 @@ class PublicationTests(unittest.TestCase):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_property_replay_seeds_use_portable_checkout_endings(self):
+        seeds = list((ROOT / "tests").rglob("*.proptest-regressions"))
+        self.assertTrue(seeds)
+        for seed in seeds:
+            relative = seed.relative_to(ROOT).as_posix()
+            with self.subTest(path=relative):
+                attributes = subprocess.check_output(
+                    ["git", "check-attr", "eol", "--", relative],
+                    cwd=ROOT,
+                    text=True,
+                )
+                self.assertTrue(attributes.strip().endswith(": eol: lf"))
+                self.assertNotIn(b"\r", seed.read_bytes())
+
     def test_native_license_assets_and_notices_follow_the_lock(self):
         packages = tomllib.loads((ROOT / "Cargo.lock").read_text())["package"]
         licensed = {f"{package['name']}-{package['version']}" for package in packages}
