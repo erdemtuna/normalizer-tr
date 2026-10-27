@@ -37,7 +37,7 @@ defusedxml==0.7.1
     # via py-serializable
 docutils==0.23
     # via readme-renderer
-filelock==4.0.3
+filelock==4.2.1
     # via cachecontrol
 id==1.6.1
     # via twine
@@ -170,5 +170,5 @@ pip==26.2.1
     #   -r requirements-dev.in
     #   pip-api
     #   pip-tools
-setuptools==84.0.0
+setuptools==84.1.0
     # via pip-tools
