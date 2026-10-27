@@ -7,8 +7,31 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+## 0.8.1 - 2026-10-27
+
+### Compatibility and dependency maintenance
+
+Maintenance changes since 0.8.0. Registry availability is verified separately
+from versioned source and build artifacts.
+
+- Update the Rust core's Unicode-normalization dependency to 0.1.26 and the
+  Python companion's PyO3 dependency to 0.30.1. Use PyO3's default extraction
+  policy instead of its deprecated `skip_from_py_object` option; retain shared
+  cancellation state and result records across all three policies.
+- Public signatures, serialized labels, policy defaults and supported platforms
+  are unchanged. No intentional reading, diagnostic or source-range migration
+  is introduced. Package/build identity becomes `0.8.1`, including
+  `normalizer-tr/0.8.1` in normalization results.
+- Preserve Rust 1.94 minimum and ordinary CPython 3.11-3.14 support on the
+  existing Windows/Linux x64 and macOS x64/arm64 wheel platforms. No audio,
+  binding-latency improvement or universal performance guarantee is claimed.
+
 ### Development tooling and maintenance
 
+- Refresh locked development dependencies, including proptest 1.12.0 and
+  serde_json 1.0.154, and clear the reported Python tool-environment advisories
+  with reviewed dependency updates. These audit findings concern development
+  and build tooling, not an established normalizer runtime vulnerability.
 - Add opt-in bounded waiting for just-published PyPI metadata without retrying
   integrity failures, artifact downloads, consumers or publication. Ordinary
   registry verification remains fail-fast.
