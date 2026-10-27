@@ -14,7 +14,7 @@ Apache-2.0 contribution in PR #1, head
 `0a5de68286cacc4f95c754f519899d15fc2c5e73`, under this repository's Apache-2.0
 license. Source: https://github.com/erdemtuna/normalizer-tr/pull/1.
 
-The separate local Python companion adds PyO3 0.29.3 (MIT OR Apache-2.0), its
+The separate local Python companion adds PyO3 0.30.1 (MIT OR Apache-2.0), its
 same-version build/FFI/macro packages, heck 0.5.0 (MIT OR Apache-2.0),
 target-lexicon 0.13.5 (Apache-2.0 WITH LLVM-exception), and portable-atomic 1.15.0
 (Apache-2.0 OR MIT). These are not core normalizer dependencies. Maturin 1.15.0
@@ -34,7 +34,7 @@ Apache-2.0 source. These binary redistribution assets are not core dependencies.
 | regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
 | aho-corasick | 1.1.5 | Unlicense OR MIT |
 | memchr | 2.8.3 | Unlicense OR MIT |
-| unicode-normalization | 0.1.25 | MIT OR Apache-2.0 |
+| unicode-normalization | 0.1.26 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | tinyvec | 1.13.3 | Zlib OR Apache-2.0 OR MIT |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
 | serde / serde_core / serde_derive (optional) | 1.0.229 | MIT OR Apache-2.0 |
@@ -45,7 +45,8 @@ Apache-2.0 source. These binary redistribution assets are not core dependencies.
 
 ## Development / target-specific lockfile dependencies
 
-Reviewed from Cargo metadata on 2026-10-01. These are not normalizer runtime
+The following inventory and advisory review retain the 2026-10-01 snapshot;
+use `Cargo.lock` for the current graph. These are not normalizer runtime
 services. MIT/Apache expressions in older upstream metadata use `/` as their
 dual-license separator; the expressions below retain the upstream wording.
 
