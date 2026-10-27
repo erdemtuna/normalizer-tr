@@ -42,7 +42,7 @@ id==1.6.1
     # via twine
 idna==3.20
     # via requests
-importlib-metadata==9.0.1
+importlib-metadata==10.1.0
     # via
     #   -r requirements-dev.in
     #   keyring
