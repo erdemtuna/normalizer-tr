@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import tarfile
+import time
 import tomllib
 import urllib.error
 import urllib.request
@@ -23,6 +24,16 @@ PYTHONS = ("3.11", "3.12", "3.13", "3.14")
 PLATFORMS = ("windows", "linux", "macos-x64", "macos-arm64")
 NETWORK_TIMEOUT = 30
 DOWNLOAD_CHUNK_BYTES = 1024 * 1024
+PUBLICATION_MAX_ATTEMPTS = 5
+PUBLICATION_RETRY_DELAY_SECONDS = 5
+
+
+class RegistryFilesMissing(RuntimeError):
+    def __init__(self, names):
+        super().__init__(
+            "registry file set differs from the release manifest; missing: "
+            + ", ".join(sorted(names))
+        )
 
 
 def check_versions():
@@ -87,13 +98,25 @@ def preflight(tag, repository):
 
 def check_registry_files(expected, published):
     actual = {row["name"]: row for row in published}
-    if len(actual) != len(published) or actual.keys() != {
-        row["name"] for row in expected
-    }:
-        raise RuntimeError("registry file set differs from the release manifest")
-    for row in expected:
-        if actual[row["name"]]["sha256"] != row["sha256"]:
-            raise RuntimeError(f"registry checksum differs: {row['name']}")
+    wanted = {row["name"]: row for row in expected}
+    if len(wanted) != len(expected):
+        raise RuntimeError("release manifest contains duplicate filenames")
+    if len(actual) != len(published):
+        raise RuntimeError(
+            "registry file set differs from the release manifest; duplicate filenames"
+        )
+    unexpected = actual.keys() - wanted.keys()
+    if unexpected:
+        raise RuntimeError(
+            "registry file set differs from the release manifest; unexpected: "
+            + ", ".join(sorted(unexpected))
+        )
+    for name, row in actual.items():
+        if row["sha256"] != wanted[name]["sha256"]:
+            raise RuntimeError(f"registry checksum differs: {name}")
+    missing = wanted.keys() - actual.keys()
+    if missing:
+        raise RegistryFilesMissing(missing)
     return actual
 
 
@@ -107,6 +130,49 @@ def read_response(response, size=-1):
 def fetch_json(url):
     with urllib.request.urlopen(url, timeout=NETWORK_TIMEOUT) as response:
         return json.loads(read_response(response))
+
+
+def pypi_registry_files(expected, release, *, wait_for_publication=False):
+    attempts = PUBLICATION_MAX_ATTEMPTS if wait_for_publication else 1
+    for attempt in range(1, attempts + 1):
+        if wait_for_publication:
+            print(
+                f"PyPI publication metadata attempt {attempt}/{attempts}",
+                file=sys.stderr,
+            )
+        try:
+            metadata = fetch_json(f"https://pypi.org/pypi/normalizer-tr/{release}/json")
+            if not isinstance(metadata, dict) or not isinstance(
+                metadata.get("urls"), list
+            ):
+                raise RuntimeError("invalid PyPI registry metadata")
+            for row in metadata["urls"]:
+                if (
+                    not isinstance(row, dict)
+                    or not isinstance(row.get("filename"), str)
+                    or not isinstance(row.get("url"), str)
+                    or not isinstance(row.get("digests"), dict)
+                    or not isinstance(row["digests"].get("sha256"), str)
+                ):
+                    raise RuntimeError("invalid PyPI registry file metadata")
+            published = [
+                {
+                    "name": row["filename"],
+                    "sha256": row["digests"]["sha256"],
+                    "url": row["url"],
+                }
+                for row in metadata["urls"]
+            ]
+            return check_registry_files(expected, published)
+        except (urllib.error.HTTPError, RegistryFilesMissing) as error:
+            if isinstance(error, urllib.error.HTTPError) and error.code != 404:
+                raise
+            if not wait_for_publication:
+                raise
+            print(str(error), file=sys.stderr)
+            if attempt == attempts:
+                raise
+            time.sleep(PUBLICATION_RETRY_DELAY_SECONDS)
 
 
 def download(url, path, expected_sha):
@@ -211,7 +277,9 @@ def registry_consumer(registry, directory, record):
             )
 
 
-def verify_registry(directory, registries, output):
+def verify_registry(directory, registries, output, *, wait_for_publication=False):
+    if wait_for_publication and "pypi" not in registries:
+        raise RuntimeError("publication waiting requires the PyPI registry")
     record = json.loads(
         (directory / "release-manifest.json").read_text(encoding="utf-8")
     )
@@ -227,18 +295,12 @@ def verify_registry(directory, registries, output):
         found = False
         try:
             if registry == "pypi":
-                metadata = fetch_json(
-                    f"https://pypi.org/pypi/normalizer-tr/{record['version']}/json"
-                )
                 expected = record["python_artifacts"]
-                published = [
-                    {
-                        "name": row["filename"],
-                        "sha256": row["digests"]["sha256"],
-                        "url": row["url"],
-                    }
-                    for row in metadata["urls"]
-                ]
+                actual = pypi_registry_files(
+                    expected,
+                    record["version"],
+                    wait_for_publication=wait_for_publication,
+                )
             else:
                 metadata = fetch_json(
                     f"https://crates.io/api/v1/crates/normalizer-tr/{record['version']}"
@@ -251,8 +313,8 @@ def verify_registry(directory, registries, output):
                         "url": f"https://static.crates.io/crates/normalizer-tr/{record['core']['name']}",
                     }
                 ]
+                actual = check_registry_files(expected, published)
             found = True
-            actual = check_registry_files(expected, published)
             for row in expected:
                 download(
                     actual[row["name"]]["url"], destination / row["name"], row["sha256"]
@@ -501,6 +563,11 @@ def main():
         "--registry", action="append", choices=("pypi", "crates"), required=True
     )
     registry.add_argument("--output", type=Path, required=True)
+    registry.add_argument(
+        "--wait-for-publication",
+        action="store_true",
+        help="Bounded waiting for missing, just-published PyPI metadata only",
+    )
     args = parser.parse_args()
     if args.action == "inspect":
         inspect(args.directory, args.python, args.platform, args.sdist)
@@ -513,7 +580,12 @@ def main():
     elif args.action == "versions":
         check_versions()
     else:
-        verify_registry(args.directory.resolve(), args.registry, args.output.resolve())
+        verify_registry(
+            args.directory.resolve(),
+            args.registry,
+            args.output.resolve(),
+            wait_for_publication=args.wait_for_publication,
+        )
 
 
 if __name__ == "__main__":

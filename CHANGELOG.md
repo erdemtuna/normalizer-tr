@@ -7,6 +7,14 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+### Development tooling and maintenance
+
+- Add opt-in bounded waiting for just-published PyPI metadata without retrying
+  integrity failures, artifact downloads, consumers or publication. Ordinary
+  registry verification remains fail-fast.
+- Add a verification-only release dispatch for retained artifacts and fresh
+  registry consumers, without building or publishing packages.
+
 ## 0.8.0 - 2026-10-15
 
 ### Behavior and migration
