@@ -301,6 +301,8 @@ class PublicationTests(unittest.TestCase):
         self.assertIn("if: inputs.verify_run != ''", recovery)
         self.assertIn('"$PUBLISH" != "false"', recovery)
         self.assertIn("actions: read", recovery)
+        self.assertIn("RUSTUP_HOME=$RUNNER_TEMP/normalizer-rustup", recovery)
+        self.assertIn("components: rustfmt, clippy", recovery)
         self.assertNotIn("id-token", recovery)
         self.assertNotIn("pypa/gh-action-pypi-publish", recovery)
         self.assertNotIn("--wait-for-publication", recovery)
