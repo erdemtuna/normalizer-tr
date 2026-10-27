@@ -7,6 +7,10 @@ on:
         description: Publish verified artifacts to PyPI (release tag only)
         type: boolean
         default: false
+      verify_run:
+        description: Verification-only source run ID (verified-release artifact; no build or publication)
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -17,6 +21,7 @@ concurrency:
 
 jobs:
   preflight:
+    if: inputs.verify_run == ''
     name: Publication revision checks
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -213,7 +218,7 @@ jobs:
 
   publish:
     name: Owner-controlled PyPI publication
-    if: inputs.publish && startsWith(github.ref, 'refs/tags/v') && github.repository == 'erdemtuna/normalizer-tr'
+    if: inputs.verify_run == '' && inputs.publish && startsWith(github.ref, 'refs/tags/v') && github.repository == 'erdemtuna/normalizer-tr'
     needs: [inspect]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -240,10 +245,53 @@ jobs:
           packages-dir: verified/dist
           print-hash: true
       - name: Verify published bytes and a fresh Python consumer
-        run: python -m scripts.release_artifacts registry verified --registry pypi --output "$RUNNER_TEMP/registry-verification"
+        run: python -m scripts.release_artifacts registry verified --registry pypi --wait-for-publication --output "$RUNNER_TEMP/registry-verification"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: pypi-registry-verification
           path: ${{ runner.temp }}/registry-verification/registry-verification.json
+          if-no-files-found: warn
+
+  verify-published:
+    name: Verify existing registry artifacts without publication
+    if: inputs.verify_run != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Require verification-only inputs
+        env:
+          PUBLISH: ${{ inputs.publish }}
+          SOURCE_RUN: ${{ inputs.verify_run }}
+        run: |
+          if [[ "$PUBLISH" != "false" || ! "$SOURCE_RUN" =~ ^[0-9]+$ ]]; then
+            echo "::error::Verification requires a numeric source run and publish=false."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: "1.99.0"
+      - name: Download the immutable verified release set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.verify_run }}
+        run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name verified-release --dir verified
+      - name: Verify published bytes and fresh consumers
+        run: python -m scripts.release_artifacts registry verified --registry pypi --registry crates --output "$RUNNER_TEMP/registry-verification"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: existing-registry-verification
+          path: |
+            ${{ runner.temp }}/registry-verification/registry-verification.json
+            ${{ runner.temp }}/registry-verification/pypi/reports/*.json
           if-no-files-found: warn
