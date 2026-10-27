@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import tempfile
+import tomllib
 import subprocess
 import urllib.error
 from pathlib import Path
@@ -306,6 +307,48 @@ class PublicationTests(unittest.TestCase):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_native_license_assets_and_notices_follow_the_lock(self):
+        packages = tomllib.loads((ROOT / "Cargo.lock").read_text())["package"]
+        licensed = {f"{package['name']}-{package['version']}" for package in packages}
+        toolchain = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())[
+            "toolchain"
+        ]["channel"]
+        licensed.add(f"rust-std-{toolchain}")
+        assets = ROOT / "bindings/python/licenses"
+        for directory in assets.iterdir():
+            if directory.is_dir() and any(directory.iterdir()):
+                self.assertIn(directory.name, licensed)
+        dependencies = tomllib.loads((ROOT / "Cargo.toml").read_text())["dependencies"]
+        required = {
+            name
+            for name, dependency in dependencies.items()
+            if not isinstance(dependency, dict) or not dependency.get("optional")
+        }
+        required.update(
+            package["name"]
+            for package in packages
+            if package["name"].startswith("pyo3")
+        )
+        notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_bytes()
+        self.assertEqual(
+            notices,
+            (ROOT / "bindings/python/THIRD_PARTY_NOTICES-PROJECT.md").read_bytes(),
+        )
+        for package in packages:
+            if package["name"] in required:
+                directory = assets / f"{package['name']}-{package['version']}"
+                self.assertTrue(directory.is_dir(), directory)
+                self.assertTrue(any(directory.glob("LICENSE*")), directory)
+                if package["name"] in dependencies:
+                    self.assertIn(
+                        f"| {package['name']} | {package['version']} |".encode(),
+                        notices,
+                    )
+                if package["name"] == "pyo3":
+                    self.assertIn(f"PyO3 {package['version']}".encode(), notices)
+                if package["name"] == "unicode-normalization":
+                    self.assertTrue((directory / "LICENSE-UNICODE").is_file())
+
     def test_versions_are_consistent(self):
         check_versions()
 
