@@ -1,5 +1,6 @@
 * text=auto
 *.rs text eol=lf
+*.proptest-regressions text eol=lf
 *.txt text eol=lf
 *.tsv text eol=lf
 *.md text eol=lf

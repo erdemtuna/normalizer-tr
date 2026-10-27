@@ -28,6 +28,8 @@ from versioned source and build artifacts.
 
 ### Development tooling and maintenance
 
+- Enforce LF checkouts for property-test replay seeds so Windows and Linux
+  produce matching core archives without changing the recorded counterexamples.
 - Refresh locked development dependencies, including proptest 1.12.0 and
   serde_json 1.0.154, and clear the reported Python tool-environment advisories
   with reviewed dependency updates. These audit findings concern development
