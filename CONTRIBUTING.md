@@ -263,6 +263,11 @@ duplicate installer pins. No write-enabled PR repair workflow or automatic merge
 policy is used. Native updates can still require maintainer reconciliation if
 upstream platform requirements change.
 
+For native dependency updates, align the current root/wheel notices and versioned
+wheel license assets with the exact upstream crates. Preserve license bytes and
+label historical inventories as snapshots. Release helper tests reject stale
+asset versions and mismatched notice copies.
+
 `ruff.toml` explicitly preserves the existing lint-rule policy; a Ruff version
 update does not implicitly add or remove rule families.
 

@@ -14,6 +14,9 @@ Platform requirements are in the [README](README.md) and
   registry verification remains fail-fast.
 - Add a verification-only release dispatch for retained artifacts and fresh
   registry consumers, without building or publishing packages.
+- Align current native dependency notices and wheel license assets with the
+  reviewed crate versions, including Unicode-normalization's Unicode-3.0 notice.
+  Guard asset versions and matching root/wheel notices in release helper tests.
 
 ## 0.8.0 - 2026-10-15
 
