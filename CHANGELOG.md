@@ -7,6 +7,11 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+### Development tooling and maintenance
+
+- Isolate the verification-only registry job's Rust toolchain from runner-image
+  state, including the components required by the repository toolchain file.
+
 ## 0.8.1 - 2026-10-27
 
 ### Compatibility and dependency maintenance
