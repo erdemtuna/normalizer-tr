@@ -38,7 +38,7 @@ Requires Rust 1.94 or newer. Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-normalizer-tr = "0.7"
+normalizer-tr = "0.8"
 ```
 
 ```rust

@@ -7,7 +7,9 @@
 ast-serialize==0.12.1
     # via mypy
 backports-tarfile==1.2.0
-    # via -r requirements-dev.in
+    # via
+    #   -r requirements-dev.in
+    #   jaraco-context
 boolean-py==5.0
     # via license-expression
 build==1.6.1
@@ -25,10 +27,7 @@ charset-normalizer==3.5.1
 click==8.5.0
     # via pip-tools
 colorama==0.4.6
-    # via
-    #   -r requirements-dev.in
-    #   build
-    #   pytest
+    # via -r requirements-dev.in
 cryptography==50.0.2
     # via secretstorage
 cyclonedx-python-lib==11.12.0
@@ -37,14 +36,16 @@ defusedxml==0.7.1
     # via py-serializable
 docutils==0.23
     # via readme-renderer
-filelock==4.0.3
+filelock==4.2.1
     # via cachecontrol
 id==1.6.1
     # via twine
 idna==3.20
     # via requests
-importlib-metadata==9.0.1
-    # via -r requirements-dev.in
+importlib-metadata==10.1.0
+    # via
+    #   -r requirements-dev.in
+    #   keyring
 iniconfig==2.3.0
     # via pytest
 jaraco-classes==3.4.0
@@ -54,7 +55,9 @@ jaraco-context==6.1.2
 jaraco-functools==4.6.0
     # via keyring
 jeepney==0.9.0
-    # via secretstorage
+    # via
+    #   keyring
+    #   secretstorage
 keyring==25.7.0
     # via twine
 librt==0.16.0
@@ -121,9 +124,7 @@ pyproject-hooks==1.3.3
 pytest==9.1.1
     # via -r requirements-dev.in
 pywin32-ctypes==0.2.3
-    # via
-    #   -r requirements-dev.in
-    #   keyring
+    # via -r requirements-dev.in
 readme-renderer==46.0
     # via twine
 requests==2.34.2
@@ -140,10 +141,12 @@ rich==15.0.0
     # via
     #   pip-audit
     #   twine
-ruff==0.17.0
+ruff==0.17.2
     # via -r requirements-dev.in
 secretstorage==3.5.0
-    # via -r requirements-dev.in
+    # via
+    #   -r requirements-dev.in
+    #   keyring
 sortedcontainers==2.4.0
     # via cyclonedx-python-lib
 tomli==2.4.1
@@ -153,7 +156,9 @@ tomli-w==1.2.0
 twine==7.0.0
     # via -r requirements-dev.in
 typing-extensions==4.16.0
-    # via mypy
+    # via
+    #   cyclonedx-python-lib
+    #   mypy
 urllib3==2.8.0
     # via
     #   id
@@ -165,10 +170,10 @@ zipp==4.1.1
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
-pip==26.2.1
+pip==26.2.2
     # via
     #   -r requirements-dev.in
     #   pip-api
     #   pip-tools
-setuptools==84.0.0
+setuptools==84.1.0
     # via pip-tools

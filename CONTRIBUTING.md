@@ -307,6 +307,14 @@ Platform requirements are in the [Python guide](bindings/python/README.md#instal
 is build/test only: 16 wheels, a tested source distribution, the core archive and
 an exact checksum manifest. No PR or ordinary push publishes packages.
 
+For verification-only recovery, set `verify_run` to the numeric run ID that
+produced the original `verified-release` artifact and leave `publish=false`.
+Only the read-only registry-verification job runs: it downloads that immutable
+artifact set, checks live bytes and exercises fresh PyPI/crates.io consumers.
+The tooling version must match the archived release version. It does not rebuild,
+upload or rerun publication; `publish=true` with `verify_run` is rejected.
+The retained report does not change the original run's conclusion.
+
 PyPI publication requires a matching `v<version>` tag, `publish=true`, the `pypi`
 environment and its configured Trusted Publisher. Only the publish job has OIDC
 permission; no persistent PyPI token is stored.
@@ -330,6 +338,15 @@ publication, check both registries from the release checkout with a downloaded
 ```powershell
 python -m scripts.release_artifacts registry <verified-directory> --registry pypi --registry crates --output <new-output-directory>
 ```
+
+Ordinary verification is fail-fast. The immediate post-publication step opts in
+to `--wait-for-publication`: it makes at most five PyPI metadata requests, waiting
+five seconds between retryable attempts, with the existing request timeouts.
+Only a missing release (HTTP 404) or missing expected files with correct hashes
+can wait. Unexpected or duplicate files and any checksum mismatch fail immediately,
+including corruption in an otherwise incomplete set. Other network failures are
+not retried. Downloads and consumers run once after complete metadata admission.
+The flag requires `--registry pypi` and never retries a package upload.
 
 Each registry reports verified, not-published or failed independently. Missing
 publication, checksum differences and failed consumers do not produce success.

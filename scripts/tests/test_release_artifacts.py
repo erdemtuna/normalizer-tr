@@ -19,10 +19,13 @@ from scripts.release_artifacts import (
     download,
     fetch_json,
     preflight,
+    main,
+    PUBLICATION_MAX_ATTEMPTS,
+    PUBLICATION_RETRY_DELAY_SECONDS,
     verify_registry,
     wheel_platform,
 )
-from scripts.common import version
+from scripts.common import ROOT, version
 
 VERSION = version()
 
@@ -42,6 +45,264 @@ class TimedOutBody(io.BytesIO):
 class TimedOutWriter(io.BytesIO):
     def write(self, value):
         raise TimeoutError("disk write timed out")
+
+
+class PublicationTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.expected = [
+            {"name": "first.whl", "sha256": "first"},
+            {"name": "second.whl", "sha256": "second"},
+        ]
+        (self.root / "release-manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": VERSION,
+                    "python_artifacts": self.expected,
+                    "core": {"name": "core.crate", "sha256": "core"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.fetch = self.enterContext(patch("scripts.release_artifacts.fetch_json"))
+        self.download = self.enterContext(patch("scripts.release_artifacts.download"))
+        self.consume = self.enterContext(
+            patch("scripts.release_artifacts.registry_consumer")
+        )
+        self.sleep = self.enterContext(patch("scripts.release_artifacts.time.sleep"))
+        self.log = self.enterContext(patch("sys.stderr", new_callable=io.StringIO))
+        self.output_number = 0
+
+    def metadata(self, rows=None):
+        return {
+            "urls": [
+                {
+                    "filename": row["name"],
+                    "digests": {"sha256": row["sha256"]},
+                    "url": "https://registry/" + row["name"],
+                }
+                for row in (self.expected if rows is None else rows)
+            ]
+        }
+
+    def verify(self, *, wait=True, registries=None):
+        self.output_number += 1
+        self.output = self.root / str(self.output_number)
+        verify_registry(
+            self.root,
+            registries or ["pypi"],
+            self.output,
+            wait_for_publication=wait,
+        )
+
+    def results(self):
+        return json.loads(
+            (self.output / "registry-verification.json").read_text(encoding="utf-8")
+        )["registries"]
+
+    def test_complete_metadata_does_not_delay_or_repeat_work(self):
+        self.fetch.return_value = self.metadata()
+        self.verify()
+        self.fetch.assert_called_once()
+        self.sleep.assert_not_called()
+        self.assertEqual(self.download.call_count, len(self.expected))
+        self.consume.assert_called_once()
+        self.assertEqual(self.results()["pypi"], {"status": "verified", "files": 2})
+
+    def test_missing_release_and_partial_metadata_wait_before_work(self):
+        missing = urllib.error.HTTPError("https://registry", 404, "missing", None, None)
+        responses = iter([missing, self.metadata(self.expected[:1]), self.metadata()])
+
+        def metadata_response(url):
+            self.download.assert_not_called()
+            self.consume.assert_not_called()
+            response = next(responses)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+        self.fetch.side_effect = metadata_response
+        self.verify()
+        self.assertEqual(self.fetch.call_count, 3)
+        self.assertEqual(
+            self.sleep.call_args_list,
+            [unittest.mock.call(PUBLICATION_RETRY_DELAY_SECONDS)] * 2,
+        )
+        self.assertIn("second.whl", self.log.getvalue())
+        self.assertEqual(self.download.call_count, len(self.expected))
+        self.consume.assert_called_once()
+
+    def test_integrity_errors_never_wait_even_with_missing_files(self):
+        for rows, message in (
+            (self.expected[:1] * 2, "duplicate"),
+            ([{"name": "unexpected.whl", "sha256": "first"}], "unexpected"),
+            ([{"name": "first.whl", "sha256": "corrupt"}], "checksum"),
+        ):
+            with self.subTest(message=message):
+                self.fetch.reset_mock()
+                self.fetch.return_value = self.metadata(rows)
+                with self.assertRaisesRegex(RuntimeError, "not all verified"):
+                    self.verify()
+                self.fetch.assert_called_once()
+                self.assertIn(message, self.results()["pypi"]["error"])
+                self.sleep.assert_not_called()
+                self.download.assert_not_called()
+                self.consume.assert_not_called()
+
+    def test_default_verification_remains_fail_fast(self):
+        for response, status in (
+            (self.metadata([]), "failed"),
+            (
+                urllib.error.HTTPError("https://registry", 404, "missing", None, None),
+                "not-published",
+            ),
+        ):
+            with self.subTest(status=status):
+                self.fetch.reset_mock()
+                self.fetch.side_effect = (
+                    response if isinstance(response, Exception) else None
+                )
+                self.fetch.return_value = response
+                with self.assertRaisesRegex(RuntimeError, "not all verified"):
+                    self.verify(wait=False)
+                self.fetch.assert_called_once()
+                self.sleep.assert_not_called()
+                self.assertEqual(self.results()["pypi"]["status"], status)
+
+    def test_exhausted_partial_metadata_preserves_other_registry_results(self):
+        self.fetch.side_effect = [self.metadata(self.expected[:1])] * (
+            PUBLICATION_MAX_ATTEMPTS
+        ) + [{"version": {"checksum": "core"}}]
+        with self.assertRaisesRegex(RuntimeError, "not all verified"):
+            self.verify(registries=["pypi", "crates"])
+        self.assertEqual(self.fetch.call_count, PUBLICATION_MAX_ATTEMPTS + 1)
+        self.assertEqual(
+            self.sleep.call_args_list,
+            [unittest.mock.call(PUBLICATION_RETRY_DELAY_SECONDS)]
+            * (PUBLICATION_MAX_ATTEMPTS - 1),
+        )
+        self.assertEqual(self.results()["pypi"]["status"], "failed")
+        self.assertIn("second.whl", self.results()["pypi"]["error"])
+        self.assertEqual(self.results()["crates"], {"status": "verified", "files": 1})
+        self.download.assert_called_once()
+        self.consume.assert_called_once()
+        self.assertEqual(self.consume.call_args.args[0], "crates")
+
+    def test_exhausted_missing_release_is_not_published(self):
+        self.fetch.side_effect = urllib.error.HTTPError(
+            "https://registry", 404, "missing", None, None
+        )
+        with self.assertRaisesRegex(RuntimeError, "not all verified"):
+            self.verify()
+        self.assertEqual(self.fetch.call_count, PUBLICATION_MAX_ATTEMPTS)
+        self.assertEqual(self.sleep.call_count, PUBLICATION_MAX_ATTEMPTS - 1)
+        self.assertEqual(self.results()["pypi"]["status"], "not-published")
+        self.download.assert_not_called()
+        self.consume.assert_not_called()
+
+    def test_other_metadata_failures_are_not_retried(self):
+        failures = [
+            urllib.error.HTTPError("https://registry", code, "failure", None, None)
+            for code in (403, 429, 500)
+        ] + [
+            urllib.error.URLError("TLS handshake failed"),
+            json.JSONDecodeError("invalid metadata", "", 0),
+            RuntimeError("registry response read timed out"),
+        ]
+        for error in failures:
+            with self.subTest(error=error):
+                self.fetch.reset_mock()
+                self.fetch.side_effect = error
+                with self.assertRaisesRegex(RuntimeError, "not all verified"):
+                    self.verify()
+                self.fetch.assert_called_once()
+                self.sleep.assert_not_called()
+                self.assertEqual(self.results()["pypi"]["status"], "failed")
+                self.download.assert_not_called()
+                self.consume.assert_not_called()
+
+    def test_download_and_consumer_failures_do_not_restart_admission(self):
+        self.fetch.return_value = self.metadata()
+        for target in (self.download, self.consume):
+            with self.subTest(target=target):
+                self.fetch.reset_mock()
+                self.download.reset_mock(side_effect=True)
+                self.consume.reset_mock(side_effect=True)
+                target.side_effect = urllib.error.HTTPError(
+                    "https://registry", 404, "missing", None, None
+                )
+                with self.assertRaisesRegex(RuntimeError, "not all verified"):
+                    self.verify()
+                self.fetch.assert_called_once()
+                self.sleep.assert_not_called()
+                self.assertEqual(self.results()["pypi"]["status"], "failed")
+
+    def test_malformed_metadata_is_reported_without_waiting(self):
+        for metadata in (
+            None,
+            [],
+            {},
+            {"urls": None},
+            {"urls": [None]},
+            {"urls": [{"filename": "first.whl", "url": "https://registry"}]},
+        ):
+            with self.subTest(metadata=metadata):
+                self.fetch.reset_mock()
+                self.fetch.return_value = metadata
+                with self.assertRaisesRegex(RuntimeError, "not all verified"):
+                    self.verify()
+                self.fetch.assert_called_once()
+                self.sleep.assert_not_called()
+                self.download.assert_not_called()
+                self.consume.assert_not_called()
+                self.assertIn("metadata", self.results()["pypi"]["error"])
+
+    def test_waiting_requires_pypi(self):
+        with self.assertRaisesRegex(RuntimeError, "requires the PyPI"):
+            self.verify(registries=["crates"])
+        self.fetch.assert_not_called()
+        self.assertFalse(self.output.exists())
+
+    def test_cli_passes_wait_flag_explicitly(self):
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "release-artifacts",
+                    "registry",
+                    str(self.root),
+                    "--registry",
+                    "pypi",
+                    "--output",
+                    str(self.root / "out"),
+                    "--wait-for-publication",
+                ],
+            ),
+            patch("scripts.release_artifacts.verify_registry") as verify,
+        ):
+            main()
+        verify.assert_called_once_with(
+            self.root.resolve(),
+            ["pypi"],
+            (self.root / "out").resolve(),
+            wait_for_publication=True,
+        )
+
+    def test_workflow_waits_only_after_upload_and_isolates_recovery(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
+        publish = workflow.split("\n  publish:", 1)[1].split(
+            "\n  verify-published:", 1
+        )[0]
+        recovery = workflow.split("\n  verify-published:", 1)[1]
+        self.assertIn("if: inputs.verify_run == ''", workflow)
+        self.assertIn("if: inputs.verify_run == '' && inputs.publish", publish)
+        self.assertIn("--registry pypi --wait-for-publication", publish)
+        self.assertIn("if: inputs.verify_run != ''", recovery)
+        self.assertIn('"$PUBLISH" != "false"', recovery)
+        self.assertIn("actions: read", recovery)
+        self.assertNotIn("id-token", recovery)
+        self.assertNotIn("pypa/gh-action-pypi-publish", recovery)
+        self.assertNotIn("--wait-for-publication", recovery)
 
 
 class ReleaseTests(unittest.TestCase):
