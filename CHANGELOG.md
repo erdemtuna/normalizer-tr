@@ -9,6 +9,11 @@ Platform requirements are in the [README](README.md) and
 
 ### Development tooling and maintenance
 
+- Refresh the Python development/build tools and update the locked msgpack
+  dependency to 1.2.3 to address CVE-2026-114613. This affects tooling only;
+  the installed normalizer still has no Python runtime dependencies.
+- Move the installed-binding macOS CI job to the supported macOS 15 runner,
+  matching release builds without changing wheel platform requirements.
 - Isolate the verification-only registry job's Rust toolchain from runner-image
   state, including the components required by the repository toolchain file.
 
