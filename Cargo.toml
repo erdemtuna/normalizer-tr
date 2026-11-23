@@ -29,7 +29,7 @@ default-members = ["."]
 resolver = "3"
 
 [dependencies]
-regex = "=1.13.1"
+regex = "=1.13.2"
 unicode-normalization = "=0.1.26"
 unicode-segmentation = "=1.13.3"
 serde = { version = "=1.0.229", features = ["derive"], optional = true }
