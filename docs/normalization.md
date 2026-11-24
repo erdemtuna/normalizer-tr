@@ -135,6 +135,10 @@ Grouped numeric ranges such as `2.000-3.000 kişi` and a date followed by a
 prose dash are not clock ranges. Clock-shaped but invalid endpoints remain
 whole unresolved ranges.
 `Toplam 25.` is not silently treated as an ordinal.
+An isolated, zero-padded ASCII digit string is not an ordinal candidate.
+A single trailing sentence period stays outside it: in `Kod 0042.`, Preserve
+and Reject report only `0042`, and Fallback reads `Kod sıfır sıfır dört iki.`.
+Repeated periods and internal numeric separators retain their existing rules.
 
 ### Multiplication
 
@@ -360,6 +364,11 @@ forms say `artı doksan` followed by the ten written national digits; no trunk
 zero is invented. Significant leading zeros in groups remain digitwise.
 Plain ten digits require Telephone intent or a clear phone cue. Digits hints
 remain digitwise, not telephone prosody. Subscriber assignment is not verified.
+
+A single sentence period following an otherwise recognized, self-identifying
+national or `+90` phone is retained outside the Telephone segment. For example,
+the phone in `0532 123 45 67.` owns `[0,14)` in all three policies. This does not
+extend period handling to cue-only ten-digit forms or repair malformed phones.
 
 Telephone suffixes are unsupported. Once telephone intent and isolated source
 membership are established, an attached tail stays with the whole invalid

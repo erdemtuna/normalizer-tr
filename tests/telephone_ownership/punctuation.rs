@@ -1,8 +1,117 @@
-use super::support::{POLICIES, failure, options, partition};
+use super::support::{POLICIES, SPOKEN, failure, options, partition};
 use normalizer_tr::{
     AmbiguityPolicy, Hint, HintKind, NormalizeError, NormalizeOptions, Normalizer, SegmentKind,
     SourceRange,
 };
+
+#[test]
+fn telephone_owner_ends_before_the_sentence_period() {
+    let normalizer = Normalizer::new().unwrap();
+    let phone = "0532 123 45 67";
+    let prefix = "O\u{308}nce “";
+    let tail = ".” 5 kg";
+    let source = format!("{prefix}{phone}{tail}");
+    let range = SourceRange::new(prefix.len(), prefix.len() + phone.len());
+    for policy in POLICIES {
+        let result = normalizer.normalize(&source, &options(policy)).unwrap();
+        assert_eq!(
+            result.normalized_text(),
+            format!("{prefix}{SPOKEN}.” beş kilogram")
+        );
+        assert!(result.complete() && result.issues().is_empty() && result.fallbacks().is_empty());
+        assert_eq!(result.segments()[1].range(), range);
+        assert_eq!(result.segments()[1].kind(), SegmentKind::Telephone);
+        assert_eq!(result.segments()[2].kind(), SegmentKind::Verbatim);
+        assert!(result.segments()[2].text().starts_with(".”"));
+        partition(&source, &result);
+    }
+}
+
+#[test]
+fn a_period_does_not_admit_unowned_number_groups_as_telephones() {
+    let normalizer = Normalizer::new().unwrap();
+    for (source, issue_count) in [
+        ("12 34 56 78.", 1),
+        ("0532 12 45 67.", 2),
+        ("0532 12 345 67.", 2),
+        ("Telefon: 532 123 45 67.", 2),
+        ("Telefon: 532 123 45 07.", 2),
+        ("Telefon: 532 12 345 07.", 2),
+        ("Telefon: 532 12 34 45 56 07.", 2),
+        ("0(532) 123 45 67.", 2),
+    ] {
+        let result = normalizer.normalize(source, &Default::default()).unwrap();
+        assert_eq!(result.issues().len(), issue_count, "{source}");
+        assert_eq!(result.issues().last().unwrap().range().end(), source.len());
+        for policy in POLICIES {
+            if policy == AmbiguityPolicy::Reject {
+                assert_eq!(
+                    normalizer.normalize(source, &options(policy)),
+                    Err(NormalizeError::Unresolved(result.issues().to_vec()))
+                );
+            } else {
+                let result = normalizer.normalize(source, &options(policy)).unwrap();
+                assert!(
+                    result
+                        .segments()
+                        .iter()
+                        .all(|s| s.kind() != SegmentKind::Telephone)
+                );
+                partition(source, &result);
+            }
+        }
+    }
+}
+
+#[test]
+fn split_zero_requires_the_same_group_admission_as_the_phone_reader() {
+    let normalizer = Normalizer::new().unwrap();
+    for source in ["0 532-123 45 67.", "0 532 123-45 67."] {
+        let range = SourceRange::new(source.len() - 3, source.len());
+        let preserved = normalizer.normalize(source, &Default::default()).unwrap();
+        let last = preserved.issues().last().unwrap();
+        assert_eq!(last.range(), range);
+        assert_eq!(last.category(), normalizer_tr::IssueCategory::Ambiguous);
+        assert!(preserved.normalized_text().ends_with("67."));
+        assert_eq!(
+            normalizer.normalize(source, &options(AmbiguityPolicy::Reject)),
+            Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+        );
+        let fallback = normalizer
+            .normalize(source, &options(AmbiguityPolicy::Fallback))
+            .unwrap();
+        assert!(fallback.normalized_text().ends_with("altmış yedi."));
+        assert_eq!(fallback.fallbacks().last().unwrap().range(), range);
+        assert!(
+            fallback
+                .segments()
+                .iter()
+                .all(|segment| segment.kind() != SegmentKind::Telephone)
+        );
+        partition(source, &preserved);
+        partition(source, &fallback);
+    }
+}
+
+#[test]
+fn a_zero_padded_group_does_not_certify_a_malformed_phone() {
+    let normalizer = Normalizer::new().unwrap();
+    let phone = "0532 12 45 07";
+    let source = format!("{phone}.");
+    let fallback = normalizer
+        .normalize(&source, &options(AmbiguityPolicy::Fallback))
+        .unwrap();
+    assert_eq!(
+        fallback.normalized_text(),
+        "sıfır beş üç iki bir iki dört beş sıfır yedi."
+    );
+    assert_eq!(fallback.fallbacks().len(), 1);
+    assert_eq!(
+        fallback.fallbacks()[0].range(),
+        SourceRange::new(0, phone.len())
+    );
+    partition(&source, &fallback);
+}
 
 #[test]
 fn suffix_after_numeric_parenthesis_does_not_open_quotes_across_another_owner() {

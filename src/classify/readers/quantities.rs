@@ -98,12 +98,7 @@ pub(super) fn read(ctx: &Context<'_>, index: usize) -> Option<Attempt> {
             Quantity::parse(source, next.text).map(Value::Quantity),
         ));
     }
-    if number_shaped(source)
-        && (lexicon::unit_marker(next.text)
-            || (next.text.starts_with(char::is_alphabetic)
-                && (next.text.contains(['/', '^', '²', '³'])
-                    || ["Μg", "μG", "µG", "ug", "oz", "cl", "dl", "ms"].contains(&next.text))))
-    {
+    if number_shaped(source) && notation::unsupported_unit_surface(next.text) {
         return Some((Err(IssueCategory::Unsupported), index + 1));
     }
     None
