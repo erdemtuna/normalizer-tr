@@ -7,6 +7,11 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+## 0.8.2 - 2026-11-24
+
+Public API signatures, policy defaults and supported platforms are unchanged.
+Package and build identity becomes `0.8.2`, including `normalizer-tr/0.8.2`.
+
 ### Behavior changes
 
 - Keep a single sentence period after a standalone zero-padded digit string or
@@ -18,6 +23,10 @@ Platform requirements are in the [README](README.md) and
 
 ### Development tooling and maintenance
 
+- Update regex to 1.13.2 and align the packaged license assets and notices with
+  the locked regex, regex-automata and regex-syntax versions.
+- Update Ruff to 0.17.6, pip-tools to 7.7.0 and importlib-metadata to 10.2.0
+  in the Python development lock.
 - Refresh the Python development/build tools and update the locked msgpack
   dependency to 1.2.3 to address CVE-2026-114613. This affects tooling only;
   the installed normalizer still has no Python runtime dependencies.
