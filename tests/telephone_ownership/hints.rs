@@ -1,8 +1,43 @@
-use super::support::{PHONE, POLICIES, SPOKEN};
+use super::support::{PHONE, POLICIES, SPOKEN, partition};
 use normalizer_tr::{
     AmbiguityPolicy, Hint, HintKind, NormalizeError, NormalizeOptions, Normalizer, SegmentKind,
     SourceRange,
 };
+
+#[test]
+fn telephone_hints_end_before_a_released_period() {
+    let normalizer = Normalizer::new().unwrap();
+    let prefix = "O\u{308}nce ";
+    let phone = "0532 123 45 67";
+    let source = format!("{prefix}{phone}.");
+    let end = prefix.len() + phone.len();
+    let range = SourceRange::new(prefix.len(), end);
+    for policy in POLICIES {
+        let opts = |range, kind| NormalizeOptions {
+            ambiguity_policy: policy,
+            hints: vec![Hint::new(range, kind)],
+        };
+        let result = normalizer
+            .normalize(&source, &opts(range, HintKind::Telephone))
+            .unwrap();
+        assert_eq!(result.normalized_text(), format!("{prefix}{SPOKEN}."));
+        assert_eq!(result.segments()[1].range(), range);
+        assert_eq!(result.segments()[1].kind(), SegmentKind::Telephone);
+        partition(&source, &result);
+        for incorrect_end in [end - 1, end + 1] {
+            assert_eq!(
+                normalizer.normalize(
+                    &source,
+                    &opts(
+                        SourceRange::new(prefix.len(), incorrect_end),
+                        HintKind::Telephone
+                    )
+                ),
+                Err(NormalizeError::InvalidHint)
+            );
+        }
+    }
+}
 
 #[test]
 fn corrected_owner_rejects_component_hints_but_keeps_independent_hints() {

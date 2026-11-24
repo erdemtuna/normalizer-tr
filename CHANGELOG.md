@@ -7,6 +7,15 @@ Platform requirements are in the [README](README.md) and
 
 ## Unreleased
 
+### Behavior changes
+
+- Keep a single sentence period after a standalone zero-padded digit string or
+  a recognized national or `+90` telephone number as punctuation. For `0042.`,
+  Preserve and Reject report `[0,4)`, and Fallback returns `sıfır sıfır dört iki.`
+  with a `leading_zeroes` diagnostic over `[0,4)`. To retain the period with an
+  explicit Digits hint, select only the digits; an existing period-inclusive
+  Digits hint still consumes it. Telephone hints should end before the period.
+
 ### Development tooling and maintenance
 
 - Refresh the Python development/build tools and update the locked msgpack

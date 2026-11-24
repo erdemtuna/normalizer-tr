@@ -8,6 +8,25 @@ pub(crate) struct Telephone {
 }
 
 impl Telephone {
+    pub(crate) const MAX_GROUPS: usize = 5;
+    const NATIONAL_DIGITS: usize = 11;
+    const INTERNATIONAL_DIGITS: usize = 12;
+
+    pub(crate) fn has_written_national_prefix(source: &str) -> bool {
+        if !source.starts_with('0') {
+            return false;
+        }
+        let prefix = source.split(['-', '(']).next().unwrap_or(source);
+        (prefix.len() == 4 && prefix.bytes().all(|byte| byte.is_ascii_digit()))
+            || (source.len() >= 10 && source.bytes().all(|byte| byte.is_ascii_digit()))
+    }
+
+    pub(crate) fn has_implicit_digit_count(text: &str, count: usize) -> bool {
+        (count == Self::NATIONAL_DIGITS
+            && (text == "0" || text.starts_with("0-") || Self::has_written_national_prefix(text)))
+            || (count == Self::INTERNATIONAL_DIGITS && text.starts_with("+90"))
+    }
+
     pub(crate) fn parse(text: &str, explicit: bool) -> Option<Self> {
         if !text
             .chars()
@@ -37,11 +56,11 @@ impl Telephone {
         let international = text.starts_with("+90");
         let cleaned: String = text.chars().filter(|c| c.is_ascii_digit()).collect();
         let (national, national_zero) = if international {
-            if cleaned.len() != 12 {
+            if cleaned.len() != Self::INTERNATIONAL_DIGITS {
                 return None;
             }
             (&cleaned[2..], false)
-        } else if cleaned.len() == 11 && cleaned.starts_with('0') {
+        } else if cleaned.len() == Self::NATIONAL_DIGITS && cleaned.starts_with('0') {
             (&cleaned[1..], true)
         } else if cleaned.len() == 10 && explicit {
             (cleaned.as_str(), false)

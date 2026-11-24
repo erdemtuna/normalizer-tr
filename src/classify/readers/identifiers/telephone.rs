@@ -33,14 +33,8 @@ pub(super) fn read(
             notation::label(next.text)
                 || ["kişi", "adet", "gün", "yaş"].contains(&lexicon::lookup_key(next.text).as_str())
         });
-    let written_prefix = source.split(['-', '(']).next().unwrap_or(source);
-    let digits_only = source.bytes().all(|byte| byte.is_ascii_digit());
-    let national_prefix = source.starts_with('0')
-        && ((digits_only && (source.len() == 4 || source.len() >= 10))
-            || (written_prefix.len() == 4
-                && written_prefix.bytes().all(|byte| byte.is_ascii_digit()))
-            || zero_group_signal
-            || telephone_cue);
+    let national_prefix = Telephone::has_written_national_prefix(source)
+        || (source.starts_with('0') && (zero_group_signal || telephone_cue));
     if !source.starts_with("+90") && !national_prefix && !source.starts_with("0-") && !telephone_cue
     {
         return Ok(None);
