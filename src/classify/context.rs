@@ -1,6 +1,7 @@
 pub(super) const DATE_CUES: &[&str] = &["tarih", "tarihi"];
 pub(super) const FOLLOWING_DATE_CUES: &[&str] = &["tarihinde", "tarihine"];
 pub(super) const TIME_CUES: &[&str] = &["saat"];
+pub(super) const TELEPHONE_CUES: &[&str] = &["telefon", "tel"];
 
 /// Casing and optional colon removal apply only to reviewed lookup keys.
 pub(super) fn cue_key(text: &str) -> String {

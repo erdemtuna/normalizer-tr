@@ -7,5 +7,7 @@
   {"id":"sentence-period-phone-parenthesized-last-group","class":"identifier","text":"0532 123 45(67).","expected":"sıfır beş yüz otuz iki yüz yirmi üç kırk beş altmış yedi."},
   {"id":"sentence-period-digits-hint","class":"number","text":"0042.","hint":{"start":0,"end":4,"kind":"digits"},"expected":"sıfır sıfır dört iki."},
   {"id":"sentence-period-ordinal-ambiguity","class":"number","text":"25.","category":"Ambiguous","fallback_class":"Number","strategy":"PreferredNumber","fallback":"yirmi beş."},
-  {"id":"sentence-period-repeated-dots","class":"date","text":"0042..","category":"InvalidExpression","fallback_class":"Date","strategy":"Literal","fallback":"sıfır sıfır dört iki nokta nokta"}
+  {"id":"sentence-period-repeated-dots","class":"date","text":"0042..","category":"InvalidExpression","fallback_class":"Date","strategy":"Literal","fallback":"sıfır sıfır dört iki nokta nokta"},
+  {"id":"sentence-period-invalid-padded-quantity","class":"quantity","text":"0042. kg","category":"InvalidExpression","fallback_class":"Quantity","strategy":"Literal","fallback":"sıfır sıfır dört iki nokta kg"},
+  {"id":"sentence-period-independent-number-before-phone","class":"mixed","text":"12 0532 123 45 67.","expected":"on iki sıfır beş yüz otuz iki yüz yirmi üç kırk beş altmış yedi."}
 ]

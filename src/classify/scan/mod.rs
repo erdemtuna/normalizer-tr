@@ -32,6 +32,7 @@ pub(super) struct Token<'a> {
     pub(super) phone_run_end: usize,
     pub(super) digit_end: usize,
     pub(super) standalone: bool,
+    pub(super) phone_period_start: bool,
 }
 
 pub(super) struct Scanned<'a> {
@@ -190,6 +191,7 @@ pub(super) fn tokens<'a>(
         tokens[index].number_run_end = index;
         tokens[index].phone_run_end = index;
         if let Some(next) = tokens.get(index + 1)
+            && !next.phone_period_start
             && number_fragment(tokens[index].text)
             && number_fragment(next.text)
             && group_whitespace(text, tokens[index].range.end, next.range.start)
@@ -238,6 +240,7 @@ fn push_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: Sou
         phone_run_end: 0,
         digit_end: 0,
         standalone: false,
+        phone_period_start: false,
     });
 }
 

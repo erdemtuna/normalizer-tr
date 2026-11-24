@@ -33,7 +33,9 @@ fn a_period_does_not_admit_unowned_number_groups_as_telephones() {
     for (source, issue_count) in [
         ("12 34 56 78.", 1),
         ("0532 12 45 67.", 2),
+        ("0532 12 345 67.", 2),
         ("Telefon: 532 123 45 67.", 2),
+        ("Telefon: 532 123 45 07.", 2),
         ("0(532) 123 45 67.", 2),
     ] {
         let result = normalizer.normalize(source, &Default::default()).unwrap();
@@ -56,6 +58,36 @@ fn a_period_does_not_admit_unowned_number_groups_as_telephones() {
                 partition(source, &result);
             }
         }
+    }
+}
+
+#[test]
+fn split_zero_requires_the_same_group_admission_as_the_phone_reader() {
+    let normalizer = Normalizer::new().unwrap();
+    for source in ["0 532-123 45 67.", "0 532 123-45 67."] {
+        let range = SourceRange::new(source.len() - 3, source.len());
+        let preserved = normalizer.normalize(source, &Default::default()).unwrap();
+        let last = preserved.issues().last().unwrap();
+        assert_eq!(last.range(), range);
+        assert_eq!(last.category(), normalizer_tr::IssueCategory::Ambiguous);
+        assert!(preserved.normalized_text().ends_with("67."));
+        assert_eq!(
+            normalizer.normalize(source, &options(AmbiguityPolicy::Reject)),
+            Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+        );
+        let fallback = normalizer
+            .normalize(source, &options(AmbiguityPolicy::Fallback))
+            .unwrap();
+        assert!(fallback.normalized_text().ends_with("altmış yedi."));
+        assert_eq!(fallback.fallbacks().last().unwrap().range(), range);
+        assert!(
+            fallback
+                .segments()
+                .iter()
+                .all(|segment| segment.kind() != SegmentKind::Telephone)
+        );
+        partition(source, &preserved);
+        partition(source, &fallback);
     }
 }
 
