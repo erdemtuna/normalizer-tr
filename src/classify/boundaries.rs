@@ -147,6 +147,7 @@ mod tests {
                 phone_run_end: 0,
                 digit_end: 1,
                 standalone: false,
+                phone_period_start: false,
             },
             Token {
                 range: SourceRange::new(2, 6),
@@ -155,6 +156,7 @@ mod tests {
                 phone_run_end: 1,
                 digit_end: 3,
                 standalone: false,
+                phone_period_start: false,
             },
         ];
         let bounds = Boundaries::new(&tokens, &[], &[]);

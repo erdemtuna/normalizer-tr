@@ -1,6 +1,7 @@
 //! Tokenization and indexed source traversal.
 mod compounds;
 mod lists;
+mod periods;
 mod piece;
 mod punctuation;
 mod quotes;
@@ -31,6 +32,7 @@ pub(super) struct Token<'a> {
     pub(super) phone_run_end: usize,
     pub(super) digit_end: usize,
     pub(super) standalone: bool,
+    pub(super) phone_period_start: bool,
 }
 
 pub(super) struct Scanned<'a> {
@@ -47,6 +49,23 @@ pub(super) fn whitespace_between(text: &str, start: usize, end: usize) -> bool {
 }
 pub(super) fn cue_whitespace(text: &str, start: usize, end: usize) -> bool {
     start == end || whitespace_between(text, start, end)
+}
+
+pub(super) fn money_tail(
+    text: &str,
+    tokens: &[Token<'_>],
+    start: usize,
+    end: usize,
+) -> Option<usize> {
+    let next = tokens.get(end + 1)?;
+    let gap_start = tokens[end].range.end;
+    let gap_end = next.range.start;
+    let spaced = end > start
+        && crate::notation::currency_marker(next.text)
+        && whitespace_between(text, gap_start, gap_end);
+    let attached = group_whitespace(text, gap_start, gap_end)
+        && crate::notation::attached_money_tail(next.text).is_some();
+    (spaced || attached).then_some(end + 1)
 }
 
 pub(super) fn tokens<'a>(
@@ -182,19 +201,14 @@ pub(super) fn tokens<'a>(
             append_token(&mut tokens, source, range);
         }
     }
-    account_periods(text, &mut tokens, control)?;
+    periods::release(text, &mut tokens, control)?;
     standalone::mark(text, &mut tokens, quote_bounds.transparent(), control)?;
-    let mut digits = 0;
-    for token in &mut tokens {
-        control.check()?;
-        digits += token.text.bytes().filter(u8::is_ascii_digit).count();
-        token.digit_end = digits;
-    }
     for index in (0..tokens.len()).rev() {
         control.check()?;
         tokens[index].number_run_end = index;
         tokens[index].phone_run_end = index;
         if let Some(next) = tokens.get(index + 1)
+            && !next.phone_period_start
             && number_fragment(tokens[index].text)
             && number_fragment(next.text)
             && group_whitespace(text, tokens[index].range.end, next.range.start)
@@ -212,45 +226,6 @@ pub(super) fn tokens<'a>(
         tokens,
         catalog_groups,
     })
-}
-
-fn account_periods(
-    text: &str,
-    tokens: &mut [Token<'_>],
-    control: &WorkControl,
-) -> Result<(), NormalizeError> {
-    let mut account = false;
-    let mut previous_end = 0;
-    for token in tokens {
-        control.check()?;
-        let adjacent =
-            previous_end == 0 || whitespace_between(text, previous_end, token.range.start);
-        let start = token.text.len() >= 4
-            && (token.text.starts_with("TR") || token.text.starts_with("tr"))
-            && token.text.as_bytes()[2..].iter().all(u8::is_ascii_digit);
-        if start || token.text == "TR" {
-            account = true;
-        } else if account && adjacent {
-            if let Some(body) = token.text.strip_suffix('.')
-                && !body.is_empty()
-                && body.bytes().all(|byte| byte.is_ascii_digit())
-            {
-                token.text = body;
-                token.range.end -= 1;
-                account = false;
-            } else if !token
-                .text
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || byte.is_ascii_uppercase())
-            {
-                account = false;
-            }
-        } else {
-            account = false;
-        }
-        previous_end = token.range.end;
-    }
-    Ok(())
 }
 
 fn approved(groups: &[CatalogGroup], offset: usize) -> bool {
@@ -282,6 +257,7 @@ fn push_token<'a>(tokens: &mut Vec<Token<'a>>, source: &'a SourceMap, range: Sou
         phone_run_end: 0,
         digit_end: 0,
         standalone: false,
+        phone_period_start: false,
     });
 }
 

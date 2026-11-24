@@ -3,7 +3,10 @@ use super::super::Context;
 use super::IdentifierMatch;
 use crate::{
     IssueCategory, NormalizeError, WorkControl,
-    classify::scan::telephone_gap,
+    classify::{
+        context,
+        scan::{cue_whitespace, telephone_gap},
+    },
     domain::{identifiers::Telephone, lexicon, quantities::NumericRange},
     interpretation::Value,
     notation,
@@ -19,28 +22,21 @@ pub(super) fn read(
     let tokens = ctx.tokens;
     let token = tokens[index];
     let source = token.text;
-    let zero_group_signal = source == "0"
-        && tokens.get(index + 1).is_some_and(|next| {
-            next.text.len() == 3 && next.text.bytes().all(|b| b.is_ascii_digit())
-        })
-        && tokens.get(index + 2).is_some_and(|next| {
-            next.text.len() >= 2 && next.text.bytes().all(|b| b.is_ascii_digit())
+    let zero_group_signal = tokens
+        .get(index + 1..index + 3)
+        .is_some_and(|next| Telephone::has_split_zero_prefix(source, next[0].text, next[1].text));
+    let telephone_cue = source.bytes().any(|b| b.is_ascii_digit())
+        && index.checked_sub(1).is_some_and(|i| {
+            context::telephone_cue(tokens[i].text)
+                && cue_whitespace(text, tokens[i].range.end, token.range.start)
         });
-    let telephone_cue =
-        source.bytes().any(|b| b.is_ascii_digit()) && ctx.cue(index, &["telefon", "tel"]);
     let quantity_context = telephone_cue
         && tokens.get(index + 1).is_some_and(|next| {
             notation::label(next.text)
                 || ["kişi", "adet", "gün", "yaş"].contains(&lexicon::lookup_key(next.text).as_str())
         });
-    let written_prefix = source.split(['-', '(']).next().unwrap_or(source);
-    let digits_only = source.bytes().all(|byte| byte.is_ascii_digit());
-    let national_prefix = source.starts_with('0')
-        && ((digits_only && (source.len() == 4 || source.len() >= 10))
-            || (written_prefix.len() == 4
-                && written_prefix.bytes().all(|byte| byte.is_ascii_digit()))
-            || zero_group_signal
-            || telephone_cue);
+    let national_prefix = Telephone::has_written_national_prefix(source)
+        || (source.starts_with('0') && (zero_group_signal || telephone_cue));
     if !source.starts_with("+90") && !national_prefix && !source.starts_with("0-") && !telephone_cue
     {
         return Ok(None);
@@ -48,11 +44,9 @@ pub(super) fn read(
     if source.starts_with("+90")
         || (source.starts_with('0') && source != "0" && source.chars().any(|c| c.is_ascii_digit()))
         || zero_group_signal
-        || (source == "0" && ctx.cue(index, &["telefon", "tel"]))
+        || (source == "0" && telephone_cue)
         || (telephone_cue && !quantity_context && source.bytes().all(|b| b.is_ascii_digit()))
-        || (source.len() == 10
-            && source.bytes().all(|b| b.is_ascii_digit())
-            && ctx.cue(index, &["telefon", "tel"]))
+        || (source.len() == 10 && source.bytes().all(|b| b.is_ascii_digit()) && telephone_cue)
     {
         let end = token.phone_run_end.min(tokens.len() - 1);
         let whole = &text[token.range.start..tokens[end].range.end];

@@ -28,9 +28,12 @@ whole before any operand is emitted. Valid neighboring address fields can
 normalize when another field fails.
 
 Primary composite readings can contain multiple source-partitioning segments.
-That does not permit hints to cut their validated owner. Corrected account
-ownership likewise prevents a trailing numeric group from escaping as an
-ordinal or money reading. Fallback cannot certify an invalid account prefix.
+That does not permit hints to cut their validated owner. A sentence period
+after a recognized phone or a standalone zero-padded code stays outside the
+expression: `0042.` reads `sıfır sıfır dört iki.` with a `leading_zeroes`
+diagnostic over the digits alone. Account ownership likewise prevents a trailing
+numeric group from escaping as an ordinal or money reading. Fallback cannot
+certify an invalid account prefix.
 New grammatical analyses that disagree on final speech remain ambiguous;
 established successful ordinary-case readings retain documented precedence.
 

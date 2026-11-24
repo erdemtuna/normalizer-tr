@@ -23,6 +23,168 @@ const POLICIES: [AmbiguityPolicy; 3] = [
     AmbiguityPolicy::Fallback,
 ];
 
+#[test]
+fn padded_period_does_not_split_invalid_quantity_notation() {
+    let normalizer = Normalizer::new().unwrap();
+    for (source, category) in [
+        ("0042. kg/m", IssueCategory::Unsupported),
+        ("0042. kg/m²", IssueCategory::Unsupported),
+        ("0042. 2TL", IssueCategory::InvalidExpression),
+        ("0042. 12 TL", IssueCategory::InvalidExpression),
+        ("0042. 123 456 TL", IssueCategory::InvalidExpression),
+    ] {
+        let range = SourceRange::new(0, source.len());
+        let preserved = normalizer.normalize(source, &Default::default()).unwrap();
+        assert_eq!(preserved.normalized_text(), source);
+        assert!(!preserved.complete());
+        assert_eq!(preserved.issues().len(), 1);
+        assert_eq!(preserved.issues()[0].range(), range);
+        assert_eq!(preserved.issues()[0].category(), category);
+        let options = |ambiguity_policy| NormalizeOptions {
+            ambiguity_policy,
+            ..Default::default()
+        };
+        assert_eq!(
+            normalizer.normalize(source, &options(AmbiguityPolicy::Reject)),
+            Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+        );
+        let fallback = normalizer
+            .normalize(source, &options(AmbiguityPolicy::Fallback))
+            .unwrap();
+        assert!(fallback.complete() && fallback.issues().is_empty());
+        assert_eq!(fallback.fallbacks().len(), 1);
+        let record = &fallback.fallbacks()[0];
+        assert_eq!(record.range(), range);
+        assert_eq!(record.original_category(), Some(category));
+        assert_eq!(record.attempted_class(), FallbackClass::Quantity);
+    }
+}
+
+#[test]
+fn electronic_neighbors_do_not_keep_a_period_inside_a_padded_code() {
+    let normalizer = Normalizer::new().unwrap();
+    for url in ["https://ornek.com", "www.ornek.com/yol"] {
+        let source = format!("Kod 0042. {url}");
+        let control = format!("Kod 0042! {url}");
+        for ambiguity_policy in POLICIES {
+            let options = NormalizeOptions {
+                ambiguity_policy,
+                ..Default::default()
+            };
+            let result = normalizer.normalize(&source, &options);
+            let control = normalizer.normalize(&control, &options);
+            if ambiguity_policy == AmbiguityPolicy::Reject {
+                let Err(NormalizeError::Unresolved(issues)) = &result else {
+                    panic!("expected unresolved digits");
+                };
+                assert_eq!(issues.len(), 1);
+                assert_eq!(issues[0].range(), SourceRange::new(4, 8));
+                assert_eq!(result, control);
+                continue;
+            }
+            let result = result.unwrap();
+            let control = control.unwrap();
+            assert_eq!(result.issues(), control.issues());
+            assert_eq!(result.fallbacks(), control.fallbacks());
+            assert_eq!(
+                result.normalized_text(),
+                control.normalized_text().replacen('!', ".", 1)
+            );
+            assert_eq!(
+                result.segments().last().unwrap().kind(),
+                SegmentKind::Electronic
+            );
+        }
+    }
+}
+
+#[test]
+fn sentence_periods_are_outside_zero_padded_code_diagnostics() {
+    let normalizer = Normalizer::new().unwrap();
+    let prefix = "O\u{308}nce “";
+    for (digits, spoken) in [
+        ("0042", "sıfır sıfır dört iki"),
+        ("0718", "sıfır yedi bir sekiz"),
+        ("007", "sıfır sıfır yedi"),
+        ("046", "sıfır dört altı"),
+        ("004512", "sıfır sıfır dört beş bir iki"),
+    ] {
+        let tail = ".”\nSonra";
+        let source = format!("{prefix}{digits}{tail}");
+        let punctuated_control = format!("{prefix}{digits}!”\nSonra");
+        let range = SourceRange::new(prefix.len(), prefix.len() + digits.len());
+        for policy in POLICIES {
+            let options = NormalizeOptions {
+                ambiguity_policy: policy,
+                ..Default::default()
+            };
+            let result = normalizer.normalize(&source, &options);
+            let control = normalizer.normalize(&punctuated_control, &options);
+            if policy == AmbiguityPolicy::Reject {
+                let Err(NormalizeError::Unresolved(issues)) = &result else {
+                    panic!("expected one unresolved code");
+                };
+                assert_eq!(issues.len(), 1);
+                assert_eq!(issues[0].range(), range);
+                assert_eq!(issues[0].category(), IssueCategory::InvalidExpression);
+                assert_eq!(result, control);
+                continue;
+            }
+            let result = result.unwrap();
+            let control = control.unwrap();
+            assert_eq!(result.issues(), control.issues());
+            assert_eq!(result.fallbacks(), control.fallbacks());
+            assert_eq!(result.segments()[1].range(), range);
+            assert_eq!(result.segments()[2].kind(), SegmentKind::Verbatim);
+            assert_eq!(result.segments()[2].text(), tail);
+            if policy == AmbiguityPolicy::Preserve {
+                assert_eq!(result.normalized_text(), source);
+                assert!(!result.complete() && result.fallbacks().is_empty());
+                assert_eq!(result.issues()[0].range(), range);
+            } else {
+                assert_eq!(result.normalized_text(), format!("{prefix}{spoken}{tail}"));
+                assert!(result.complete() && result.issues().is_empty());
+                assert_eq!(result.fallbacks().len(), 1);
+                let diagnostic = &result.fallbacks()[0];
+                assert_eq!(diagnostic.range(), range);
+                assert_eq!(diagnostic.reason(), FallbackReason::LeadingZeroes);
+                assert_eq!(diagnostic.strategy(), FallbackStrategy::Literal);
+                assert_eq!(
+                    diagnostic.original_category(),
+                    Some(IssueCategory::InvalidExpression)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn code_hints_keep_the_period_outside_unless_it_is_explicitly_selected() {
+    let normalizer = Normalizer::new().unwrap();
+    for policy in POLICIES {
+        for (kind, end, expected) in [
+            (HintKind::Digits, 4, "sıfır sıfır dört iki."),
+            (HintKind::Digits, 5, "sıfır sıfır dört iki"),
+            (HintKind::Cardinal, 4, "kırk iki."),
+        ] {
+            let result = normalizer
+                .normalize(
+                    "0042.",
+                    &NormalizeOptions {
+                        ambiguity_policy: policy,
+                        hints: vec![Hint::new(SourceRange::new(0, end), kind)],
+                    },
+                )
+                .unwrap();
+            assert_eq!(result.normalized_text(), expected);
+            assert!(
+                result.complete() && result.issues().is_empty() && result.fallbacks().is_empty()
+            );
+            assert_eq!(result.segments()[0].range(), SourceRange::new(0, end));
+        }
+    }
+}
+
 fn options() -> NormalizeOptions {
     NormalizeOptions {
         ambiguity_policy: AmbiguityPolicy::Fallback,

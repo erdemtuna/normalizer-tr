@@ -6,7 +6,7 @@ mod temporal;
 
 pub(crate) use quantities::{
     attached_money_tail, attached_quantity, currency_marker, label, quantity_piece,
-    unsupported_label,
+    unsupported_label, unsupported_unit_surface,
 };
 pub(crate) use suffix::{
     split_suffix, suffix_parts, telephone_suffix_surface, telephone_tail_surface,

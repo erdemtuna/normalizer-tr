@@ -27,12 +27,11 @@ pub(in crate::classify) fn phones(
     for matched in rules.phone_like.find_iter(text) {
         control.check()?;
         let range = SourceRange::new(matched.start(), matched.end());
-        if tokens
-            .binary_search_by_key(&range.start, |t| t.range.start)
-            .is_ok()
-            && tokens
-                .binary_search_by_key(&range.end, |t| t.range.end)
-                .is_ok()
+        if let Ok(first) = tokens.binary_search_by_key(&range.start, |t| t.range.start)
+            && let Ok(last) = tokens.binary_search_by_key(&range.end, |t| t.range.end)
+            && !tokens[first + 1..=last]
+                .iter()
+                .any(|token| token.phone_period_start)
         {
             phones.push(range);
         }

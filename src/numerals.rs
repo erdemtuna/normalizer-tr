@@ -8,6 +8,10 @@ const MAX_GROUP_SEPARATORS: usize = (MAX_INTEGER_DIGITS - 1) / GROUP_WIDTH;
 const MAX_STANDARD_NUMBER_BYTES: usize =
     1 + MAX_INTEGER_DIGITS + MAX_GROUP_SEPARATORS + 1 + MAX_FRACTION_DIGITS;
 
+pub(crate) fn zero_padded_digits(text: &str) -> bool {
+    text.len() > 1 && text.starts_with('0') && text.bytes().all(|byte| byte.is_ascii_digit())
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Sign {
     None,
