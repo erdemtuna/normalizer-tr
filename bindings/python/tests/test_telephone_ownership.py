@@ -19,6 +19,36 @@ PHONE_CASES = json.loads(
 )
 
 
+@pytest.mark.parametrize("policy", ("preserve", "reject", "fallback"))
+def test_sentence_period_is_outside_telephone_and_code_hint_ranges(policy):
+    prefix = "O\u0308nce "
+    phone = "0532 123 45 67"
+    start = len(prefix.encode("utf-8"))
+    end = start + len(phone)
+    source = f"{prefix}{phone}. Sonra 0042."
+    code_end = len(source.encode("utf-8")) - 1
+    hints = [Hint(start, end, "telephone"), Hint(code_end - 4, code_end, "digits")]
+    normalizer = Normalizer()
+    result = normalizer.normalize(source, ambiguity_policy=policy, hints=hints)
+    assert result.complete and not result.issues and not result.fallbacks
+    assert result.normalized_text == (
+        f"{prefix}sıfır beş yüz otuz iki yüz yirmi üç kırk beş altmış yedi."
+        " Sonra sıfır sıfır dört iki."
+    )
+    assert [
+        (segment.start_byte, segment.end_byte, segment.kind)
+        for segment in result.segments
+        if segment.kind != "verbatim"
+    ] == [(start, end, "telephone"), (code_end - 4, code_end, "digits")]
+    with pytest.raises(NormalizationError) as error:
+        normalizer.normalize(
+            source,
+            ambiguity_policy=policy,
+            hints=[Hint(start, end + 1, "telephone"), hints[1]],
+        )
+    assert error.value.code == "invalid_hint"
+
+
 @pytest.mark.parametrize(
     "phone,literal,strategy",
     [

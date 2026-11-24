@@ -10,7 +10,7 @@ use crate::{
     },
     morphology::{Inflection, NominalInflection},
     notation::{DateSurface, TimeSurface},
-    numerals::Number,
+    numerals::{Number, zero_padded_digits},
 };
 
 #[derive(Clone, Debug)]
@@ -126,10 +126,7 @@ impl UnresolvedFinding {
         category: IssueCategory,
         alternative: Alternative,
     ) -> Self {
-        let reason = if source.len() > 1
-            && source.starts_with('0')
-            && source.bytes().all(|byte| byte.is_ascii_digit())
-        {
+        let reason = if zero_padded_digits(source) {
             FallbackReason::LeadingZeroes
         } else {
             match category {

@@ -8,7 +8,35 @@ pub(crate) struct Telephone {
 }
 
 impl Telephone {
-    pub(crate) fn parse(text: &str, explicit: bool) -> Option<Self> {
+    pub(crate) const MAX_GROUPS: usize = 5;
+    const CUE_ONLY_DIGITS: usize = 10;
+    const NATIONAL_DIGITS: usize = 11;
+    const INTERNATIONAL_DIGITS: usize = 12;
+
+    pub(crate) fn has_written_national_prefix(source: &str) -> bool {
+        if !source.starts_with('0') {
+            return false;
+        }
+        let prefix = source.split(['-', '(']).next().unwrap_or(source);
+        (prefix.len() == 4 && prefix.bytes().all(|byte| byte.is_ascii_digit()))
+            || (source.len() >= 10 && source.bytes().all(|byte| byte.is_ascii_digit()))
+    }
+
+    pub(crate) fn has_split_zero_prefix(source: &str, first: &str, second: &str) -> bool {
+        source == "0"
+            && first.len() == 3
+            && first.bytes().all(|b| b.is_ascii_digit())
+            && second.len() >= 2
+            && second.bytes().all(|b| b.is_ascii_digit())
+    }
+
+    pub(crate) fn has_implicit_digit_count(text: &str, count: usize) -> bool {
+        (count == Self::NATIONAL_DIGITS
+            && (text == "0" || text.starts_with("0-") || Self::has_written_national_prefix(text)))
+            || (count == Self::INTERNATIONAL_DIGITS && text.starts_with("+90"))
+    }
+
+    fn shape(text: &str, explicit: bool) -> Option<(bool, bool)> {
         if !text
             .chars()
             .all(|c| c.is_ascii_digit() || matches!(c, '+' | ' ' | '-' | '(' | ')'))
@@ -35,41 +63,57 @@ impl Telephone {
             return None;
         }
         let international = text.starts_with("+90");
-        let cleaned: String = text.chars().filter(|c| c.is_ascii_digit()).collect();
-        let (national, national_zero) = if international {
-            if cleaned.len() != 12 {
+        let digits = text.bytes().filter(u8::is_ascii_digit);
+        let count = digits.clone().count();
+        let national_zero = if international {
+            if count != Self::INTERNATIONAL_DIGITS {
                 return None;
             }
-            (&cleaned[2..], false)
-        } else if cleaned.len() == 11 && cleaned.starts_with('0') {
-            (&cleaned[1..], true)
-        } else if cleaned.len() == 10 && explicit {
-            (cleaned.as_str(), false)
+            false
+        } else if count == Self::NATIONAL_DIGITS && digits.clone().next() == Some(b'0') {
+            true
+        } else if count == Self::CUE_ONLY_DIGITS && explicit {
+            false
         } else {
             return None;
         };
-        let groups: Vec<_> = text
+        let sizes = text
             .split([' ', '-', '(', ')'])
             .filter(|s| !s.is_empty())
-            .collect();
-        if groups.len() > 1 {
-            let sizes: Vec<_> = groups
-                .iter()
-                .map(|s| s.trim_start_matches('+').len())
-                .collect();
+            .map(|s| s.trim_start_matches('+').len());
+        if sizes.clone().nth(1).is_some() {
             let allowed = if international {
-                sizes == [2, 3, 3, 2, 2]
+                sizes.eq([2, 3, 3, 2, 2])
             } else if national_zero {
-                sizes == [4, 3, 2, 2] || sizes == [1, 3, 3, 2, 2]
+                sizes.clone().eq([4, 3, 2, 2]) || sizes.eq([1, 3, 3, 2, 2])
             } else {
-                explicit && sizes == [3, 3, 2, 2]
+                explicit && sizes.eq([3, 3, 2, 2])
             };
             if !allowed {
                 return None;
             }
         }
+        Some((international, national_zero))
+    }
+
+    pub(crate) fn valid_shape(text: &str, explicit: bool) -> bool {
+        Self::shape(text, explicit).is_some()
+    }
+
+    pub(crate) fn parse(text: &str, explicit: bool) -> Option<Self> {
+        let (international, national_zero) = Self::shape(text, explicit)?;
+        let skip = if international {
+            2
+        } else {
+            usize::from(national_zero)
+        };
         Some(Self {
-            national: national.to_owned(),
+            national: text
+                .bytes()
+                .filter(u8::is_ascii_digit)
+                .skip(skip)
+                .map(char::from)
+                .collect(),
             international,
             national_zero,
         })
