@@ -16,7 +16,7 @@ pub(super) fn release(
     let mut cued_phone = false;
     let mut previous_end = 0;
     let mut digits = 0;
-    let mut amount_end = 0;
+    let mut amount = GroupedMoney::default();
     for index in 0..tokens.len() {
         control.check()?;
         let token = tokens[index];
@@ -66,7 +66,7 @@ pub(super) fn release(
                         || (padded
                             && !cued_phone
                             && !quantity_neighbor(text, tokens, index)
-                            && !grouped_money_tail(text, tokens, index, &mut amount_end, control)?)
+                            && !amount.has_tail(text, tokens, index, control)?)
                 }
             };
             if release {
@@ -98,27 +98,37 @@ fn quantity_neighbor(text: &str, tokens: &[Token<'_>], index: usize) -> bool {
     })
 }
 
-fn grouped_money_tail(
-    text: &str,
-    tokens: &[Token<'_>],
-    index: usize,
-    cached_end: &mut usize,
-    control: &WorkControl,
-) -> Result<bool, NormalizeError> {
-    // A later candidate in the same run can reuse its rightmost token.
-    if index >= *cached_end {
-        *cached_end = index;
-        while let Some(next) = tokens.get(*cached_end + 1) {
+#[derive(Default)]
+struct GroupedMoney {
+    end: usize,
+    has_tail: bool,
+}
+
+impl GroupedMoney {
+    fn has_tail(
+        &mut self,
+        text: &str,
+        tokens: &[Token<'_>],
+        start: usize,
+        control: &WorkControl,
+    ) -> Result<bool, NormalizeError> {
+        // Only an interior start shares the cached separate-label decision.
+        if start < self.end {
+            return Ok(self.has_tail);
+        }
+        self.end = start;
+        while let Some(next) = tokens.get(self.end + 1) {
             control.check()?;
             if !number_fragment(next.text)
-                || !group_whitespace(text, tokens[*cached_end].range.end, next.range.start)
+                || !group_whitespace(text, tokens[self.end].range.end, next.range.start)
             {
                 break;
             }
-            *cached_end += 1;
+            self.end += 1;
         }
+        self.has_tail = super::money_tail(text, tokens, start, self.end).is_some();
+        Ok(self.has_tail)
     }
-    Ok(super::money_tail(text, tokens, index, *cached_end).is_some())
 }
 
 fn terminal_telephone(text: &str, tokens: &[Token<'_>], terminal: &str) -> Option<usize> {

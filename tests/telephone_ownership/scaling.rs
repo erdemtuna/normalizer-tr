@@ -4,6 +4,27 @@ use normalizer_tr::{
 };
 
 #[test]
+fn grouped_money_owner_survives_many_period_candidates_and_a_long_currency_gap() {
+    let groups = "0042. ".repeat((MAX_INPUT_BYTES / 2) / "0042. ".len());
+    let currency = "TL";
+    let gap = " ".repeat(MAX_INPUT_BYTES - groups.len() - currency.len());
+    let source = format!("{groups}{gap}{currency}");
+    let normalizer = Normalizer::new().unwrap();
+    let result = normalizer.normalize(&source, &Default::default()).unwrap();
+    assert_eq!(result.normalized_text(), source);
+    assert_eq!(result.issues().len(), 1);
+    assert_eq!(
+        result.issues()[0].range(),
+        SourceRange::new(0, source.len())
+    );
+    assert_eq!(
+        result.issues()[0].category(),
+        normalizer_tr::IssueCategory::InvalidExpression
+    );
+    partition(&source, &result);
+}
+
+#[test]
 fn repeated_sentence_periods_keep_independent_owners_on_long_inputs() {
     let normalizer = Normalizer::new().unwrap();
     for (member, primary) in [
