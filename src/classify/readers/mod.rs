@@ -39,15 +39,7 @@ impl Context<'_> {
         if !scan::number_fragment(token.text) {
             return None;
         }
-        let end = self.number_end(index);
-        let next = self.tokens.get(end + 1)?;
-        let spaced = end > index
-            && numbers::currency_marker(next.text)
-            && whitespace_between(self.text, self.tokens[end].range.end, next.range.start);
-        let attached =
-            scan::group_whitespace(self.text, self.tokens[end].range.end, next.range.start)
-                && numbers::attached_money_tail(next.text).is_some();
-        (spaced || attached).then_some(end + 1)
+        scan::money_tail(self.text, self.tokens, index, self.number_end(index))
     }
 
     pub(super) fn cue(&self, index: usize, allowed: &[&str]) -> bool {

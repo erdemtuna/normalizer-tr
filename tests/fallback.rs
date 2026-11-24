@@ -30,6 +30,8 @@ fn padded_period_does_not_split_invalid_quantity_notation() {
         ("0042. kg/m", IssueCategory::Unsupported),
         ("0042. kg/m²", IssueCategory::Unsupported),
         ("0042. 2TL", IssueCategory::InvalidExpression),
+        ("0042. 12 TL", IssueCategory::InvalidExpression),
+        ("0042. 123 456 TL", IssueCategory::InvalidExpression),
     ] {
         let range = SourceRange::new(0, source.len());
         let preserved = normalizer.normalize(source, &Default::default()).unwrap();
@@ -55,6 +57,44 @@ fn padded_period_does_not_split_invalid_quantity_notation() {
         assert_eq!(record.range(), range);
         assert_eq!(record.original_category(), Some(category));
         assert_eq!(record.attempted_class(), FallbackClass::Quantity);
+    }
+}
+
+#[test]
+fn electronic_neighbors_do_not_keep_a_period_inside_a_padded_code() {
+    let normalizer = Normalizer::new().unwrap();
+    for url in ["https://ornek.com", "www.ornek.com/yol"] {
+        let source = format!("Kod 0042. {url}");
+        let control = format!("Kod 0042! {url}");
+        for ambiguity_policy in POLICIES {
+            let options = NormalizeOptions {
+                ambiguity_policy,
+                ..Default::default()
+            };
+            let result = normalizer.normalize(&source, &options);
+            let control = normalizer.normalize(&control, &options);
+            if ambiguity_policy == AmbiguityPolicy::Reject {
+                let Err(NormalizeError::Unresolved(issues)) = &result else {
+                    panic!("expected unresolved digits");
+                };
+                assert_eq!(issues.len(), 1);
+                assert_eq!(issues[0].range(), SourceRange::new(4, 8));
+                assert_eq!(result, control);
+                continue;
+            }
+            let result = result.unwrap();
+            let control = control.unwrap();
+            assert_eq!(result.issues(), control.issues());
+            assert_eq!(result.fallbacks(), control.fallbacks());
+            assert_eq!(
+                result.normalized_text(),
+                control.normalized_text().replacen('!', ".", 1)
+            );
+            assert_eq!(
+                result.segments().last().unwrap().kind(),
+                SegmentKind::Electronic
+            );
+        }
     }
 }
 

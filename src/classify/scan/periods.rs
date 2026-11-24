@@ -1,5 +1,8 @@
 //! Release terminal periods before indexing runs and validating hint ranges.
-use super::{Token, cue_whitespace, group_whitespace, signals, telephone_gap, whitespace_between};
+use super::{
+    Token, cue_whitespace, group_whitespace, number_fragment, signals, telephone_gap,
+    whitespace_between,
+};
 use crate::{NormalizeError, WorkControl, domain::identifiers::Telephone, notation, numerals};
 
 use super::super::{boundaries::quantity_tail, context};
@@ -13,6 +16,7 @@ pub(super) fn release(
     let mut cued_phone = false;
     let mut previous_end = 0;
     let mut digits = 0;
+    let mut amount_end = 0;
     for index in 0..tokens.len() {
         control.check()?;
         let token = tokens[index];
@@ -59,7 +63,10 @@ pub(super) fn release(
                 }
                 None => {
                     account_period
-                        || (padded && !cued_phone && !quantity_neighbor(text, tokens, index))
+                        || (padded
+                            && !cued_phone
+                            && !quantity_neighbor(text, tokens, index)
+                            && !grouped_money_tail(text, tokens, index, &mut amount_end, control)?)
                 }
             };
             if release {
@@ -80,15 +87,38 @@ fn digits_only(text: &str) -> bool {
 fn quantity_neighbor(text: &str, tokens: &[Token<'_>], index: usize) -> bool {
     let token = tokens[index];
     tokens.get(index + 1).is_some_and(|next| {
-        (whitespace_between(text, token.range.end, next.range.start)
-            && (quantity_tail(next.text) || notation::unsupported_unit_surface(next.text)))
-            || (group_whitespace(text, token.range.end, next.range.start)
-                && notation::attached_money_tail(next.text).is_some())
+        whitespace_between(text, token.range.end, next.range.start)
+            && (quantity_tail(next.text)
+                || (notation::unsupported_unit_surface(next.text)
+                    && !crate::domain::electronic::looks_like(next.text)))
     }) || index.checked_sub(1).is_some_and(|i| {
         let previous = tokens[i];
         whitespace_between(text, previous.range.end, token.range.start)
             && (notation::label(previous.text) || notation::unsupported_label(previous.text))
     })
+}
+
+fn grouped_money_tail(
+    text: &str,
+    tokens: &[Token<'_>],
+    index: usize,
+    cached_end: &mut usize,
+    control: &WorkControl,
+) -> Result<bool, NormalizeError> {
+    // A later candidate in the same run can reuse its rightmost token.
+    if index >= *cached_end {
+        *cached_end = index;
+        while let Some(next) = tokens.get(*cached_end + 1) {
+            control.check()?;
+            if !number_fragment(next.text)
+                || !group_whitespace(text, tokens[*cached_end].range.end, next.range.start)
+            {
+                break;
+            }
+            *cached_end += 1;
+        }
+    }
+    Ok(super::money_tail(text, tokens, index, *cached_end).is_some())
 }
 
 fn terminal_telephone(text: &str, tokens: &[Token<'_>], terminal: &str) -> Option<usize> {

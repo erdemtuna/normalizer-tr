@@ -51,6 +51,23 @@ pub(super) fn cue_whitespace(text: &str, start: usize, end: usize) -> bool {
     start == end || whitespace_between(text, start, end)
 }
 
+pub(super) fn money_tail(
+    text: &str,
+    tokens: &[Token<'_>],
+    start: usize,
+    end: usize,
+) -> Option<usize> {
+    let next = tokens.get(end + 1)?;
+    let gap_start = tokens[end].range.end;
+    let gap_end = next.range.start;
+    let spaced = end > start
+        && crate::notation::currency_marker(next.text)
+        && whitespace_between(text, gap_start, gap_end);
+    let attached = group_whitespace(text, gap_start, gap_end)
+        && crate::notation::attached_money_tail(next.text).is_some();
+    (spaced || attached).then_some(end + 1)
+}
+
 pub(super) fn tokens<'a>(
     source: &'a SourceMap,
     rules: &Resources,
