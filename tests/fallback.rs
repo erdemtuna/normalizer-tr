@@ -24,6 +24,41 @@ const POLICIES: [AmbiguityPolicy; 3] = [
 ];
 
 #[test]
+fn padded_period_does_not_split_invalid_quantity_notation() {
+    let normalizer = Normalizer::new().unwrap();
+    for (source, category) in [
+        ("0042. kg/m", IssueCategory::Unsupported),
+        ("0042. kg/m²", IssueCategory::Unsupported),
+        ("0042. 2TL", IssueCategory::InvalidExpression),
+    ] {
+        let range = SourceRange::new(0, source.len());
+        let preserved = normalizer.normalize(source, &Default::default()).unwrap();
+        assert_eq!(preserved.normalized_text(), source);
+        assert!(!preserved.complete());
+        assert_eq!(preserved.issues().len(), 1);
+        assert_eq!(preserved.issues()[0].range(), range);
+        assert_eq!(preserved.issues()[0].category(), category);
+        let options = |ambiguity_policy| NormalizeOptions {
+            ambiguity_policy,
+            ..Default::default()
+        };
+        assert_eq!(
+            normalizer.normalize(source, &options(AmbiguityPolicy::Reject)),
+            Err(NormalizeError::Unresolved(preserved.issues().to_vec()))
+        );
+        let fallback = normalizer
+            .normalize(source, &options(AmbiguityPolicy::Fallback))
+            .unwrap();
+        assert!(fallback.complete() && fallback.issues().is_empty());
+        assert_eq!(fallback.fallbacks().len(), 1);
+        let record = &fallback.fallbacks()[0];
+        assert_eq!(record.range(), range);
+        assert_eq!(record.original_category(), Some(category));
+        assert_eq!(record.attempted_class(), FallbackClass::Quantity);
+    }
+}
+
+#[test]
 fn sentence_periods_are_outside_zero_padded_code_diagnostics() {
     let normalizer = Normalizer::new().unwrap();
     let prefix = "O\u{308}nce “";

@@ -36,6 +36,8 @@ fn a_period_does_not_admit_unowned_number_groups_as_telephones() {
         ("0532 12 345 67.", 2),
         ("Telefon: 532 123 45 67.", 2),
         ("Telefon: 532 123 45 07.", 2),
+        ("Telefon: 532 12 345 07.", 2),
+        ("Telefon: 532 12 34 45 56 07.", 2),
         ("0(532) 123 45 67.", 2),
     ] {
         let result = normalizer.normalize(source, &Default::default()).unwrap();

@@ -3,7 +3,10 @@ use super::super::Context;
 use super::IdentifierMatch;
 use crate::{
     IssueCategory, NormalizeError, WorkControl,
-    classify::{context::TELEPHONE_CUES, scan::telephone_gap},
+    classify::{
+        context,
+        scan::{cue_whitespace, telephone_gap},
+    },
     domain::{identifiers::Telephone, lexicon, quantities::NumericRange},
     interpretation::Value,
     notation,
@@ -22,8 +25,11 @@ pub(super) fn read(
     let zero_group_signal = tokens
         .get(index + 1..index + 3)
         .is_some_and(|next| Telephone::has_split_zero_prefix(source, next[0].text, next[1].text));
-    let telephone_cue =
-        source.bytes().any(|b| b.is_ascii_digit()) && ctx.cue(index, TELEPHONE_CUES);
+    let telephone_cue = source.bytes().any(|b| b.is_ascii_digit())
+        && index.checked_sub(1).is_some_and(|i| {
+            context::telephone_cue(tokens[i].text)
+                && cue_whitespace(text, tokens[i].range.end, token.range.start)
+        });
     let quantity_context = telephone_cue
         && tokens.get(index + 1).is_some_and(|next| {
             notation::label(next.text)

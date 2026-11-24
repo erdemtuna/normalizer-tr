@@ -1,5 +1,5 @@
 //! Release terminal periods before indexing runs and validating hint ranges.
-use super::{Token, signals, telephone_gap, whitespace_between};
+use super::{Token, cue_whitespace, group_whitespace, signals, telephone_gap, whitespace_between};
 use crate::{NormalizeError, WorkControl, domain::identifiers::Telephone, notation, numerals};
 
 use super::super::{boundaries::quantity_tail, context};
@@ -10,6 +10,7 @@ pub(super) fn release(
     control: &WorkControl,
 ) -> Result<(), NormalizeError> {
     let mut account = false;
+    let mut cued_phone = false;
     let mut previous_end = 0;
     let mut digits = 0;
     for index in 0..tokens.len() {
@@ -28,26 +29,44 @@ pub(super) fn release(
                     .text
                     .bytes()
                     .all(|byte| byte.is_ascii_digit() || byte.is_ascii_uppercase()));
-        if let Some(body) = token.text.strip_suffix('.') {
+        let period_body = token.text.strip_suffix('.');
+        cued_phone = index.checked_sub(1).is_some_and(|i| {
+            let previous = tokens[i];
+            (cued_phone
+                && signals::telephone_group(period_body.unwrap_or(token.text))
+                && telephone_gap(&text[previous.range.end..token.range.start]))
+                || (token
+                    .text
+                    .as_bytes()
+                    .first()
+                    .is_some_and(u8::is_ascii_digit)
+                    && context::telephone_cue(previous.text)
+                    && digits_only(period_body.unwrap_or(token.text))
+                    && cue_whitespace(text, previous.range.end, token.range.start))
+        });
+        if let Some(body) = period_body {
             let account_period = account_group && digits_only(body);
             let padded = numerals::zero_padded_digits(body);
             let phone = if !account_period && signals::telephone_group(body) {
-                terminal_telephone(text, &tokens[..=index], body, padded)
+                terminal_telephone(text, &tokens[..=index], body)
             } else {
                 None
             };
             let release = match phone {
-                Some(PhonePeriod::ReleaseAt(start)) => {
+                Some(start) => {
                     tokens[start].phone_period_start = true;
                     true
                 }
-                Some(PhonePeriod::KeepWithCue) => false,
-                None => account_period || (padded && !quantity_neighbor(text, tokens, index)),
+                None => {
+                    account_period
+                        || (padded && !cued_phone && !quantity_neighbor(text, tokens, index))
+                }
             };
             if release {
                 tokens[index].text = body;
                 tokens[index].range.end -= 1;
             }
+            cued_phone = false;
         }
         previous_end = tokens[index].range.end;
     }
@@ -61,7 +80,10 @@ fn digits_only(text: &str) -> bool {
 fn quantity_neighbor(text: &str, tokens: &[Token<'_>], index: usize) -> bool {
     let token = tokens[index];
     tokens.get(index + 1).is_some_and(|next| {
-        whitespace_between(text, token.range.end, next.range.start) && quantity_tail(next.text)
+        (whitespace_between(text, token.range.end, next.range.start)
+            && (quantity_tail(next.text) || notation::unsupported_unit_surface(next.text)))
+            || (group_whitespace(text, token.range.end, next.range.start)
+                && notation::attached_money_tail(next.text).is_some())
     }) || index.checked_sub(1).is_some_and(|i| {
         let previous = tokens[i];
         whitespace_between(text, previous.range.end, token.range.start)
@@ -69,17 +91,7 @@ fn quantity_neighbor(text: &str, tokens: &[Token<'_>], index: usize) -> bool {
     })
 }
 
-enum PhonePeriod {
-    ReleaseAt(usize),
-    KeepWithCue,
-}
-
-fn terminal_telephone(
-    text: &str,
-    tokens: &[Token<'_>],
-    terminal: &str,
-    padded: bool,
-) -> Option<PhonePeriod> {
+fn terminal_telephone(text: &str, tokens: &[Token<'_>], terminal: &str) -> Option<usize> {
     let last = tokens.len() - 1;
     let end = tokens[last].range.end - 1;
     let first = tokens.len().saturating_sub(Telephone::MAX_GROUPS);
@@ -104,18 +116,7 @@ fn terminal_telephone(
             && split_zero
             && Telephone::valid_shape(surface, false)
         {
-            return Some(PhonePeriod::ReleaseAt(index));
-        }
-        if padded
-            && count == Telephone::CUE_ONLY_DIGITS
-            && index.checked_sub(1).is_some_and(|i| {
-                let previous = tokens[i];
-                super::cue_whitespace(text, previous.range.end, token.range.start)
-                    && context::TELEPHONE_CUES.contains(&context::cue_key(previous.text).as_str())
-            })
-            && Telephone::valid_shape(surface, true)
-        {
-            return Some(PhonePeriod::KeepWithCue);
+            return Some(index);
         }
     }
     None

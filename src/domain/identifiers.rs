@@ -9,7 +9,7 @@ pub(crate) struct Telephone {
 
 impl Telephone {
     pub(crate) const MAX_GROUPS: usize = 5;
-    pub(crate) const CUE_ONLY_DIGITS: usize = 10;
+    const CUE_ONLY_DIGITS: usize = 10;
     const NATIONAL_DIGITS: usize = 11;
     const INTERNATIONAL_DIGITS: usize = 12;
 

@@ -69,3 +69,10 @@ pub(crate) fn unsupported_label(text: &str) -> bool {
             | "W"
     )
 }
+
+pub(crate) fn unsupported_unit_surface(text: &str) -> bool {
+    lexicon::unit_marker(text)
+        || (text.starts_with(char::is_alphabetic)
+            && (text.contains(['/', '^', '²', '³'])
+                || ["Μg", "μG", "µG", "ug", "oz", "cl", "dl", "ms"].contains(&text)))
+}
